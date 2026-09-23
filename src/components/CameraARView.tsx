@@ -424,8 +424,10 @@ const CameraARView = ({
           accessibilityRole="button">
           <Text style={styles.debugText}>
             {previewMode === 'performance' ? 'SURF' : 'TEX'} ·{' '}
-            {previewLive ? 'vivo' : 'parado'} · {sessionInfo} ·{' '}
-            {viewSize.w}×{viewSize.h}
+            {previewLive ? 'vivo' : 'parado'} · devs:{allDevices.length} ·
+            back:{hasBack ? 1 : 0} · perm:{hasPermission ? 1 : 0} · can:
+            {canRequestPermission ? 1 : 0} · {sessionInfo} · {viewSize.w}×
+            {viewSize.h}
           </Text>
         </Pressable>
       )}
