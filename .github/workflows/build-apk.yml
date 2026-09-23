@@ -1,0 +1,66 @@
+name: Build e publica APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'App.tsx'
+      - 'android/app/src/**'
+      - 'android/app/build.gradle'
+      - 'android/gradle.properties'
+      - 'android/build.gradle'
+      - 'package.json'
+      - 'package-lock.json'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build (assembleRelease)
+        run: |
+          cd android
+          ./gradlew assembleRelease -x lint -x test
+
+      - name: Publicar APK no release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          CODE=$(grep -E '^versionCode=' android/app/version.properties | cut -d'=' -f2)
+          NAME=$(grep -E '^versionName=' android/app/version.properties | cut -d'=' -f2)
+          TMP=/tmp/bussola-v${CODE}.apk
+          cp "$APK" "$TMP"
+          if gh release view bussola-apk --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload bussola-apk "$TMP" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create bussola-apk "$TMP" --repo "$GITHUB_REPOSITORY" \
+              --title "Bussola APK ($NAME, cod $CODE)" \
+              --notes "APK release do app Bussola. Baixe o ultimo asset."
+          fi
+          echo "Publicado: https://github.com/$GITHUB_REPOSITORY/releases/tag/bussola-apk"
+          echo "apk_name=bussola-v${CODE}.apk" >> "$GITHUB_OUTPUT"
+          echo "version_code=$CODE" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK (artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: bussola-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
