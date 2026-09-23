@@ -401,7 +401,11 @@ const CameraARView = ({
       {showCamera && !previewLive && !graphical && (
         <View style={styles.warmupWrap}>
           <View style={styles.warmupChip}>
-            <Text style={styles.warmupText}>{t('cam_loading')}</Text>
+            <Text style={styles.warmupText}>
+              {t('cam_loading')} · devs:{allDevices.length} back:
+              {hasBack ? 1 : 0} perm:{hasPermission ? 1 : 0} can:
+              {canRequestPermission ? 1 : 0}
+            </Text>
           </View>
         </View>
       )}
