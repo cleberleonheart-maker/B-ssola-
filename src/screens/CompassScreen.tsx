@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
+  BackHandler,
   Pressable,
   ScrollView,
   useWindowDimensions,
@@ -470,18 +471,26 @@ const CompassScreen = () => {
   }, [location.latitude, location.longitude]);
 
   useEffect(() => {
-    if (
-      alertsCheckedRef.current ||
-      (location.latitude === 0 && location.longitude === 0)
-    ) {
-      return;
+    const lat = location.latitude;
+    const lon = location.longitude;
+    if (lat === 0 && lon === 0) return;
+    let active = true;
+    const check = () => {
+      fetchCivilAlerts(lat, lon).then(result => {
+        if (active && isSevere(result)) {
+          setAlertsVisible(true);
+        }
+      });
+    };
+    if (!alertsCheckedRef.current) {
+      alertsCheckedRef.current = true;
+      check();
     }
-    alertsCheckedRef.current = true;
-    fetchCivilAlerts(location.latitude, location.longitude).then(result => {
-      if (isSevere(result)) {
-        setAlertsVisible(true);
-      }
-    });
+    const id = setInterval(check, 30 * 60 * 1000);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
   }, [location.latitude, location.longitude]);
 
   useEffect(() => {
@@ -844,6 +853,21 @@ const CompassScreen = () => {
       }
     });
   }, [assistant, selectDisplayMode]);
+
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (launcherVisible) {
+        setLauncherVisible(false);
+        return true;
+      }
+      if (displayMode !== 'compass') {
+        selectDisplayMode('compass');
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [launcherVisible, displayMode, selectDisplayMode]);
 
   useEffect(() => {
     if (!widgetSupported) return;

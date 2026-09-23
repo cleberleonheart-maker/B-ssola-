@@ -35,6 +35,16 @@ type RawWeatherAlert = {
   expires?: string;
 };
 
+type RawInmetAlert = {
+  severidade?: string;
+  aviso_cor?: string;
+  descricao?: string;
+  instrucoes?: string;
+  data_inicio?: string;
+  data_fim?: string;
+  poligono?: string;
+};
+
 const REQUEST_TIMEOUT = 10000;
 
 const fetchJson = async (url: string): Promise<unknown> => {
@@ -159,15 +169,110 @@ export const fetchNearbyQuakes = async (
   }
 };
 
+type Pt = number[];
+
+const inmetRings = (geojson: string): Pt[][] => {
+  try {
+    const parsed = JSON.parse(geojson) as {
+      type?: string;
+      coordinates?: unknown;
+    };
+    const coords = parsed.coordinates as unknown;
+    if (!Array.isArray(coords)) return [];
+    const rings: Pt[][] = [];
+    if (parsed.type === 'Polygon') {
+      (coords as Pt[][]).forEach(ring => rings.push(ring));
+    } else if (parsed.type === 'MultiPolygon') {
+      (coords as Pt[][][]).forEach(poly =>
+        poly.forEach(ring => rings.push(ring)),
+      );
+    }
+    return rings;
+  } catch {
+    return [];
+  }
+};
+
+const pointInRing = (lat: number, lon: number, ring: Pt[]): boolean => {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [lonI, latI] = ring[i];
+    const [lonJ, latJ] = ring[j];
+    const intersects =
+      latI > lat !== latJ > lat &&
+      lon < ((lonJ - lonI) * (lat - latI)) / (latJ - latI) + lonI;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+};
+
+const parseInmetSeverity = (
+  value?: string,
+  color?: string,
+): WeatherAlert['severity'] => {
+  const level = (value ?? '').toLowerCase();
+  const hex = (color ?? '').toUpperCase();
+  if (level.includes('grande') || hex === '#FF0000') return 'red';
+  if (level.includes('potencial')) return 'yellow';
+  if (level.includes('perigo') || hex === '#FF9900') return 'orange';
+  return 'green';
+};
+
+export const fetchInmetAlerts = async (
+  latitude: number,
+  longitude: number,
+): Promise<WeatherAlert[]> => {
+  try {
+    const data = (await fetchJson(
+      'https://apiprevmet3.inmet.gov.br/avisos/ativos',
+    )) as { hoje?: RawInmetAlert[]; futuro?: RawInmetAlert[] };
+    const now = Date.now();
+    const items = [
+      ...(Array.isArray(data.hoje) ? data.hoje : []),
+      ...(Array.isArray(data.futuro) ? data.futuro : []),
+    ];
+    return items
+      .map((raw): WeatherAlert | null => {
+        const rings =
+          typeof raw.poligono === 'string' ? inmetRings(raw.poligono) : [];
+        if (
+          rings.length === 0 ||
+          !rings.some(ring => pointInRing(latitude, longitude, ring))
+        ) {
+          return null;
+        }
+        const expires = raw.data_fim ? toTime(raw.data_fim) : null;
+        if (expires !== null && expires < now) return null;
+        const severity = parseInmetSeverity(raw.severidade, raw.aviso_cor);
+        if (severity === 'green') return null;
+        return {
+          event: raw.severidade ?? 'Aviso INMET',
+          headline: raw.descricao ?? null,
+          description: raw.descricao ?? null,
+          instruction: raw.instrucoes ?? null,
+          severity,
+          awareness_type: 'INMET',
+          effective: raw.data_inicio ? toTime(raw.data_inicio) : null,
+          expires,
+        };
+      })
+      .filter((a): a is WeatherAlert => a !== null)
+      .slice(0, 6);
+  } catch {
+    return [];
+  }
+};
+
 export const fetchCivilAlerts = async (
   latitude: number,
   longitude: number,
 ): Promise<CivilAlerts> => {
-  const [weather, quakes] = await Promise.all([
+  const [weather, quakes, inmet] = await Promise.all([
     fetchWeatherAlerts(latitude, longitude),
     fetchNearbyQuakes(latitude, longitude),
+    fetchInmetAlerts(latitude, longitude),
   ]);
-  return { weather, quakes };
+  return { weather: [...weather, ...inmet], quakes };
 };
 
 export const isSevere = (alerts: CivilAlerts): boolean =>

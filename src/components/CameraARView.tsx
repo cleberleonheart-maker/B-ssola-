@@ -24,6 +24,7 @@ import type { CelestialPoint } from '../utils/astro';
 const FOV = 110;
 
 const PREVIEW_SETTLE_MS = 2600;
+const PREVIEW_PULSE_MS = 1100;
 const PREVIEW_MODES = ['compatible', 'performance'] as const;
 type PreviewMode = (typeof PREVIEW_MODES)[number];
 
@@ -79,6 +80,7 @@ const CameraARView = ({
   const [graphical, setGraphical] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [previewLive, setPreviewLive] = useState(false);
+  const [armed, setArmed] = useState(true);
 
   const previewLiveRef = useRef(false);
   const triedModesRef = useRef<Record<PreviewMode, boolean>>({
@@ -112,13 +114,32 @@ const CameraARView = ({
     if (!active || !showCamera) {
       return;
     }
+    let alive = true;
     const startedAt = Date.now();
+    let everLive = false;
+    let pulsed = false;
     const id = setInterval(() => {
-      if (previewLiveRef.current) {
-        clearInterval(id);
+      if (!alive) {
         return;
       }
-      if (Date.now() - startedAt < PREVIEW_SETTLE_MS) {
+      const elapsed = Date.now() - startedAt;
+      if (previewLiveRef.current) {
+        everLive = true;
+      }
+      if (!pulsed && elapsed >= PREVIEW_PULSE_MS) {
+        pulsed = true;
+        setArmed(false);
+        setTimeout(() => {
+          if (alive) {
+            setArmed(true);
+          }
+        }, 150);
+        return;
+      }
+      if (elapsed < PREVIEW_SETTLE_MS) {
+        return;
+      }
+      if (everLive && previewLiveRef.current) {
         return;
       }
       clearInterval(id);
@@ -132,9 +153,12 @@ const CameraARView = ({
         previewMode === 'performance' ? 'compatible' : 'performance';
       setPreviewMode(next);
       setRetryKey(k => k + 1);
-    }, 1000);
-    return () => clearInterval(id);
-  }, [active, showCamera, retryKey, previewMode, autoFallback, setRetryKey]);
+    }, 500);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [active, showCamera, retryKey, previewMode, autoFallback]);
 
   useEffect(() => {
     if (!hasPermission && canRequestPermission) {
@@ -162,6 +186,7 @@ const CameraARView = ({
     setPreviewMode(PREVIEW_MODES[0]);
     setStatus(null);
     setPreviewLive(false);
+    setArmed(true);
     setRetryKey(k => k + 1);
   }, [setRetryKey]);
 
@@ -229,7 +254,7 @@ const CameraARView = ({
           <Camera
             key={retryKey}
             device={cameraTarget}
-            isActive={active}
+            isActive={active && armed}
             style={StyleSheet.absoluteFill}
             resizeMode="cover"
             implementationMode={previewMode}
