@@ -182,6 +182,7 @@ const CompassScreen = () => {
   const notifiedAlertsRef = useRef(new Set<string>());
   const [calibrated, setCalibrated] = useState(false);
   const calibrationRef = useRef<MagCalibration | null>(null);
+  const calPromptedRef = useRef(false);
   const [location, setLocation] = useState<LocationFix>({
     latitude: 0,
     longitude: 0,
@@ -266,6 +267,18 @@ const CompassScreen = () => {
       setVirtualWpId(id);
     });
   }, []);
+
+  useEffect(() => {
+    if (calibrated || calPromptedRef.current || calibrationVisible) {
+      return;
+    }
+    if (displayMode !== 'compass' || launcherVisible) {
+      return;
+    }
+    calPromptedRef.current = true;
+    const id = setTimeout(() => setCalibrationVisible(true), 1500);
+    return () => clearTimeout(id);
+  }, [calibrated, calibrationVisible, displayMode, launcherVisible]);
 
   const toggleVoiceGuide = useCallback(() => {
     setVoiceGuide(prev => {

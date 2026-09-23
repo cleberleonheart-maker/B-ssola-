@@ -81,6 +81,8 @@ const CameraARView = ({
   const [status, setStatus] = useState<string | null>(null);
   const [previewLive, setPreviewLive] = useState(false);
   const [armed, setArmed] = useState(true);
+  const [viewSize, setViewSize] = useState({ w: 0, h: 0 });
+  const [sessionInfo, setSessionInfo] = useState('—');
 
   const previewLiveRef = useRef(false);
   const triedModesRef = useRef<Record<PreviewMode, boolean>>({
@@ -108,6 +110,12 @@ const CameraARView = ({
 
   const autoFallback = useCallback(() => {
     setGraphical(true);
+  }, []);
+
+  const cycleMode = useCallback(() => {
+    setPreviewMode(p => (p === 'performance' ? 'compatible' : 'performance'));
+    triedModesRef.current = { compatible: false, performance: false };
+    setRetryKey(k => k + 1);
   }, []);
 
   useEffect(() => {
@@ -250,6 +258,12 @@ const CameraARView = ({
       {showCamera ? (
         <View
           collapsable={false}
+          onLayout={e =>
+            setViewSize({
+              w: Math.round(e.nativeEvent.layout.width),
+              h: Math.round(e.nativeEvent.layout.height),
+            })
+          }
           style={styles.cameraLayer}>
           <Camera
             key={retryKey}
@@ -260,6 +274,13 @@ const CameraARView = ({
             implementationMode={previewMode}
             mirrorMode="auto"
             constraints={[{ binned: true }, { fps: 30 }]}
+            onSessionConfigSelected={cfg => {
+              try {
+                setSessionInfo(`${cfg.selectedFPS ?? '-'}fps ${cfg.nativePixelFormat}`);
+              } catch {
+                setSessionInfo('?');
+              }
+            }}
             onStarted={() => setStatus(null)}
             onPreviewStarted={() => {
               previewLiveRef.current = true;
@@ -381,6 +402,19 @@ const CameraARView = ({
         <Text style={styles.headingCardinal}>{cardinal.full}</Text>
       </View>
 
+      {notDenied && (
+        <Pressable
+          onPress={cycleMode}
+          style={styles.debugWrap}
+          accessibilityRole="button">
+          <Text style={styles.debugText}>
+            {previewMode === 'performance' ? 'SURF' : 'TEX'} ·{' '}
+            {previewLive ? 'vivo' : 'parado'} · {sessionInfo} ·{' '}
+            {viewSize.w}×{viewSize.h}
+          </Text>
+        </Pressable>
+      )}
+
       {status !== null && !graphical && (
         <View style={styles.statusChip}>
           <Text style={styles.statusText}>{status}</Text>
@@ -425,7 +459,6 @@ const createStyles = (colors: {
     container: {
       flex: 1,
       backgroundColor: colors.background,
-      overflow: 'hidden',
     },
     cameraLayer: {
       position: 'absolute',
@@ -491,6 +524,24 @@ const createStyles = (colors: {
       right: 0,
       alignItems: 'center',
       zIndex: 6,
+    },
+    debugWrap: {
+      position: 'absolute',
+      top: spacing.sm,
+      left: spacing.sm,
+      zIndex: 7,
+      backgroundColor: 'rgba(4,4,10,0.78)',
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.sm,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+    debugText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: colors.primary,
+      fontFamily: 'monospace',
     },
     headingBig: {
       fontSize: 44,
