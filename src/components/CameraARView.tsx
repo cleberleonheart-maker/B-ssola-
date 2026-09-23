@@ -475,6 +475,8 @@ const createStyles = (colors: {
   StyleSheet.create({
     container: {
       flex: 1,
+      alignSelf: 'stretch',
+      width: '100%',
       backgroundColor: colors.background,
     },
     cameraLayer: {
