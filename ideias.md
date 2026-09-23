@@ -122,3 +122,27 @@
       permitir ajuste fino por aparelho para os marcadores casarem com a lente real.
 - [ ] **22. Cadência GPS econômica** — pausar/alongar o intervalo do GPS quando o
       usuário está parado para economizar bateria (ver também a ideia nova abaixo).
+
+## ✅ Feitos (v7.9 e v7.10)
+1. **AR sem giroscópio (v7.9)** — removido o bloqueio pelo sensor de orientação; o AR
+   agora funciona só pelo rumo (heading), mesmo sem giroscópio.
+2. **GPS econômico (v7.9)** — quando o usuário fica parado (4 leituras seguidas sem
+   movimento), o watch do GPS relaxa (intervalo 20–40 s, filtro 20–50 m) e volta ao fino
+   ao andar de novo.
+3. **FOV ajustável na Visão (v7.9)** — botões −/+ (60°–140°, passo 10) salvam por
+   aparelho (novidade #21 adiantada).
+4. **⌖ Altura (v7.10)** — novo modo: mira no topo e na base com a inclinação + distância
+   (manual ou de um waypoint ativo) → altura = D × (tan topo − tan base).
+5. **🚗 Meu carro (v7.10)** — novo modo: 1 toque marca onde parou; seta, distância e
+   "chegou" guiam de volta; ponto fica salvo no aparelho.
+
+## Ideias novas (23/09/2026, 2ª leva)
+- [ ] **23. "Volte antes do escuro"** — com a trilha gravando, estimar o ritmo e avisar a
+      hora-limite de retorno antes do pôr do sol (junta trilha + relógio de sol).
+- [ ] **24. Rastreio ao vivo por link** — gerar link (WhatsApp/família) com a posição em
+      tempo real por X minutos, expira sozinho.
+- [ ] **25. Foto com rumo** — na caderneta, guardar junto da foto a direção da bússola
+      apontada no momento.
+- [ ] **26. Metrônomo de passo** — bipes de cadência (~120/min) para caminhada no ritmo.
+- [ ] **27. Triangulação offline por rumos** — estimar a posição mirando 2 marcos
+      conhecidos, sem GPS.

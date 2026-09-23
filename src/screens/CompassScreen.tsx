@@ -34,6 +34,8 @@ import MetalDetectorView from '../components/MetalDetectorView';
 import EmfReaderView from '../components/EmfReaderView';
 import EmergencyModal from '../components/EmergencyModal';
 import TheodoliteView from '../components/TheodoliteView';
+import HeightView from '../components/HeightView';
+import CarSpotView from '../components/CarSpotView';
 import SunWatchView from '../components/SunWatchView';
 import WindView from '../components/WindView';
 import TargetNavBar from '../components/TargetNavBar';
@@ -966,6 +968,8 @@ const CompassScreen = () => {
     { key: 'wind', icon: '🍃', label: t('ui_mode_wind').replace(/^\S+\s*/, ''), sub: t('ui_card_wind') },
     { key: 'track', icon: '🗺️', label: t('ui_mode_track').replace(/^\S+\s*/, ''), sub: t('ui_card_track') },
     { key: 'notes', icon: '📓', label: t('ui_mode_notes').replace(/^\S+\s*/, ''), sub: t('ui_card_notes') },
+    { key: 'height', icon: '⌖', label: t('ui_mode_height').replace(/^\S+\s*/, ''), sub: t('ui_card_height') },
+    { key: 'car', icon: '🚗', label: t('ui_mode_car').replace(/^\S+\s*/, ''), sub: t('ui_card_car') },
   ];
 
   const statusPanels = (
@@ -1329,6 +1333,23 @@ const CompassScreen = () => {
             heading={heading}
             declination={declination}
             accel={accel}
+          />
+        </View>
+      ) : displayMode === 'height' ? (
+        <View style={styles.arArea}>
+          <HeightView
+            accel={accel}
+            targetDistance={targetMarker ? targetMarker.distance : null}
+          />
+        </View>
+      ) : displayMode === 'car' ? (
+        <View style={styles.arArea}>
+          <CarSpotView
+            latitude={location.latitude}
+            longitude={location.longitude}
+            accuracy={location.accuracy}
+            heading={heading}
+            hasFix={hasFix}
           />
         </View>
       ) : displayMode === 'sun' ? (

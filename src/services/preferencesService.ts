@@ -13,7 +13,9 @@ export type DisplayMode =
   | 'sun'
   | 'wind'
   | 'track'
-  | 'notes';
+  | 'notes'
+  | 'height'
+  | 'car';
 
 export type WindCal = { zero: number; strong: number };
 
@@ -72,6 +74,8 @@ export const loadDisplayMode = async (): Promise<DisplayMode> => {
       'wind',
       'track',
       'notes',
+      'height',
+      'car',
     ];
     return modes.includes(raw as DisplayMode) ? (raw as DisplayMode) : 'compass';
   } catch {
