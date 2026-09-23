@@ -107,3 +107,18 @@
 - [ ] **14. Tiles Android** — quick-settings tile para abrir direto num modo.
 - [ ] **15. Tema automático** — seguir horário (dia/noite) com transição suave.
 - [ ] **16. Brilho/keep-awake outdoor** — opção para não dormir durante Bússola/AR/trilha.
+
+## Ideias novas (23/09/2026)
+- [ ] **17. AR sobre a câmera real** — marcar sol/lua/destino com o fundo da câmera
+      viva (a camada de marcadores do `CameraARView` já existe; falta unir os dois).
+- [ ] **18. Backup e sincronização de notas/waypoints** — revisar o `cloud.ts`
+      (`Supabase`): garantir que caderneta e pontos realmente sincronizam por usuário,
+      com tratamento de conflito e aviso de offline.
+- [ ] **19. Nível em graus** — além do nível de bolha, mostrar inclinação exata
+      (pitch/roll em °) e cruzar com o teodolito para leituras mais precisas.
+- [ ] **20. Widget do rumo — publicar/validar** — o `widgetService` existe; confirmar se
+      o widget está publicado na Play e polir (rumo, pressão, temperatura).
+- [ ] **21. FOV calibrado por aparelho** — o campo de visão da Visão está fixo em 110°;
+      permitir ajuste fino por aparelho para os marcadores casarem com a lente real.
+- [ ] **22. Cadência GPS econômica** — pausar/alongar o intervalo do GPS quando o
+      usuário está parado para economizar bateria (ver também a ideia nova abaixo).

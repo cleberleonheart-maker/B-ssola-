@@ -20,8 +20,13 @@ import { spacing, radius } from '../theme/colors';
 import { cardinalOf, normalizeHeading } from '../utils/compass';
 import { formatDistance } from '../utils/geo';
 import type { CelestialPoint } from '../utils/astro';
-
-const FOV = 110;
+import {
+  adjustFov,
+  DEFAULT_FOV,
+  FOV_STEP,
+  loadFov,
+  saveFov,
+} from '../services/fovService';
 
 const PREVIEW_SETTLE_MS = 2600;
 const PREVIEW_PULSE_MS = 1100;
@@ -83,6 +88,8 @@ const CameraARView = ({
   const [armed, setArmed] = useState(true);
   const [viewSize, setViewSize] = useState({ w: 0, h: 0 });
   const [sessionInfo, setSessionInfo] = useState('—');
+  const [fov, setFov] = useState(DEFAULT_FOV);
+  const fovRef = useRef(DEFAULT_FOV);
 
   const previewLiveRef = useRef(false);
   const triedModesRef = useRef<Record<PreviewMode, boolean>>({
@@ -183,10 +190,44 @@ const CameraARView = ({
   }, [hasPermission, canRequestPermission, requestPermission]);
 
   useEffect(() => {
+    let alive = true;
+    loadFov()
+      .then(v => {
+        if (alive) setFov(v);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (cameraDevice !== undefined) {
       setPreviewLive(false);
     }
   }, [cameraDevice]);
+
+  useEffect(() => {
+    let alive = true;
+    loadFov()
+      .then(v => {
+        if (alive) {
+          fovRef.current = v;
+          setFov(v);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const bumpFov = useCallback((delta: number) => {
+    const n = adjustFov(fovRef.current, delta);
+    fovRef.current = n;
+    setFov(n);
+    saveFov(n).catch(() => {});
+  }, []);
 
   const tryCameraAgain = useCallback(() => {
     setGraphical(false);
@@ -311,7 +352,7 @@ const CameraARView = ({
         <View pointerEvents="none" style={styles.markersLayer}>
           {cardinals.map(card => {
             const diff = angularDiff(heading, card.angle);
-            const clamped = Math.max(-1, Math.min(1, diff / FOV));
+            const clamped = Math.max(-1, Math.min(1, diff / fov));
             const leftPct = 50 + clamped * 50;
             return (
               <View
@@ -319,7 +360,7 @@ const CameraARView = ({
                 style={[
                   styles.cardLeft,
                   { left: `${leftPct}%` },
-                  Math.abs(diff) > FOV && styles.markerDim,
+                  Math.abs(diff) > fov && styles.markerDim,
                 ]}>
                 <Text style={[styles.cardText, { color: colors.primary }]}>
                   {card.icon}
@@ -329,7 +370,7 @@ const CameraARView = ({
           })}
           {markers.map(marker => {
             const diff = angularDiff(heading, marker.angle);
-            const clamped = Math.max(-1, Math.min(1, diff / FOV));
+            const clamped = Math.max(-1, Math.min(1, diff / fov));
             const leftPct = 50 + clamped * 50;
             return (
               <View
@@ -338,7 +379,7 @@ const CameraARView = ({
                   styles.marker,
                   styles.markerTop,
                   { left: `${leftPct}%` },
-                  Math.abs(diff) > FOV && styles.markerDim,
+                  Math.abs(diff) > fov && styles.markerDim,
                   !graphical && styles.markerCamera,
                 ]}>
                 <View style={styles.markerChip}>
@@ -459,6 +500,24 @@ const CameraARView = ({
         <View style={[styles.crossV, { backgroundColor: colors.border }]} />
         <View style={[styles.crossDot, { backgroundColor: colors.accent }]} />
       </View>
+
+      {notDenied && (
+        <View style={styles.fovWrap}>
+          <Pressable
+            onPress={() => bumpFov(-FOV_STEP)}
+            accessibilityRole="button"
+            style={[styles.fovBtn, { borderColor: colors.border }]}>
+            <Text style={[styles.fovBtnText, { color: colors.primary }]}>−</Text>
+          </Pressable>
+          <Text style={styles.fovValue}>{Math.round(fov)}°</Text>
+          <Pressable
+            onPress={() => bumpFov(FOV_STEP)}
+            accessibilityRole="button"
+            style={[styles.fovBtn, { borderColor: colors.border }]}>
+            <Text style={[styles.fovBtnText, { color: colors.primary }]}>+</Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 };
@@ -772,6 +831,42 @@ const createStyles = (colors: {
       shadowOpacity: 0.8,
       shadowRadius: 6,
       elevation: 3,
+    },
+    fovWrap: {
+      position: 'absolute',
+      bottom: spacing.md,
+      alignSelf: 'center',
+      flexDirection: 'row',
+      alignItems: 'center',
+      zIndex: 8,
+      backgroundColor: 'rgba(4,4,10,0.78)',
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.full,
+      paddingHorizontal: spacing.xs,
+      paddingVertical: 3,
+    },
+    fovBtn: {
+      width: 30,
+      height: 26,
+      borderRadius: radius.full,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    fovBtnText: {
+      fontSize: 16,
+      fontWeight: '900',
+      lineHeight: 18,
+    },
+    fovValue: {
+      minWidth: 46,
+      textAlign: 'center',
+      fontSize: 12,
+      fontWeight: '800',
+      color: colors.text,
+      fontFamily: 'monospace',
+      paddingHorizontal: 4,
     },
   });
 

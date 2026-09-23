@@ -58,6 +58,7 @@ export type LocationMode = 'satellite' | 'network' | 'tower';
 export type WatchOptions = {
   mode: LocationMode;
   distanceFilter?: number;
+  relaxed?: boolean;
 };
 
 const toFix = (position: any): LocationFix => ({
@@ -73,11 +74,14 @@ const toFix = (position: any): LocationFix => ({
 const buildOptions = (opts: WatchOptions): GeolocationOptions => {
   const sat = opts.mode === 'satellite';
   const tower = opts.mode === 'tower';
+  const relaxed = !!opts.relaxed;
   return {
     enableHighAccuracy: sat,
-    distanceFilter: opts.distanceFilter ?? (sat ? 1 : 10),
+    distanceFilter:
+      opts.distanceFilter ?? (relaxed ? (sat ? 20 : 50) : sat ? 1 : 10),
     timeout: tower ? 8000 : 15000,
     maximumAge: tower ? 30000 : sat ? 1000 : 5000,
+    interval: relaxed ? (sat ? 20000 : tower ? 40000 : 30000) : sat ? 5000 : tower ? 15000 : 10000,
   };
 };
 

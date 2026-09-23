@@ -17,7 +17,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   magnetometer,
   accelerometer,
-  orientation,
   setUpdateIntervalForType,
   SensorTypes,
 } from 'react-native-sensors';
@@ -130,6 +129,7 @@ const SMOOTHING = 0.2;
 const ROTATION_DEAD_ZONE = 0.5;
 const ACCEL_VERIFY_SAMPLES = 20;
 const ACCEL_MIN_MAGNITUDE = 0.6;
+const IDLE_STEPS = 4;
 const ARRIVE_METERS = 15;
 const GUIDE_INTERVAL_MS = 9000;
 
@@ -201,6 +201,9 @@ const CompassScreen = () => {
   const stopWatchRef = useRef<(() => void) | null>(null);
   const prevFixRef = useRef<{ latitude: number; longitude: number } | null>(null);
   const distTotalRef = useRef(0);
+  const currentModeRef = useRef<LocationMode>('satellite');
+  const idleCountRef = useRef(0);
+  const relaxedRef = useRef(false);
   const [locExpanded, setLocExpanded] = useState(false);
 
   const [declination, setDeclinationState] = useState<Declination>({
@@ -248,7 +251,6 @@ const CompassScreen = () => {
     moon: CelestialPoint;
     moonIcon: string;
   } | null>(null);
-  const [orientationFault, setOrientationFault] = useState(false);
 
   useEffect(() => {
     loadCalibration().then(cal => {
@@ -349,19 +351,35 @@ const CompassScreen = () => {
   }, []);
 
   const handleFix = useCallback((fix: LocationFix) => {
-    if (prevFixRef.current) {
-      const d = haversine(
-        prevFixRef.current.latitude,
-        prevFixRef.current.longitude,
-        fix.latitude,
-        fix.longitude,
-      );
-      if (d > 0 && d < 500) {
-        distTotalRef.current += d;
-        setOdometer(distTotalRef.current);
-      }
+    const prev = prevFixRef.current;
+    const d = prev
+      ? haversine(
+          prev.latitude,
+          prev.longitude,
+          fix.latitude,
+          fix.longitude,
+        )
+      : 0;
+    if (d > 0 && d < 500) {
+      distTotalRef.current += d;
+      setOdometer(distTotalRef.current);
     }
     prevFixRef.current = { latitude: fix.latitude, longitude: fix.longitude };
+
+    const moving = d > 2 || (fix.speed ?? 0) > 2;
+    idleCountRef.current = moving ? 0 : idleCountRef.current + 1;
+
+    if (!relaxedRef.current && idleCountRef.current >= IDLE_STEPS) {
+      relaxedRef.current = true;
+      applyWatchingRef.current(currentModeRef.current, true, false);
+    } else if (
+      relaxedRef.current &&
+      moving &&
+      idleCountRef.current === 0
+    ) {
+      applyWatchingRef.current(currentModeRef.current, false, false);
+    }
+
     setLocation(fix);
     setLocLoading(false);
     setLocError(null);
@@ -373,11 +391,14 @@ const CompassScreen = () => {
   }, [t]);
 
   const applyWatching = useCallback(
-    (mode: LocationMode) => {
+    (mode: LocationMode, relaxed = false, announce = true) => {
       stopWatchRef.current?.();
-      setLocLoading(true);
+      currentModeRef.current = mode;
+      relaxedRef.current = relaxed;
+      idleCountRef.current = 0;
+      if (announce) setLocLoading(true);
       stopWatchRef.current = watchLocation(
-        { mode },
+        { mode, relaxed },
         handleFix,
         handleLocError,
       );
@@ -385,10 +406,12 @@ const CompassScreen = () => {
     [handleFix, handleLocError],
   );
 
+  const applyWatchingRef = useRef(applyWatching);
+  applyWatchingRef.current = applyWatching;
+
   useEffect(() => {
     setUpdateIntervalForType(SensorTypes.accelerometer, SENSOR_INTERVAL);
     setUpdateIntervalForType(SensorTypes.magnetometer, SENSOR_INTERVAL);
-    setUpdateIntervalForType(SensorTypes.orientation, SENSOR_INTERVAL);
 
     let lastAccel = { x: 0, y: 0, z: 1 };
     let lastMag = { x: 0, y: 0, z: 0 };
@@ -441,17 +464,9 @@ const CompassScreen = () => {
       },
     });
 
-    const orientationSub = orientation.subscribe({
-      next: () => {},
-      error: () => {
-        setOrientationFault(true);
-      },
-    });
-
     return () => {
       magSub.unsubscribe();
       accelSub.unsubscribe();
-      orientationSub.unsubscribe();
     };
   }, [handleHeading, t]);
 
@@ -635,7 +650,7 @@ const CompassScreen = () => {
     [location.latitude, location.longitude],
   );
 
-  const arSupported = !sensorError && !accelError && !orientationFault;
+  const arSupported = !sensorError && !accelError;
   const arBlocked = arSupported ? null : t('ui_ar_blocked');
   const arLabel = arSupported ? t('ui_ar_ready') : t('ui_ar_blocked');
 
