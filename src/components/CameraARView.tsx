@@ -199,12 +199,12 @@ const CameraARView = ({
   }, [setRetryKey]);
 
   const toggleGraphical = useCallback(() => {
-    if (graphical) {
-      tryCameraAgain();
-    } else {
+    if (showCamera && !graphical) {
       setGraphical(true);
+      return;
     }
-  }, [graphical, tryCameraAgain]);
+    tryCameraAgain();
+  }, [showCamera, graphical, tryCameraAgain]);
 
   const markers: Marker[] = [];
   if (sun) {
@@ -252,6 +252,9 @@ const CameraARView = ({
 
   const cardinal = cardinalOf(heading);
   const notDenied = hasPermission || canRequestPermission;
+  const noCamera = cameraDevice === undefined;
+  const waitingPermission = !hasPermission && canRequestPermission;
+  const effectiveGraphical = notDenied && (graphical || !showCamera);
 
   return (
     <View style={styles.container}>
@@ -363,18 +366,26 @@ const CameraARView = ({
         </View>
       )}
 
-      {notDenied && graphical && (
+      {effectiveGraphical && (
         <View style={styles.fallbackWrap}>
           <View style={[styles.fallbackChip, { borderColor: colors.border }]}>
             <Text style={styles.fallbackTitle}>
-              {cameraDevice === undefined
+              {noCamera
                 ? t('cam_no_camera')
+                : waitingPermission
+                ? t('cam_perm_waiting')
                 : t('ui_cam_unavailable')}
             </Text>
             <Text style={styles.fallbackHint}>
-              {cameraDevice === undefined
+              {noCamera
                 ? t('ui_cam_unavailable')
+                : waitingPermission
+                ? t('cam_perm_hint')
                 : t('cam_graphical_on')}
+            </Text>
+            <Text style={styles.fallbackDiag}>
+              📷 devs:{allDevices.length} · back:{hasBack ? 1 : 0} · perm:
+              {hasPermission ? 1 : 0} · can:{canRequestPermission ? 1 : 0}
             </Text>
             <Pressable
               onPress={tryCameraAgain}
@@ -427,11 +438,11 @@ const CameraARView = ({
             onPress={toggleGraphical}
             style={[styles.controlPill, { borderColor: colors.border }]}>
             <Text style={styles.controlPillIcon}>
-              {graphical ? '📷' : '🗺️'}
+              {effectiveGraphical ? '📷' : '🗺️'}
             </Text>
             <Text
               style={[styles.controlPillText, { color: colors.primary }]}>
-              {graphical ? t('cam_retry') : t('cam_graphical')}
+              {effectiveGraphical ? t('cam_retry') : t('cam_graphical')}
             </Text>
           </Pressable>
         </View>
@@ -625,6 +636,14 @@ const createStyles = (colors: {
       fontWeight: '600',
       color: colors.textMuted,
       textAlign: 'center',
+    },
+    fallbackDiag: {
+      marginTop: 6,
+      fontSize: 10,
+      fontWeight: '700',
+      color: colors.textMuted,
+      textAlign: 'center',
+      fontFamily: 'monospace',
     },
     fallbackRetry: {
       marginTop: spacing.sm,
