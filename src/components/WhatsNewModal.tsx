@@ -10,35 +10,19 @@ import {
 import { useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
-import { APP_VERSION } from '../version.generated';
+import { APP_VERSION, APP_VERSION_CODE } from '../version.generated';
 import type { Translator } from '../i18n/strings';
 
-const FEATURES = (
-  t: Translator,
-): { icon: string; title: string; desc: string }[] => [
-  { icon: '🤖', title: t('wn_feature_redesign_title'), desc: t('wn_feature_redesign_desc') },
-  { icon: '🎙️', title: t('wn_feature_voice_title'), desc: t('wn_feature_voice_desc') },
-  { icon: '🌐', title: t('wn_feature_i18n_title'), desc: t('wn_feature_i18n_desc') },
-  { icon: '📍', title: t('wn_feature_waypoints_title'), desc: t('wn_feature_waypoints_desc') },
-  { icon: '🌡️', title: t('wn_feature_baro_title'), desc: t('wn_feature_baro_desc') },
-  { icon: '◉', title: t('wn_feature_level_title'), desc: t('wn_feature_level_desc') },
-  { icon: '✨', title: t('wn_feature_ar_title'), desc: t('wn_feature_ar_desc') },
-  { icon: '🧲', title: t('wn_feature_cal_title'), desc: t('wn_feature_cal_desc') },
-  { icon: '🚶', title: t('wn_feature_odo_title'), desc: t('wn_feature_odo_desc') },
-  { icon: '☀️', title: t('wn_feature_sun_title'), desc: t('wn_feature_sun_desc') },
-  { icon: '🔊', title: t('wn_feature_sound_title'), desc: t('wn_feature_sound_desc') },
-  { icon: '📈', title: t('wn_feature_charts_title'), desc: t('wn_feature_charts_desc') },
-  { icon: '🌌', title: t('wn_feature_neon_title'), desc: t('wn_feature_neon_desc') },
-  { icon: '🍃', title: t('wn_feature_wind_title'), desc: t('wn_feature_wind_desc') },
-  { icon: '📌', title: t('wn_feature_vmark_title'), desc: t('wn_feature_vmark_desc') },
-  { icon: '🗺️', title: t('wn_feature_track_title'), desc: t('wn_feature_track_desc') },
-  { icon: '📓', title: t('wn_feature_notes_title'), desc: t('wn_feature_notes_desc') },
-  { icon: '🌙', title: t('wn_feature_night_title'), desc: t('wn_feature_night_desc') },
-  { icon: '🧲', title: t('wn_feature_metalcal_title'), desc: t('wn_feature_metalcal_desc') },
-  { icon: '🔔', title: t('wn_feature_geofence_title'), desc: t('wn_feature_geofence_desc') },
-  { icon: '🗺️', title: t('wn_feature_gpx_title'), desc: t('wn_feature_gpx_desc') },
-  { icon: '↩️', title: t('wn_feature_back_title'), desc: t('wn_feature_back_desc') },
-];
+type Entry = { icon: string; title: string; desc: string };
+
+const CHANGELOG: Record<number, (t: Translator) => Entry[]> = {
+  133: t => [
+    { icon: '📷', title: t('wn_cam_title'), desc: t('wn_cam_desc') },
+    { icon: '↩️', title: t('wn_back_title'), desc: t('wn_back_desc') },
+    { icon: '🚨', title: t('wn_inmet_title'), desc: t('wn_inmet_desc') },
+    { icon: '🔔', title: t('wn_notify_title'), desc: t('wn_notify_desc') },
+  ],
+};
 
 type Props = {
   visible: boolean;
@@ -48,7 +32,8 @@ type Props = {
 const WhatsNewModal = ({ visible, onClose }: Props) => {
   const colors = useThemeColors();
   const { t } = useLanguage();
-  const features = FEATURES(t);
+  const build = CHANGELOG[APP_VERSION_CODE];
+  const features = build ? build(t) : [];
 
   return (
     <Modal
@@ -70,34 +55,36 @@ const WhatsNewModal = ({ visible, onClose }: Props) => {
             {t('wn_subtitle')}
           </Text>
 
-          <ScrollView
-            style={styles.list}
-            showsVerticalScrollIndicator={false}>
-            {features.map((feature, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.row,
-                  i > 0 && {
-                    borderTopWidth: StyleSheet.hairlineWidth,
-                    borderTopColor: colors.border,
-                  },
-                ]}>
+          {features.length > 0 && (
+            <ScrollView
+              style={styles.list}
+              showsVerticalScrollIndicator={false}>
+              {features.map((feature, i) => (
                 <View
-                  style={[styles.iconChip, { backgroundColor: colors.surfaceAlt }]}>
-                  <Text style={styles.iconChipText}>{feature.icon}</Text>
+                  key={i}
+                  style={[
+                    styles.row,
+                    i > 0 && {
+                      borderTopWidth: StyleSheet.hairlineWidth,
+                      borderTopColor: colors.border,
+                    },
+                  ]}>
+                  <View
+                    style={[styles.iconChip, { backgroundColor: colors.surfaceAlt }]}>
+                    <Text style={styles.iconChipText}>{feature.icon}</Text>
+                  </View>
+                  <View style={styles.rowText}>
+                    <Text style={[styles.rowTitle, { color: colors.text }]}>
+                      {feature.title}
+                    </Text>
+                    <Text style={[styles.rowDesc, { color: colors.textMuted }]}>
+                      {feature.desc}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.rowText}>
-                  <Text style={[styles.rowTitle, { color: colors.text }]}>
-                    {feature.title}
-                  </Text>
-                  <Text style={[styles.rowDesc, { color: colors.textMuted }]}>
-                    {feature.desc}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </ScrollView>
+              ))}
+            </ScrollView>
+          )}
 
           <Pressable
             onPress={onClose}

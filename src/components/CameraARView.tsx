@@ -25,7 +25,7 @@ const FOV = 110;
 
 const PREVIEW_SETTLE_MS = 2600;
 const PREVIEW_PULSE_MS = 1100;
-const PREVIEW_MODES = ['compatible', 'performance'] as const;
+const PREVIEW_MODES = ['performance', 'compatible'] as const;
 type PreviewMode = (typeof PREVIEW_MODES)[number];
 
 type Props = {
@@ -126,7 +126,7 @@ const CameraARView = ({
       if (previewLiveRef.current) {
         everLive = true;
       }
-      if (!pulsed && elapsed >= PREVIEW_PULSE_MS) {
+      if (!pulsed && !everLive && elapsed >= PREVIEW_PULSE_MS) {
         pulsed = true;
         setArmed(false);
         setTimeout(() => {
@@ -259,6 +259,7 @@ const CameraARView = ({
             resizeMode="cover"
             implementationMode={previewMode}
             mirrorMode="auto"
+            constraints={[{ binned: true }, { fps: 30 }]}
             onStarted={() => setStatus(null)}
             onPreviewStarted={() => {
               previewLiveRef.current = true;
