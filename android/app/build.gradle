@@ -160,11 +160,9 @@ android {
             keyPassword 'android'
         }
         release {
-            def ksB64 = System.getenv("ANDROID_KEYSTORE_BASE64")
-            if (ksB64 != null && !ksB64.isEmpty()) {
-                def ksFile = new File(buildDir, "bussola-release.keystore")
-                ksFile.bytes = java.util.Base64.getDecoder().decode(ksB64)
-                storeFile ksFile
+            def ksFile = System.getenv("ANDROID_KEYSTORE_FILE")
+            if (ksFile != null && !ksFile.isEmpty()) {
+                storeFile file(ksFile)
                 storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
                 keyAlias System.getenv("ANDROID_KEY_ALIAS")
                 keyPassword System.getenv("ANDROID_KEY_PASSWORD")
