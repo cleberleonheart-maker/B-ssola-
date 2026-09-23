@@ -26,6 +26,7 @@ export type RecordedTrack = {
 } & TrackStats;
 
 const STORAGE_KEY = '@bussola/tracks';
+const ALT_DEADBAND = 1.5;
 
 export const computeTrackStats = (
   points: TrackPoint[],
@@ -44,8 +45,10 @@ export const computeTrackStats = (
       distance += haversine(prev.lat, prev.lon, p.lat, p.lon);
       if (p.alt != null && prev.alt != null) {
         const dp = p.alt - prev.alt;
-        if (dp > 0) eleGain += dp;
-        else eleLoss += -dp;
+        if (Math.abs(dp) > ALT_DEADBAND) {
+          if (dp > 0) eleGain += dp;
+          else eleLoss += -dp;
+        }
       }
       const dtSec = Math.max((p.ts - prev.ts) / 1000, 0);
       const dMeters = haversine(prev.lat, prev.lon, p.lat, p.lon);

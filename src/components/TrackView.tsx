@@ -242,7 +242,13 @@ const TrackView = ({ active, location, heading = 0 }: Props) => {
 
   const exportTrack = useCallback(async (track: RecordedTrack) => {
     try {
-      const ok = await shareTrackGpx(track.name, serializeTrackToGpx(track));
+      const ok = await shareTrackGpx(
+        track.name,
+        serializeTrackToGpx({
+          ...track,
+          points: simplifyPath(track.points, 0.00002),
+        }),
+      );
       setCloudMsg(ok ? t('track_gpx_ok') : t('track_cloud_fail'));
     } catch {
       setCloudMsg(t('track_cloud_fail'));

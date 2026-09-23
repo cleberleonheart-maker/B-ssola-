@@ -146,3 +146,21 @@
 - [ ] **26. Metrônomo de passo** — bipes de cadência (~120/min) para caminhada no ritmo.
 - [ ] **27. Triangulação offline por rumos** — estimar a posição mirando 2 marcos
       conhecidos, sem GPS.
+
+## ✅ Feitos (v7.11)
+1. **Bússola adaptativa** — a suavização do rumo agora muda de intensidade: rápida
+   quando você caminha/vira (α 0.45) e forte quando está parado (α 0.08), reduzindo a
+   tremedeira.
+2. **Visão: zoom e lanterna** — pinch (gesto) + botão de zoom (×1…×6, multiplica o
+   neutral) e lanterna liga/desliga 🔦.
+3. **Trilha: GPX podado** — antes de exportar, os pontos passam pelo Douglas–Peucker
+   (tol. 0.00002° ≈ 2,2 m) → arquivo menor e linha mais limpa; e o ganho/perda de
+   elevação ignora variações < 1,5 m (barulho do altímetro).
+
+## Ideias novas (23/09/2026, 3ª leva — melhorias em modos existentes)
+- [ ] **28. Teodolito com altura direta** — usar a distância do waypoint ativo/marco na
+      fórmula de altura (sem digitar) + média de N leituras para estabilizar o ângulo.
+- [ ] **29. SOS com contexto** — incluir % de bateria e operadora/rede no alerta
+      (adianta a ideia #8).
+- [ ] **30. Aviso de desvio de rota** — durante o retorno pela trilha, se sair X metros
+      do trajeto, avisar com o rumo para voltar.

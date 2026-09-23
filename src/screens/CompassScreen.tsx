@@ -127,7 +127,8 @@ import {
 } from '../services/geofenceService';
 
 const SENSOR_INTERVAL = 200;
-const SMOOTHING = 0.2;
+const SMOOTHING_FAST = 0.45;
+const SMOOTHING_SLOW = 0.08;
 const ROTATION_DEAD_ZONE = 0.5;
 const ACCEL_VERIFY_SAMPLES = 20;
 const ACCEL_MIN_MAGNITUDE = 0.6;
@@ -200,6 +201,7 @@ const CompassScreen = () => {
   const prevHeadingRef = useRef<number | null>(null);
   const continuousRef = useRef(0);
   const smoothedRef = useRef(0);
+  const smoothingRef = useRef(SMOOTHING_FAST);
   const stopWatchRef = useRef<(() => void) | null>(null);
   const prevFixRef = useRef<{ latitude: number; longitude: number } | null>(null);
   const distTotalRef = useRef(0);
@@ -341,7 +343,8 @@ const CompassScreen = () => {
 
     const previous = smoothedRef.current;
     const next =
-      previous + (continuousRef.current - previous) * SMOOTHING;
+      previous +
+      (continuousRef.current - previous) * smoothingRef.current;
     smoothedRef.current = next;
 
     if (Math.abs(next - previous) < ROTATION_DEAD_ZONE) {
@@ -369,6 +372,7 @@ const CompassScreen = () => {
     prevFixRef.current = { latitude: fix.latitude, longitude: fix.longitude };
 
     const moving = d > 2 || (fix.speed ?? 0) > 2;
+    smoothingRef.current = moving ? SMOOTHING_FAST : SMOOTHING_SLOW;
     idleCountRef.current = moving ? 0 : idleCountRef.current + 1;
 
     if (!relaxedRef.current && idleCountRef.current >= IDLE_STEPS) {

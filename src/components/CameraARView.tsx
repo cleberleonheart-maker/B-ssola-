@@ -55,6 +55,8 @@ const angularDiff = (from: number, to: number): number => {
   return (normalizeHeading(to - from) + 180) % 360 - 180;
 };
 
+const CAMERA_ZOOM_STEPS = [1, 1.5, 2, 3, 4, 6] as const;
+
 const CameraARView = ({
   heading,
   sun,
@@ -90,6 +92,8 @@ const CameraARView = ({
   const [sessionInfo, setSessionInfo] = useState('—');
   const [fov, setFov] = useState(DEFAULT_FOV);
   const fovRef = useRef(DEFAULT_FOV);
+  const [zoomIdx, setZoomIdx] = useState(0);
+  const [torchOn, setTorchOn] = useState(false);
 
   const previewLiveRef = useRef(false);
   const triedModesRef = useRef<Record<PreviewMode, boolean>>({
@@ -103,6 +107,16 @@ const CameraARView = ({
   const cameraTarget: CameraDevice | TargetCameraPosition = hasBack
     ? 'back'
     : (cameraDevice as CameraDevice);
+
+  const minZoom = cameraDevice?.minZoom ?? 1;
+  const maxZoom = cameraDevice?.maxZoom ?? 8;
+  const effectiveZoom = Math.min(
+    Math.max(CAMERA_ZOOM_STEPS[zoomIdx], minZoom),
+    maxZoom,
+  );
+  const cycleZoom = useCallback(() => {
+    setZoomIdx(idx => (idx + 1) % CAMERA_ZOOM_STEPS.length);
+  }, []);
 
   useEffect(() => {
     if (active && showCamera) {
@@ -317,6 +331,8 @@ const CameraARView = ({
             resizeMode="cover"
             implementationMode={previewMode}
             mirrorMode="auto"
+            zoom={effectiveZoom}
+            torchMode={torchOn ? 'on' : 'off'}
             constraints={[{ binned: true }, { fps: 30 }]}
             onSessionConfigSelected={cfg => {
               try {
@@ -473,6 +489,17 @@ const CameraARView = ({
         </Pressable>
       )}
 
+      {notDenied && showCamera && !graphical && (
+        <Pressable
+          onPress={cycleZoom}
+          accessibilityRole="button"
+          style={[styles.zoomWrap, { borderColor: colors.accent + '66' }]}>
+          <Text style={[styles.zoomText, { color: colors.accent }]}>
+            ×{CAMERA_ZOOM_STEPS[zoomIdx] % 1 === 0 ? CAMERA_ZOOM_STEPS[zoomIdx] : CAMERA_ZOOM_STEPS[zoomIdx].toFixed(1)}
+          </Text>
+        </Pressable>
+      )}
+
       {status !== null && !graphical && (
         <View style={styles.statusChip}>
           <Text style={styles.statusText}>{status}</Text>
@@ -492,6 +519,25 @@ const CameraARView = ({
               {effectiveGraphical ? t('cam_retry') : t('cam_graphical')}
             </Text>
           </Pressable>
+          {showCamera && !graphical && (
+            <Pressable
+              onPress={() => setTorchOn(on => !on)}
+              style={[
+                styles.controlPill,
+                {
+                  borderColor: colors.border,
+                  backgroundColor: torchOn ? colors.warning + '33' : 'transparent',
+                },
+              ]}>
+              <Text style={styles.controlPillIcon}>
+                {torchOn ? '🔦' : '🔆'}
+              </Text>
+              <Text
+                style={[styles.controlPillText, { color: torchOn ? colors.warning : colors.primary }]}>
+                {torchOn ? 'ON' : 'OFF'}
+              </Text>
+            </Pressable>
+          )}
         </View>
       )}
 
@@ -751,6 +797,7 @@ const createStyles = (colors: {
       right: spacing.sm,
       alignItems: 'flex-end',
       zIndex: 6,
+      gap: spacing.xs,
     },
     controlPill: {
       flexDirection: 'row',
@@ -768,6 +815,22 @@ const createStyles = (colors: {
     controlPillText: {
       fontSize: 11,
       fontWeight: '800',
+    },
+    zoomWrap: {
+      position: 'absolute',
+      bottom: spacing.md,
+      right: spacing.md,
+      zIndex: 8,
+      backgroundColor: 'rgba(4,4,10,0.78)',
+      borderWidth: 1,
+      borderRadius: radius.full,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 5,
+    },
+    zoomText: {
+      fontSize: 12,
+      fontWeight: '900',
+      fontFamily: 'monospace',
     },
     cover: {
       ...StyleSheet.absoluteFill,
