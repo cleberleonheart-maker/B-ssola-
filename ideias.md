@@ -164,3 +164,36 @@
       (adianta a ideia #8).
 - [ ] **30. Aviso de desvio de rota** — durante o retorno pela trilha, se sair X metros
       do trajeto, avisar com o rumo para voltar.
+
+## Ideias novas (23/09/2026, 4ª leva)
+- [ ] **31. 🔐 PIN/biometria no app** — trancar o app (privacidade, útil ao compartilhar
+      o telefone). Configurável em Configurações.
+- [ ] **32. 🧭 Leitura em mil (militar)** — alternar azimute entre graus e **milésimos**
+      (mrad/"mils", 6400/6000). Bom pra quem usa bússola tática.
+- [ ] **33. 📸 Waypoint pela câmera** — marcar um ponto distante sem chegar perto: 2+
+      avistagens de lugares diferentes cruzam os rumos e **estimam a coordenada**
+      (complemento da triangulação #27, usando teodolito + AR).
+- [ ] **34. 🗺️ Atalho de volta (linha reta)** — na trilha, além do retorno pelo trajeto,
+      mostrar o rumo direto ao início ("em linha reta") para encurtar quando dá.
+- [ ] **35. 🔲 QR de localização** — gerar QR com as coordenadas para outro aparelho
+      escanear e navegar até ali (boneco de rastreio offline).
+- [ ] **36. 🌡️ Heatmap "onde estive"** — registrar posições ao longo do dia e desenhar um
+      mapa de calor do dia/semana (junta GPS + trilhas salvas).
+- [ ] **37. 🔗 GPX por link** — além do arquivo, gerar link curto da trilha salva na
+      nuvem para compartilhar (email/WhatsApp).
+- [ ] **38. 💾 Backup completo** — exportar tudo (notas, waypoints, trilhas, calibrações,
+      declinação, FOV) como um JSON/PDF para restaurar/transferir.
+- [ ] **39. ⚠️ Aviso de bateria do sistema** — alertar se o Android estiver restringindo
+      o app em segundo plano (afeta GPS e câmera contínuos).
+- [ ] **40. 🧭 Melhoria: rumo inverso sempre visível** — mostrar o rumo de volta em tempo
+      real (não só no retorno de trilha), útil em navegação de retorno simples.
+- [ ] **41. 🛠️ Gesture de pinch na Visão** — o vision-camera v5 não expõe pinch; fazer
+      zoom por gesto com react-native-gesture-handler (além do botão ×1–×6).
+- [ ] **42. 🎨 Tema "sol forte"** — tema de alto contraste para leitura outdoor sob sol
+      direto (além do Noturno e Neon).
+- [ ] **43. ⚡ Performance: memoizar marcos** — evitar recálculo de distância/rumo de
+      waypoints a cada fix (já há useMemo parcial; revisar).
+- [ ] **44. 🧾 Caderneta: exportar relatório** — gerar PDF/GPX com notas + fotos
+      (geo-relato do dia de campo).
+- [ ] **45. 🧪 Verificação cruzada da calibração** — comparar o norte do app com o
+      azimute do sol naquele horário/local (didático, combina Sol + bússola).
