@@ -90,17 +90,13 @@ def buildRequested = gradle.startParameter.taskNames.any { taskName ->
 
 if (buildRequested) {
     def current = (versionProps.getProperty("versionCode") as int) ?: 0
-    def newCode = current + 1
     def name = versionProps.getProperty("versionName")
     if (name == null || name.isInteger()) {
         name = "6.0"
     }
-    versionProps.setProperty("versionCode", String.valueOf(newCode))
-    versionProps.setProperty("versionName", name)
-    versionPropsFile.withOutputStream { versionProps.store(it, null) }
     new File(rootProject.projectDir.parentFile, "src/version.generated.ts").write(
         "// gerado automaticamente a cada build\n" +
-        "export const APP_VERSION_CODE = ${newCode};\n" +
+        "export const APP_VERSION_CODE = ${current};\n" +
         "export const APP_VERSION = 'v${name}';\n")
 }
 

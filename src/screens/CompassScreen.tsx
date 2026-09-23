@@ -45,6 +45,7 @@ import {
   fetchCivilAlerts,
   isSevere,
 } from '../services/alertsService';
+import { showAlertNotification } from '../services/notifications';
 import { useThemeColors, useTheme } from '../theme/ThemeContext';
 import { useAssistant } from '../assistant/AssistantContext';
 import { speak } from '../assistant/voice';
@@ -178,6 +179,7 @@ const CompassScreen = () => {
   const [alertsVisible, setAlertsVisible] = useState(false);
   const [emergencyVisible, setEmergencyVisible] = useState(false);
   const alertsCheckedRef = useRef(false);
+  const notifiedAlertsRef = useRef(new Set<string>());
   const [calibrated, setCalibrated] = useState(false);
   const calibrationRef = useRef<MagCalibration | null>(null);
   const [location, setLocation] = useState<LocationFix>({
@@ -477,9 +479,21 @@ const CompassScreen = () => {
     let active = true;
     const check = () => {
       fetchCivilAlerts(lat, lon).then(result => {
-        if (active && isSevere(result)) {
+        if (!active) return;
+        if (isSevere(result)) {
           setAlertsVisible(true);
         }
+        result.weather
+          .filter(
+            alert => alert.severity === 'orange' || alert.severity === 'red',
+          )
+          .forEach(alert => {
+            const key = `${alert.severity}|${alert.event}|${alert.expires ?? 'x'}`;
+            if (!notifiedAlertsRef.current.has(key)) {
+              notifiedAlertsRef.current.add(key);
+              showAlertNotification(alert);
+            }
+          });
       });
     };
     if (!alertsCheckedRef.current) {

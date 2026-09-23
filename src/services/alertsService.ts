@@ -171,7 +171,7 @@ export const fetchNearbyQuakes = async (
 
 type Pt = number[];
 
-const inmetRings = (geojson: string): Pt[][] => {
+export const inmetRings = (geojson: string): Pt[][] => {
   try {
     const parsed = JSON.parse(geojson) as {
       type?: string;
@@ -193,7 +193,7 @@ const inmetRings = (geojson: string): Pt[][] => {
   }
 };
 
-const pointInRing = (lat: number, lon: number, ring: Pt[]): boolean => {
+export const pointInRing = (lat: number, lon: number, ring: Pt[]): boolean => {
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
     const [lonI, latI] = ring[i];
@@ -206,7 +206,7 @@ const pointInRing = (lat: number, lon: number, ring: Pt[]): boolean => {
   return inside;
 };
 
-const parseInmetSeverity = (
+export const parseInmetSeverity = (
   value?: string,
   color?: string,
 ): WeatherAlert['severity'] => {
