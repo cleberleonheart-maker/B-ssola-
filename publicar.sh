@@ -38,7 +38,10 @@ echo ""
 echo "APK publicado ($SIZE):"
 echo "  https://github.com/$REPO/releases/tag/$TAG"
 echo ""
-echo "LEMBRETE: atualize a tabela app_version no Supabase:"
-echo "  bash scripts/publicar-supabase.sh   (grava sozinho se houver ~/.supabase-service-key)"
-echo "  sem chave, copie o que ele gerar em scripts/app_version.sql no SQL editor e"
-echo "  rode: git add scripts/app_version.sql && git commit -m \"app_version\" && git push"
+echo "==> Atualizando app_version no Supabase"
+if bash scripts/publicar-supabase.sh; then
+  echo "  (app_version no Supabase atualizado)"
+else
+  echo "  (sem chave de escrita -> nao gravou; use scripts/app_version.sql)" >&2
+  echo "  rode: git add scripts/app_version.sql && git commit -m \"app_version\" && git push" >&2
+fi

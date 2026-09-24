@@ -1,0 +1,59 @@
+name: app_version
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Atualiza app_version no Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          REPO="cleberleonheart-maker/B-ssola-"
+          TAG="bussola-apk"
+          : "${SUPABASE_URL:?defina o secret SUPABASE_PROJECT_URL}"
+          : "${SUPABASE_SERVICE_ROLE_KEY:?defina o secret SUPABASE_SERVICE_ROLE_KEY}"
+
+          RELEASE="$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.')"
+
+          ASSET="$(jq -r '.assets[] | .name' <<<"$RELEASE" \
+            | grep -oE 'bussola-v[0-9]+(-[0-9.]+)?\.apk' \
+            | sort -t'v' -k2 -n \
+            | tail -1 || true)"
+
+          if [ -z "$ASSET" ]; then
+            echo "Nenhum asset bussola-v*.apk na tag $TAG." >&2
+            exit 1
+          fi
+
+          CODE="$(sed -E 's/bussola-v([0-9]+).*/\1/' <<<"$ASSET")"
+          NAME="$(sed -E 's/bussola-v[0-9]+-([0-9.]+)\.apk/\1/' <<<"$ASSET")"
+          if [ "$NAME" = "$ASSET" ]; then
+            NAME="$(curl -fsS \
+              -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+              "$SUPABASE_URL/rest/v1/app_version?select=version_name&order=version_code.desc&limit=1" \
+              | jq -r '.[0].version_name // ""')"
+          fi
+
+          URL="https://github.com/$REPO/releases/download/$TAG/$ASSET"
+          BODY="{\"version_code\":$CODE,\"version_name\":\"$NAME\",\"update_url\":\"$URL\",\"message\":\"Nova versão disponível\",\"required\":false}"
+
+          curl -fsS -X PATCH "$SUPABASE_URL/rest/v1/app_version?id=eq.1" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=representation" \
+            -d "$BODY"
+
+          echo "app_version -> $CODE ($NAME)"
+          echo "URL: $URL"
