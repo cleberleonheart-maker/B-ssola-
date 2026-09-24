@@ -37,3 +37,6 @@ fi
 echo ""
 echo "APK publicado ($SIZE):"
 echo "  https://github.com/$REPO/releases/tag/$TAG"
+echo ""
+echo "LEMBRETE: atualize a tabela app_version no Supabase:"
+echo "  bash scripts/publicar-supabase.sh"
