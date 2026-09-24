@@ -55,9 +55,11 @@ if [ -n "$SERVICE_KEY" ]; then
 else
   echo
   echo "Sem SUPABASE_SERVICE_ROLE_KEY -- atualize manualmente no dashboard."
-  echo "Cole o SQL abaixo no SQL editor do projeto ($SUPABASE_URL):"
-  echo
-  echo "$SQL"
-  echo
-  echo "Dica: export SUPABASE_SERVICE_ROLE_KEY=... para gravar automaticamente."
+  echo "Abra scripts/app_version.sql (enviado ao GitHub) e cole o conteudo no"
+  echo "SQL editor do projeto ($SUPABASE_URL)."
 fi
+
+printf '%s\n' "$SQL" > "$ROOT/scripts/app_version.sql"
+echo
+echo "SQL salvo em scripts/app_version.sql (copie e cole no SQL editor)."
+echo "Depois de publicar, envie de volta: git add scripts/app_version.sql && git commit -m ..."
