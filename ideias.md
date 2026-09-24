@@ -170,6 +170,12 @@
    sol e o app compara a leitura média com o azimute solar real (±6° de tolerância) e
    diz se o norte está deslocado para a esquerda/direita.
 
+## ✅ Feitos (v7.15)
+1. **Novo modo: Triangulação** (ideia #33) — aviste o mesmo alvo distante de 2 lugares
+   (topo do aparelho apontado ao alvo + toque em Avistar); o app cruza os rumos
+   geográficos, estima a coordenada do alvo e permite adicioná-lo como waypoint.
+   (A estimativa de posição própria por 2 marcos — #27 — continua pendente.)
+
 ## Ideias novas (23/09/2026, 3ª leva — melhorias em modos existentes)
 - [ ] **28. Teodolito com altura direta** — usar a distância do waypoint ativo/marco na
       fórmula de altura (sem digitar) + média de N leituras para estabilizar o ângulo.
@@ -183,7 +189,7 @@
       o telefone). Configurável em Configurações.
 - [ ] **32. 🧭 Leitura em mil (militar)** — alternar azimute entre graus e **milésimos**
       (mrad/"mils", 6400/6000). Bom pra quem usa bússola tática.
-- [ ] **33. 📸 Waypoint pela câmera** — marcar um ponto distante sem chegar perto: 2+
+- [x] **33. 📸 Waypoint pela câmera** — marcar um ponto distante sem chegar perto: 2+
       avistagens de lugares diferentes cruzam os rumos e **estimam a coordenada**
       (complemento da triangulação #27, usando teodolito + AR).
 - [x] **34. 🗺️ Atalho de volta (linha reta)** — na trilha, além do retorno pelo trajeto,

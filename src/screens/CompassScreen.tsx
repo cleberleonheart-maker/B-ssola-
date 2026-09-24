@@ -37,6 +37,7 @@ import TheodoliteView from '../components/TheodoliteView';
 import HeightView from '../components/HeightView';
 import CarSpotView from '../components/CarSpotView';
 import SunWatchView from '../components/SunWatchView';
+import TriangulationView from '../components/TriangulationView';
 import WindView from '../components/WindView';
 import TargetNavBar from '../components/TargetNavBar';
 import TrackView from '../components/TrackView';
@@ -610,6 +611,22 @@ const CompassScreen = () => {
     [location],
   );
 
+  const addRemoteWaypoint = useCallback(
+    async (wp: { name: string; latitude: number; longitude: number }) => {
+      const entry: Waypoint = {
+        id: createWaypointId(),
+        name: wp.name,
+        latitude: wp.latitude,
+        longitude: wp.longitude,
+        altitude: null,
+        createdAt: Date.now(),
+      };
+      const next = await saveWaypoint(entry);
+      setWaypoints(next);
+    },
+    [],
+  );
+
   const deleteWaypoint = useCallback(async (id: string) => {
     const next = await removeWaypoint(id);
     setWaypoints(next);
@@ -974,6 +991,7 @@ const CompassScreen = () => {
     { key: 'notes', icon: '📓', label: t('ui_mode_notes').replace(/^\S+\s*/, ''), sub: t('ui_card_notes') },
     { key: 'height', icon: '⌖', label: t('ui_mode_height').replace(/^\S+\s*/, ''), sub: t('ui_card_height') },
     { key: 'car', icon: '🚗', label: t('ui_mode_car').replace(/^\S+\s*/, ''), sub: t('ui_card_car') },
+    { key: 'tri', icon: '📐', label: t('ui_mode_tri').replace(/^\S+\s*/, ''), sub: t('ui_card_tri') },
   ];
 
   const statusPanels = (
@@ -1359,6 +1377,18 @@ const CompassScreen = () => {
             accuracy={location.accuracy}
             heading={heading}
             hasFix={hasFix}
+          />
+        </View>
+      ) : displayMode === 'tri' ? (
+        <View style={styles.arArea}>
+          <TriangulationView
+            heading={heading}
+            latitude={location.latitude}
+            longitude={location.longitude}
+            hasFix={hasFix}
+            declinationEnabled={declination.enabled}
+            declinationDegrees={declination.degrees}
+            onAdd={addRemoteWaypoint}
           />
         </View>
       ) : displayMode === 'sun' ? (
