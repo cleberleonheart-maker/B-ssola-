@@ -1428,6 +1428,11 @@ const CompassScreen = () => {
         visible={calibrationVisible}
         onClose={() => setCalibrationVisible(false)}
         onSave={handleCalibrationSave}
+        heading={heading}
+        latitude={location.latitude}
+        longitude={location.longitude}
+        declinationEnabled={declination.enabled}
+        declinationDegrees={declination.degrees}
       />
 
       <WaypointModal

@@ -165,6 +165,11 @@
 1. **Atalho em linha reta na trilha** (ideia #34) — no retorno, ative "⚡ Ver atalho" e
    veja a distância e o rumo direto ao início (e o rumo de volta) para cortar caminho.
 
+## ✅ Feitos (v7.14)
+1. **Verificação pelo Sol** (ideia #45) — na calibração, aponte o topo do aparelho ao
+   sol e o app compara a leitura média com o azimute solar real (±6° de tolerância) e
+   diz se o norte está deslocado para a esquerda/direita.
+
 ## Ideias novas (23/09/2026, 3ª leva — melhorias em modos existentes)
 - [ ] **28. Teodolito com altura direta** — usar a distância do waypoint ativo/marco na
       fórmula de altura (sem digitar) + média de N leituras para estabilizar o ângulo.
@@ -203,5 +208,5 @@
       waypoints a cada fix (já há useMemo parcial; revisar).
 - [ ] **44. 🧾 Caderneta: exportar relatório** — gerar PDF/GPX com notas + fotos
       (geo-relato do dia de campo).
-- [ ] **45. 🧪 Verificação cruzada da calibração** — comparar o norte do app com o
+- [x] **45. 🧪 Verificação cruzada da calibração** — comparar o norte do app com o
       azimute do sol naquele horário/local (didático, combina Sol + bússola).
