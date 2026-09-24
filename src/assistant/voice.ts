@@ -115,7 +115,7 @@ export const requestMicPermission = async (): Promise<boolean> => {
       {
         title: 'Permissão de microfone',
         message:
-          'A Keffera precisa do microfone para ouvir os seus comandos de voz.',
+          'A Kefera precisa do microfone para ouvir os seus comandos de voz.',
         buttonPositive: 'Permitir',
         buttonNegative: 'Negar',
         buttonNeutral: 'Depois',
@@ -204,7 +204,7 @@ export const destroyVoice = async (): Promise<void> => {
 export const isWakeWord = (normalizedText: string): boolean =>
   normalizedText.includes('kefera') ||
   normalizedText.includes('quefera') ||
-  normalizedText.includes('keffera') ||
+  normalizedText.includes('kefera') ||
   normalizedText.includes('keferas') ||
   normalizedText.includes('kefega');
 

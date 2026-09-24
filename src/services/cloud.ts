@@ -62,7 +62,7 @@ const withTimeout = <T,>(
 const warnDisabled = (): void => {
   if (!client) {
     console.warn(
-      '[Keffera] Nuvem não configurada. Configure SUPABASE_URL e SUPABASE_ANON_KEY para sincronizar a memória.',
+      '[Kefera] Nuvem não configurada. Configure SUPABASE_URL e SUPABASE_ANON_KEY para sincronizar a memória.',
     );
   }
 };
@@ -119,7 +119,7 @@ export const fetchCloudMemory = async (
         .maybeSingle(),
     );
     if (error) {
-      console.warn('[Keffera] Falha ao buscar memória na nuvem', error.message);
+      console.warn('[Kefera] Falha ao buscar memória na nuvem', error.message);
       return null;
     }
     return (data as CloudMemoryRow) ?? null;
@@ -148,7 +148,7 @@ export const pushCloudMemory = async (
       ),
     );
     if (error) {
-      console.warn('[Keffera] Falha ao enviar memória para a nuvem', error.message);
+      console.warn('[Kefera] Falha ao enviar memória para a nuvem', error.message);
       return false;
     }
     return true;
@@ -259,7 +259,7 @@ export const fetchLatestAppVersion = async (): Promise<AppVersion | null> => {
     );
     if (error) {
       console.warn(
-        '[Keffera] Falha ao verificar versão na nuvem',
+        '[Kefera] Falha ao verificar versão na nuvem',
         error.message,
       );
       return null;

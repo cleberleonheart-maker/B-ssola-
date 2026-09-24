@@ -27,7 +27,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import { useAssistant } from '../assistant/AssistantContext';
 import type { ChatMessage } from '../assistant/types';
-import KefferaAvatar from './KefferaAvatar';
+import KeferaAvatar from './KeferaAvatar';
 import { formatTime } from '../utils/compass';
 
 const SUGGESTION_KEYS = [
@@ -286,7 +286,7 @@ const AssistantModal = () => {
                     endScale={1.9}
                   />
                 )}
-                <KefferaAvatar size={48} listening={listening} dim={!ready} />
+                <KeferaAvatar size={48} listening={listening} dim={!ready} />
                 <View
                   style={[
                     styles.statusDot,
@@ -296,7 +296,7 @@ const AssistantModal = () => {
               </View>
 
             <View style={styles.headerText}>
-              <Text style={styles.title}>KEFFERA</Text>
+              <Text style={styles.title}>KEFERA</Text>
               <View style={styles.subtitleWrap}>
                 <View style={[styles.subtitleDot, { backgroundColor: statusColor }]} />
                 <Text style={styles.subtitle} numberOfLines={1}>
@@ -353,7 +353,7 @@ const AssistantModal = () => {
                       startScale={1}
                       endScale={1.35}
                     />
-                    <KefferaAvatar size={84} listening={listening} />
+                    <KeferaAvatar size={84} listening={listening} />
                   </View>
                 <Text style={styles.emptyHello}>{t('as_empty_intro')}</Text>
                 <Text style={styles.emptyHint}>{t('as_empty_hint')}</Text>
@@ -431,7 +431,7 @@ const ThinkingBubble = () => {
   return (
     <View style={styles.bubbleRow}>
       <View style={styles.bubbleAvatar}>
-        <KefferaAvatar size={26} />
+        <KeferaAvatar size={26} />
       </View>
       <View style={styles.bubbleGroup}>
         <View style={[styles.bubble, styles.bubbleAssistant, styles.thinkingBubble]}>
@@ -455,7 +455,7 @@ const MessageBubble = ({ message }: { message: ChatMessage }) => {
       ]}>
       {!isUser && (
         <View style={styles.bubbleAvatar}>
-          <KefferaAvatar size={26} />
+          <KeferaAvatar size={26} />
         </View>
       )}
       <View style={styles.bubbleGroup}>

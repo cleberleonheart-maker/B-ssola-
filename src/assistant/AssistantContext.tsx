@@ -76,7 +76,7 @@ const MAX_COMMAND_RETRIES = 5;
 const detectWakeCommand = (text: string): 'on' | 'off' | null => {
   const n = normalizeText(text);
   const target =
-    '(?:a )?(?:keffera|kefera|escuta por voz da keffera|escuta por voz|escuta)';
+    '(?:a )?(?:kefera|escuta por voz da kefera|escuta por voz|escuta)';
   const onRe = new RegExp(
     `^(?:ativ(a|ar|e)|lig(a|ar|ue)|acord(a|ar|e)|cham(a|ar|e)|vem|venha|despert(a|ar|e)) ${target}(?: |$)`,
   );

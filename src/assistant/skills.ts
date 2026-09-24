@@ -568,7 +568,7 @@ const mathSkill: Skill = {
 
 const greetingSkill: Skill = {
   id: 'greeting',
-  patterns: ['oi', 'ola', 'opa', 'e ai', 'ei', 'bom dia', 'boa tarde', 'boa noite', 'salve', 'ola keffera', 'oi keffera'],
+  patterns: ['oi', 'ola', 'opa', 'e ai', 'ei', 'bom dia', 'boa tarde', 'boa noite', 'salve', 'ola kefera', 'oi kefera'],
   run: (_ctx, _n, _tokens, _wildcards, t) => {
     const h = new Date().getHours();
     const part = h < 6 ? t('as_greeting_dawn') : h < 12 ? t('as_greeting_morning') : h < 18 ? t('as_greeting_afternoon') : t('as_greeting_night');
@@ -594,7 +594,7 @@ const originSkill: Skill = {
   id: 'origin',
   patterns: [
     'quem e voce',
-    'quem e a keffera',
+    'quem e a kefera',
     'como voce nasceu',
     'como foi que voce nasceu',
     'qual * sua historia',
@@ -639,13 +639,13 @@ const byeSkill: Skill = {
 
 const howAreYouSkill: Skill = {
   id: 'how_are_you',
-  patterns: ['como voce esta', 'como vai voce', 'tudo bem', 'como esta a keffera', 'voce esta bem'],
+  patterns: ['como voce esta', 'como vai voce', 'tudo bem', 'como esta a kefera', 'voce esta bem'],
   run: (_ctx, _n, _tokens, _wildcards, t) => t('as_how_are_you'),
 };
 
 const complimentSkill: Skill = {
   id: 'compliment',
-  patterns: ['voce e demais', 'te amo keffera', 'amo voce', 'voce e incrivel', 'muito legal'],
+  patterns: ['voce e demais', 'te amo kefera', 'amo voce', 'voce e incrivel', 'muito legal'],
   run: (_ctx, _n, _tokens, _wildcards, t) =>
     pick([t('as_compliment_1'), t('as_compliment_2'), t('as_compliment_3')]),
 };

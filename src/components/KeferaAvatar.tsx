@@ -2,13 +2,13 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { useThemeColors } from '../theme/ThemeContext';
 
-type KefferaAvatarProps = {
+type KeferaAvatarProps = {
   size: number;
   listening?: boolean;
   dim?: boolean;
 };
 
-const KefferaAvatar = ({ size, listening = false, dim = false }: KefferaAvatarProps) => {
+const KeferaAvatar = ({ size, listening = false, dim = false }: KeferaAvatarProps) => {
   const colors = useThemeColors();
   const styles = StyleSheet.create({
     root: {
@@ -223,4 +223,4 @@ const KefferaAvatar = ({ size, listening = false, dim = false }: KefferaAvatarPr
   );
 };
 
-export default KefferaAvatar;
+export default KeferaAvatar;

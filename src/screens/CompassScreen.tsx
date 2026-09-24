@@ -51,7 +51,7 @@ import { showAlertNotification } from '../services/notifications';
 import { useThemeColors, useTheme } from '../theme/ThemeContext';
 import { useAssistant } from '../assistant/AssistantContext';
 import { speak } from '../assistant/voice';
-import KefferaAvatar from '../components/KefferaAvatar';
+import KeferaAvatar from '../components/KeferaAvatar';
 import { useLanguage } from '../i18n/LanguageContext';
 import type { KnownWaypoint } from '../assistant/types';
 import { spacing, radius } from '../theme/colors';
@@ -1206,7 +1206,7 @@ const CompassScreen = () => {
           onPress={() => assistant.setOpen(true)}
           style={styles.roundButton}
           hitSlop={12}>
-          <KefferaAvatar size={30} />
+          <KeferaAvatar size={30} />
         </Pressable>
         <View style={styles.headerText}>
           <Text style={styles.headerTitle}>{t('ui_app_title')}</Text>
