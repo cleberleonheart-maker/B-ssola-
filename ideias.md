@@ -157,6 +157,10 @@
    (tol. 0.00002° ≈ 2,2 m) → arquivo menor e linha mais limpa; e o ganho/perda de
    elevação ignora variações < 1,5 m (barulho do altímetro).
 
+## ✅ Feitos (v7.12)
+1. **Rumo de volta sempre visível** (ideia #40) — abaixo do rumo atual aparece a
+   direção inversa (graus + ponto cardeal), sem precisar calcular nada.
+
 ## Ideias novas (23/09/2026, 3ª leva — melhorias em modos existentes)
 - [ ] **28. Teodolito com altura direta** — usar a distância do waypoint ativo/marco na
       fórmula de altura (sem digitar) + média de N leituras para estabilizar o ângulo.
@@ -185,7 +189,7 @@
       declinação, FOV) como um JSON/PDF para restaurar/transferir.
 - [ ] **39. ⚠️ Aviso de bateria do sistema** — alertar se o Android estiver restringindo
       o app em segundo plano (afeta GPS e câmera contínuos).
-- [ ] **40. 🧭 Melhoria: rumo inverso sempre visível** — mostrar o rumo de volta em tempo
+- [x] **40. 🧭 Melhoria: rumo inverso sempre visível** — mostrar o rumo de volta em tempo
       real (não só no retorno de trilha), útil em navegação de retorno simples.
 - [ ] **41. 🛠️ Gesture de pinch na Visão** — o vision-camera v5 não expõe pinch; fazer
       zoom por gesto com react-native-gesture-handler (além do botão ×1–×6).

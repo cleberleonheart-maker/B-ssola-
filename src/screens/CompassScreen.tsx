@@ -1289,6 +1289,11 @@ const CompassScreen = () => {
               {Math.round(heading).toString().padStart(3, '0')}°
             </Text>
             <Text style={styles.headingCardinal}>{cardinal.full}</Text>
+            <Text style={styles.backBearing}>
+              {t('ui_back_bearing')}{' '}
+              {((Math.round(heading) + 180) % 360).toString().padStart(3, '0')}°{' '}
+              {cardinalOf(heading + 180).short}
+            </Text>
           </View>
 
           {activeTarget && targetMarker ? (
@@ -1665,6 +1670,13 @@ const createStyles = (colors: {
       textShadowColor: colors.primary + '66',
       textShadowOffset: { width: 0, height: 0 },
       textShadowRadius: 8,
+    },
+    backBearing: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.text + 'aa',
+      marginTop: spacing.xs,
+      letterSpacing: 1,
     },
     levelHint: {
       fontSize: 14,
