@@ -1352,7 +1352,7 @@ const CompassScreen = () => {
         </View>
       ) : displayMode === 'emf' ? (
         <View style={styles.arArea}>
-          <EmfReaderView active />
+          <EmfReaderView active hasFix={hasFix} onAdd={addWaypoint} />
         </View>
       ) : displayMode === 'theodolite' ? (
         <View style={styles.arArea}>

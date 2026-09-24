@@ -176,6 +176,11 @@
    geográficos, estima a coordenada do alvo e permite adicioná-lo como waypoint.
    (A estimativa de posição própria por 2 marcos — #27 — continua pendente.)
 
+## ✅ Feitos (v7.16)
+1. **EMF: ambiente, vibração e ponto quente** — botão "🍃 Ambiente" fixa a referência e
+   a barra passa a escalar pelo Δ (variação fica visível); vibração a cada pulso mesmo
+   sem som; "📌 Ponto quente" guarda um waypoint na sua posição com a leitura atual.
+
 ## Ideias novas (23/09/2026, 3ª leva — melhorias em modos existentes)
 - [ ] **28. Teodolito com altura direta** — usar a distância do waypoint ativo/marco na
       fórmula de altura (sem digitar) + média de N leituras para estabilizar o ângulo.
@@ -216,3 +221,13 @@
       (geo-relato do dia de campo).
 - [x] **45. 🧪 Verificação cruzada da calibração** — comparar o norte do app com o
       azimute do sol naquele horário/local (didático, combina Sol + bússola).
+
+## Ideias novas (23/09/2026, 5ª leva — EMF)
+- [ ] **46. 🧲 EMF com calibração magnética** — aplicar o hard/soft-iron da calibração
+      da bússola no cálculo da magnitude (hoje usa o magnetômetro cru).
+- [ ] **47. 🧭 EMF: direção da fonte** — mostrar qual eixo (X/Y/Z) domina o pico para
+      apontar onde a fonte está.
+- [ ] **48. 🗺️ EMF: levantamento geolocalizado** — marcar leituras num mini-mapa
+      (heatmap) para mapear fontes numa área.
+- [ ] **49. ❄️ EMF: travar leitura** — congelar o valor na tela ao caminhar em direção
+      à fonte (pico mantido).

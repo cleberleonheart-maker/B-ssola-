@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Platform, Vibration } from 'react-native';
 import {
   magnetometer,
   setUpdateIntervalForType,
@@ -23,9 +23,11 @@ const MONO = Platform.select({ ios: 'Menlo', default: 'monospace' });
 
 type Props = {
   active: boolean;
+  hasFix: boolean;
+  onAdd: (name: string) => void;
 };
 
-const EmfReaderView = ({ active }: Props) => {
+const EmfReaderView = ({ active, hasFix, onAdd }: Props) => {
   const colors = useThemeColors();
   const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -35,6 +37,7 @@ const EmfReaderView = ({ active }: Props) => {
   const [max, setMax] = useState<number | null>(null);
   const [error, setError] = useState(false);
   const [history, setHistory] = useState<number[]>([]);
+  const [ambient, setAmbient] = useState<number | null>(null);
 
   const filteredRef = useRef(0);
   const subRef = useRef<ReturnType<typeof magnetometer.subscribe> | null>(null);
@@ -83,11 +86,27 @@ const EmfReaderView = ({ active }: Props) => {
     maxRef.current = null;
     setMin(null);
     setMax(null);
+    setAmbient(null);
     historyRef.current = [];
     setHistory([]);
   }, []);
 
-  const ratio = Math.max(0, Math.min(1, value / SCALE_MAX));
+  const captureAmbient = useCallback(() => {
+    setAmbient(Math.round(filteredRef.current * 10) / 10);
+  }, []);
+
+  const markHotspot = useCallback(() => {
+    if (!hasFix) return;
+    onAdd(`⚡ ${value.toFixed(1)}µT`);
+  }, [hasFix, onAdd, value]);
+
+  const delta = ambient === null || min === null ? 0 : Math.max(0, value - ambient);
+  const span =
+    ambient === null || max === null ? SCALE_MAX : Math.max(max - ambient, 8);
+  const ratio =
+    ambient === null
+      ? Math.max(0, Math.min(1, value / SCALE_MAX))
+      : Math.max(0, Math.min(1, delta / span));
   const levelColor =
     value >= HIGH_THRESHOLD
       ? colors.danger
@@ -109,6 +128,12 @@ const EmfReaderView = ({ active }: Props) => {
     frequency: beepFreq,
     enabled: beepActive && soundAvailable,
   });
+
+  useEffect(() => {
+    if (!active || !beepActive) return;
+    const id = setInterval(() => Vibration.vibrate(45), 420);
+    return () => clearInterval(id);
+  }, [active, beepActive]);
 
   return (
     <View style={styles.container}>
@@ -135,6 +160,14 @@ const EmfReaderView = ({ active }: Props) => {
               {levelLabel}
             </Text>
           </View>
+
+          {ambient !== null && (
+            <View style={styles.deltaRow}>
+              <Text style={[styles.deltaText, { color: levelColor }]}>
+                +{delta.toFixed(1)} µT · {t('emf_delta')}
+              </Text>
+            </View>
+          )}
 
           <View style={[styles.track, { backgroundColor: colors.surfaceAlt }]}>
             <View
@@ -174,17 +207,47 @@ const EmfReaderView = ({ active }: Props) => {
             </View>
           )}
 
-          <Pressable
-            onPress={reset}
-            style={[styles.resetButton, { borderColor: colors.border }]}>
-            <Text style={[styles.resetText, { color: colors.text }]}>
-              {t('emf_reset')}
-            </Text>
-          </Pressable>
+          <View style={styles.actionRow}>
+            <Pressable
+              onPress={captureAmbient}
+              style={[styles.resetButton, { borderColor: colors.border }]}>
+              <Text style={[styles.resetText, { color: colors.text }]}>
+                {t('emf_ambient')}
+              </Text>
+            </Pressable>
 
-          <Text style={[styles.hint, { color: colors.textMuted }]}>
-            {t('emf_hint')}
-          </Text>
+            <Pressable
+              onPress={markHotspot}
+              disabled={!hasFix}
+              style={[
+                styles.resetButton,
+                { borderColor: hasFix ? colors.primary : colors.border },
+              ]}>
+              <Text
+                style={[styles.resetText, { color: hasFix ? colors.primary : colors.textMuted }]}>
+                {t('emf_hotspot')}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={reset}
+              style={[styles.resetButton, { borderColor: colors.border }]}>
+              <Text style={[styles.resetText, { color: colors.text }]}>
+                {t('emf_reset')}
+              </Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.hintRow}>
+            {!hasFix && (
+              <Text style={[styles.hintSmall, { color: colors.warning }]}>
+                {t('emf_hotspot_nofix')}
+              </Text>
+            )}
+            <Text style={[styles.hint, { color: colors.textMuted }]}>
+              {t('emf_hint')}
+            </Text>
+          </View>
         </>
       )}
     </View>
@@ -292,15 +355,38 @@ const createStyles = (_colors: ColorScheme) =>
       fontVariant: ['tabular-nums'],
     },
     resetButton: {
-      marginTop: spacing.lg,
-      paddingHorizontal: spacing.xl,
+      paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,
       borderRadius: radius.full,
       borderWidth: 1,
     },
+    actionRow: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginTop: spacing.lg,
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+    },
     resetText: {
       fontSize: 13,
       fontWeight: '800',
+    },
+    deltaRow: {
+      marginTop: spacing.xs,
+    },
+    deltaText: {
+      fontSize: 13,
+      fontWeight: '900',
+      fontVariant: ['tabular-nums'],
+    },
+    hintRow: {
+      alignItems: 'center',
+    },
+    hintSmall: {
+      fontSize: 11,
+      fontWeight: '700',
+      textAlign: 'center',
+      marginTop: spacing.sm,
     },
     hint: {
       fontSize: 12,
