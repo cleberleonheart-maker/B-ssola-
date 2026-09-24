@@ -16,7 +16,8 @@ export type DisplayMode =
   | 'notes'
   | 'height'
   | 'car'
-  | 'tri';
+  | 'tri'
+  | 'odometer';
 
 export type WindCal = { zero: number; strong: number };
 
@@ -26,6 +27,7 @@ const DISPLAY_MODE_KEY = '@bussola/displayMode';
 const VOICE_GUIDE_KEY = '@bussola/voiceGuide';
 const WIND_CAL_KEY = '@bussola/windCal';
 const VIRTUAL_WP_KEY = '@bussola/virtualWp';
+const USE_MILS_KEY = '@bussola/useMils';
 
 export const DEFAULT_WIND_CAL: WindCal = { zero: 0.015, strong: 0.22 };
 
@@ -78,6 +80,7 @@ export const loadDisplayMode = async (): Promise<DisplayMode> => {
       'height',
       'car',
       'tri',
+      'odometer',
     ];
     return modes.includes(raw as DisplayMode) ? (raw as DisplayMode) : 'compass';
   } catch {
@@ -134,4 +137,34 @@ export const saveVirtualWp = async (id: string | null) => {
   } else {
     await AsyncStorage.setItem(VIRTUAL_WP_KEY, id);
   }
+};
+
+export const loadUseMils = async (): Promise<boolean> => {
+  try {
+    return (await AsyncStorage.getItem(USE_MILS_KEY)) === '1';
+  } catch {
+    return false;
+  }
+};
+
+export const saveUseMils = async (enabled: boolean) => {
+  await AsyncStorage.setItem(USE_MILS_KEY, enabled ? '1' : '0');
+};
+
+const LOCK_PIN_KEY = '@bussola/lockPin';
+
+export const loadLockPin = async (): Promise<string | null> => {
+  try {
+    return await AsyncStorage.getItem(LOCK_PIN_KEY);
+  } catch {
+    return null;
+  }
+};
+
+export const saveLockPin = async (pin: string) => {
+  await AsyncStorage.setItem(LOCK_PIN_KEY, pin);
+};
+
+export const clearLockPin = async () => {
+  await AsyncStorage.removeItem(LOCK_PIN_KEY);
 };

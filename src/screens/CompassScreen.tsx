@@ -43,6 +43,7 @@ import TargetNavBar from '../components/TargetNavBar';
 import TrackView from '../components/TrackView';
 import FieldNotesSheet from '../components/FieldNotesSheet';
 import CoordModal from '../components/CoordModal';
+import OdometerView from '../components/OdometerView';
 import {
   fetchCivilAlerts,
   isSevere,
@@ -53,7 +54,7 @@ import { useAssistant } from '../assistant/AssistantContext';
 import { speak } from '../assistant/voice';
 import KeferaAvatar from '../components/KeferaAvatar';
 import { useLanguage } from '../i18n/LanguageContext';
-import type { KnownWaypoint } from '../assistant/types';
+import type { KnownWaypoint, TrackSummary } from '../assistant/types';
 import { spacing, radius } from '../theme/colors';
 import {
   watchLocation,
@@ -89,9 +90,24 @@ import {
   saveVoiceGuide,
   loadVirtualWp,
   saveVirtualWp,
+  loadUseMils,
+  saveUseMils,
+  loadLockPin,
+  saveLockPin,
+  clearLockPin,
   type AppMode,
   type DisplayMode,
 } from '../services/preferencesService';
+import { buildBackup, applyBackup } from '../services/backupService';
+import {
+  addDistance,
+  getTotals,
+  type DayTotal,
+} from '../services/odometerService';
+import {
+  loadTracks,
+  type RecordedTrack,
+} from '../services/trackService';
 import {
   applyDeclination,
   suggestDeclination,
@@ -103,6 +119,7 @@ import {
   cardinalOf,
   formatCoord,
   formatTime,
+  formatAzimuth,
 } from '../utils/compass';
 import {
   haversine,
@@ -235,6 +252,13 @@ const CompassScreen = () => {
   const [baroBaseline, setBaroBaseline] = useState<number | null>(null);
 
   const [odometer, setOdometer] = useState(0);
+  const [useMils, setUseMils] = useState(false);
+  const [odoHistory, setOdoHistory] = useState<{
+    today: number;
+    week: number;
+    lastDays: DayTotal[];
+  } | null>(null);
+  const [trackSummary, setTrackSummary] = useState<TrackSummary | null>(null);
 
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
   const [wpVisible, setWpVisible] = useState(false);
@@ -273,6 +297,32 @@ const CompassScreen = () => {
     loadVirtualWp().then(id => {
       setVirtualWpId(id);
     });
+    loadUseMils().then(setUseMils);
+  }, []);
+
+  useEffect(() => {
+    const refresh = () => {
+      getTotals()
+        .then(setOdoHistory)
+        .catch(() => {});
+      loadTracks().then(tracks => {
+        let longest: RecordedTrack | null = null;
+        for (const tr of tracks) {
+          if (longest === null || tr.distance > longest.distance) {
+            longest = tr;
+          }
+        }
+        setTrackSummary({
+          count: tracks.length,
+          totalDistance: tracks.reduce((acc, tr) => acc + tr.distance, 0),
+          longestDistance: longest ? longest.distance : null,
+          longestName: longest ? longest.name : null,
+        });
+      });
+    };
+    refresh();
+    const id = setInterval(refresh, 20000);
+    return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
@@ -295,6 +345,14 @@ const CompassScreen = () => {
     });
   }, []);
 
+  const toggleMils = useCallback(() => {
+    setUseMils(prev => {
+      const next = !prev;
+      saveUseMils(next).catch(() => {});
+      return next;
+    });
+  }, []);
+
   const setDeclination = useCallback((decl: Declination) => {
     declinationRef.current = decl;
     setDeclinationState(decl);
@@ -305,6 +363,49 @@ const CompassScreen = () => {
     setAppModeState(mode);
     saveAppMode(mode).catch(() => {});
   }, []);
+
+  const handleVerifyPin = useCallback(async (pin: string): Promise<boolean> => {
+    const stored = await loadLockPin();
+    return stored != null && stored === pin;
+  }, []);
+
+  const handleSetPin = useCallback(async (pin: string | null) => {
+    if (pin == null) {
+      await clearLockPin();
+    } else {
+      await saveLockPin(pin);
+    }
+  }, []);
+
+  const handleExportBackup = useCallback(async () => {
+    const json = await buildBackup();
+    await Share.share({ message: json });
+  }, []);
+
+  const handleApplyBackup = useCallback(
+    async (json: string): Promise<string | null> => {
+      const result = await applyBackup(json);
+      if (!result.ok) {
+        return result.error === 'invalid' ? 'invalid' : result.error;
+      }
+      await Promise.all([
+        loadAppMode().then(setAppModeState),
+        loadDeclination().then(decl => {
+          declinationRef.current = decl;
+          setDeclinationState(decl);
+        }),
+        loadWaypoints().then(setWaypoints),
+        loadVoiceGuide().then(setVoiceGuide),
+        loadVirtualWp().then(setVirtualWpId),
+        loadUseMils().then(setUseMils),
+      ]);
+      getTotals()
+        .then(setOdoHistory)
+        .catch(() => {});
+      return null;
+    },
+    [],
+  );
 
   const selectDisplayMode = useCallback((mode: DisplayMode) => {
     setDisplayModeState(mode);
@@ -369,6 +470,7 @@ const CompassScreen = () => {
     if (d > 0 && d < 500) {
       distTotalRef.current += d;
       setOdometer(distTotalRef.current);
+      addDistance(d).catch(() => {});
     }
     prevFixRef.current = { latitude: fix.latitude, longitude: fix.longitude };
 
@@ -891,6 +993,9 @@ const CompassScreen = () => {
       declinationEnabled: declination.enabled,
       declination: declination.degrees,
       odometer,
+      todayDistance: odoHistory ? odoHistory.today : null,
+      weekDistance: odoHistory ? odoHistory.week : null,
+      trackSummary,
       appMode,
       displayMode,
       theme,
@@ -905,6 +1010,8 @@ const CompassScreen = () => {
     baroAvailable,
     declination,
     odometer,
+    odoHistory,
+    trackSummary,
     appMode,
     displayMode,
     theme,
@@ -915,9 +1022,14 @@ const CompassScreen = () => {
     assistant.setActionHandler(action => {
       if (action.type === 'setMode') {
         selectDisplayMode(action.mode as DisplayMode);
+      } else if (action.type === 'addWaypoint') {
+        if (location.latitude === 0 && location.longitude === 0) {
+          return;
+        }
+        addWaypoint(action.name);
       }
     });
-  }, [assistant, selectDisplayMode]);
+  }, [assistant, selectDisplayMode, addWaypoint, location.latitude, location.longitude]);
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -989,6 +1101,7 @@ const CompassScreen = () => {
     { key: 'wind', icon: '🍃', label: t('ui_mode_wind').replace(/^\S+\s*/, ''), sub: t('ui_card_wind') },
     { key: 'track', icon: '🗺️', label: t('ui_mode_track').replace(/^\S+\s*/, ''), sub: t('ui_card_track') },
     { key: 'notes', icon: '📓', label: t('ui_mode_notes').replace(/^\S+\s*/, ''), sub: t('ui_card_notes') },
+    { key: 'odometer', icon: '📏', label: t('ui_mode_odometer').replace(/^\S+\s*/, ''), sub: t('ui_card_odometer') },
     { key: 'height', icon: '⌖', label: t('ui_mode_height').replace(/^\S+\s*/, ''), sub: t('ui_card_height') },
     { key: 'car', icon: '🚗', label: t('ui_mode_car').replace(/^\S+\s*/, ''), sub: t('ui_card_car') },
     { key: 'tri', icon: '📐', label: t('ui_mode_tri').replace(/^\S+\s*/, ''), sub: t('ui_card_tri') },
@@ -1168,7 +1281,7 @@ const CompassScreen = () => {
                   <Text style={styles.coordLabel}>{t('ui_destination')}</Text>
                   <Text style={styles.coordValue}>
                     {activeTarget
-                      ? `${Math.round(activeTarget.bearing)}° · ${formatDistance(activeTarget.distance)}`
+                      ? `${formatAzimuth(activeTarget.bearing, useMils)} · ${formatDistance(activeTarget.distance)}`
                       : '—'}
                   </Text>
                 </View>
@@ -1259,7 +1372,7 @@ const CompassScreen = () => {
                 style={[styles.statusPillDot, { backgroundColor: colors.success }]}
               />
               <Text style={styles.statusPillText}>
-                {t('ui_home_status')} · {Math.round(heading)}° {cardinal.short}
+                {t('ui_home_status')} · {formatAzimuth(heading, useMils)} {cardinal.short}
               </Text>
             </View>
           </View>
@@ -1304,12 +1417,12 @@ const CompassScreen = () => {
 
           <View style={styles.headingBlock}>
             <Text style={styles.headingBig}>
-              {Math.round(heading).toString().padStart(3, '0')}°
+              {formatAzimuth(heading, useMils)}
             </Text>
             <Text style={styles.headingCardinal}>{cardinal.full}</Text>
             <Text style={styles.backBearing}>
               {t('ui_back_bearing')}{' '}
-              {((Math.round(heading) + 180) % 360).toString().padStart(3, '0')}°{' '}
+              {formatAzimuth(heading + 180, useMils)}{' '}
               {cardinalOf(heading + 180).short}
             </Text>
           </View>
@@ -1320,6 +1433,7 @@ const CompassScreen = () => {
               distance={activeTarget.distance}
               relative={targetRelative}
               arrived={arrived}
+              mils={useMils}
             />
           ) : null}
         </View>
@@ -1342,6 +1456,7 @@ const CompassScreen = () => {
               moonIcon={celestial?.moonIcon ?? '🌙'}
               target={targetMarker}
               virtual={virtualMarker}
+              mils={useMils}
               active
             />
           </ErrorBoundary>
@@ -1377,6 +1492,7 @@ const CompassScreen = () => {
             accuracy={location.accuracy}
             heading={heading}
             hasFix={hasFix}
+            mils={useMils}
           />
         </View>
       ) : displayMode === 'tri' ? (
@@ -1388,6 +1504,7 @@ const CompassScreen = () => {
             hasFix={hasFix}
             declinationEnabled={declination.enabled}
             declinationDegrees={declination.degrees}
+            mils={useMils}
             onAdd={addRemoteWaypoint}
           />
         </View>
@@ -1404,7 +1521,7 @@ const CompassScreen = () => {
         </View>
       ) : displayMode === 'track' ? (
         <View style={styles.trackArea}>
-          <TrackView active location={location} heading={heading} />
+          <TrackView active location={location} heading={heading} mils={useMils} />
         </View>
       ) : displayMode === 'notes' ? (
         <View style={styles.trackArea}>
@@ -1414,6 +1531,10 @@ const CompassScreen = () => {
             altitude={location.altitude}
             hasFix={hasFix}
           />
+        </View>
+      ) : displayMode === 'odometer' ? (
+        <View style={styles.trackArea}>
+          <OdometerView />
         </View>
       ) : (
         <View style={styles.arArea}>
@@ -1426,6 +1547,7 @@ const CompassScreen = () => {
             moonIcon={celestial?.moonIcon ?? '🌙'}
             target={targetMarker}
             virtual={virtualMarker}
+            mils={useMils}
             blocked={arBlocked}
           />
         </View>
@@ -1452,6 +1574,12 @@ const CompassScreen = () => {
         arStatus={{ supported: arSupported, label: arLabel }}
         voiceGuide={voiceGuide}
         onToggleVoiceGuide={toggleVoiceGuide}
+        mils={useMils}
+        onToggleMils={toggleMils}
+        onVerifyPin={handleVerifyPin}
+        onSetPin={handleSetPin}
+        onExportBackup={handleExportBackup}
+        onApplyBackup={handleApplyBackup}
       />
 
       <CalibrationModal

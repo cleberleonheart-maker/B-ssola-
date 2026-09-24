@@ -5,6 +5,23 @@ export const normalizeHeading = (deg: number) => {
   return value < 0 ? value + 360 : value;
 };
 
+export const MILS_PER_DEG = 6400 / 360;
+
+/**
+ * Formata um azimute em graus (000°–360°) ou milésimos militares
+ * ("mils", 6400 no círculo completo).
+ */
+export const formatAzimuth = (deg: number | null, useMils: boolean): string => {
+  if (deg == null || !Number.isFinite(deg)) return '—';
+  const value = Math.round(normalizeHeading(deg));
+  if (useMils) {
+    return `${Math.round(value * MILS_PER_DEG)
+      .toString()
+      .padStart(4, '0')} mil`;
+  }
+  return `${value.toString().padStart(3, '0')}°`;
+};
+
 /**
  * Heading (azimute) com compensação de inclinação, em graus (0-360).
  * Usa acelerômetro para estimar pitch/roll e corrige o magnetômetro.

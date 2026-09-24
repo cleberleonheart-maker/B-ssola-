@@ -36,6 +36,11 @@ export const deleteNote = async (id: string) => {
   return next;
 };
 
+export const replaceNotes = async (list: FieldNote[]) => {
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  return list;
+};
+
 export const markSynced = async (id: string): Promise<FieldNote[]> => {
   const list = await loadNotes();
   const next = list.map(n => (n.id === id ? { ...n, cloudSynced: true } : n));

@@ -34,5 +34,10 @@ export const removeWaypoint = async (id: string) => {
   return next;
 };
 
+export const replaceWaypoints = async (list: Waypoint[]) => {
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  return list;
+};
+
 export const createWaypointId = () =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;

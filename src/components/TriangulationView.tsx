@@ -4,7 +4,7 @@ import { useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import { formatDistance } from '../utils/geo';
-import { normalizeHeading, formatTime } from '../utils/compass';
+import { normalizeHeading, formatTime, formatAzimuth } from '../utils/compass';
 
 type Sight = {
   lat: number;
@@ -21,6 +21,7 @@ type Props = {
   hasFix: boolean;
   declinationEnabled: boolean;
   declinationDegrees: number;
+  mils?: boolean;
   onAdd: (wp: { name: string; latitude: number; longitude: number }) => void;
 };
 
@@ -66,6 +67,7 @@ export const TriangulationView = ({
   hasFix,
   declinationEnabled,
   declinationDegrees,
+  mils = false,
   onAdd,
 }: Props) => {
   const colors = useThemeColors();
@@ -158,7 +160,7 @@ export const TriangulationView = ({
             { color: sights.length >= 2 ? colors.textMuted : colors.background },
           ]}>
           {sights.length === 0 ? t('tri_sight1') : t('tri_sight2')} ·{' '}
-          {Math.round(heading).toString().padStart(3, '0')}°
+          {formatAzimuth(heading, mils)}
         </Text>
       </Pressable>
 

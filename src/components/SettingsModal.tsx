@@ -3,6 +3,7 @@ import {
   Modal,
   View,
   Text,
+  TextInput,
   Pressable,
   StyleSheet,
   ScrollView,
@@ -19,6 +20,7 @@ import type { ThemeName } from '../theme/themes';
 import type { LocationMode } from '../services/locationService';
 import type { AppMode } from '../services/preferencesService';
 import type { Declination } from '../utils/declination';
+import { loadLockPin } from '../services/preferencesService';
 import { APP_VERSION, APP_VERSION_CODE } from '../version.generated';
 import { checkForUpdate, type AvailableUpdate } from '../services/versionService';
 import { soundAvailable, loadSoundPref, saveSoundPref } from '../services/sound';
@@ -42,6 +44,12 @@ type Props = {
   arStatus: { supported: boolean; label: string };
   voiceGuide: boolean;
   onToggleVoiceGuide: () => void;
+  mils: boolean;
+  onToggleMils: () => void;
+  onVerifyPin: (pin: string) => Promise<boolean>;
+  onSetPin: (pin: string | null) => Promise<void>;
+  onExportBackup: () => Promise<void>;
+  onApplyBackup: (json: string) => Promise<string | null>;
 };
 
 const LOCATION_MODES = (
@@ -69,6 +77,13 @@ const THEME_LABEL_KEYS: Record<string, string> = {
   night: 'ui_theme_night',
 };
 
+type PinFlow =
+  | { kind: 'new'; step: 'enter' | 'confirm'; first: string }
+  | { kind: 'change'; step: 'current' }
+  | { kind: 'change'; step: 'enter' | 'confirm'; first: string }
+  | { kind: 'remove'; step: 'current' }
+  | null;
+
 const SettingsModal = ({
   visible,
   onClose,
@@ -86,6 +101,12 @@ const SettingsModal = ({
   arStatus,
   voiceGuide,
   onToggleVoiceGuide,
+  mils,
+  onToggleMils,
+  onVerifyPin,
+  onSetPin,
+  onExportBackup,
+  onApplyBackup,
 }: Props) => {
   const { colors, theme, setTheme, themeOptions } = useTheme();
   const { t, lang, setLang } = useLanguage();
@@ -104,6 +125,155 @@ const SettingsModal = ({
   const [checking, setChecking] = useState(false);
   const [whatsNewVisible, setWhatsNewVisible] = useState(false);
   const [soundOn, setSoundOn] = useState(true);
+  const [pinFlow, setPinFlow] = useState<PinFlow>(null);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [importVisible, setImportVisible] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [hasPin, setHasPin] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    loadLockPin()
+      .then(pin => setHasPin(pin != null))
+      .catch(() => {});
+  }, [visible]);
+
+  const closePinFlow = React.useCallback(() => {
+    setPinFlow(null);
+    setPinInput('');
+    setPinError(null);
+  }, []);
+
+  const advancePin = React.useCallback(async () => {
+    const digits = pinInput;
+    const flow = pinFlow;
+    if (!flow || digits.length !== 4) return;
+
+    if (flow.kind === 'new') {
+      if (flow.step === 'enter') {
+        setPinFlow({ kind: 'new', step: 'confirm', first: digits });
+        setPinInput('');
+        return;
+      }
+      if (digits === flow.first) {
+        await onSetPin(digits);
+        closePinFlow();
+        setHasPin(true);
+        Alert.alert(t('lock_title'), t('lock_pin_created'));
+      } else {
+        setPinFlow({ kind: 'new', step: 'enter', first: '' });
+        setPinInput('');
+        setPinError(t('lock_pin_mismatch'));
+      }
+      return;
+    }
+
+    if (flow.kind === 'change') {
+      if (flow.step === 'current') {
+        const ok = await onVerifyPin(digits);
+        if (ok) {
+          setPinFlow({ kind: 'change', step: 'enter', first: '' });
+          setPinInput('');
+        } else {
+          setPinInput('');
+          setPinError(t('lock_pin_wrong'));
+        }
+        return;
+      }
+      if (flow.step === 'enter') {
+        setPinFlow({ kind: 'change', step: 'confirm', first: digits });
+        setPinInput('');
+        return;
+      }
+      if (digits === flow.first) {
+        await onSetPin(digits);
+        closePinFlow();
+        Alert.alert(t('lock_title'), t('lock_pin_created'));
+      } else {
+        setPinFlow({ kind: 'change', step: 'enter', first: '' });
+        setPinInput('');
+        setPinError(t('lock_pin_mismatch'));
+      }
+      return;
+    }
+
+    const ok = await onVerifyPin(digits);
+    if (ok) {
+      await onSetPin(null);
+      closePinFlow();
+      setHasPin(false);
+      Alert.alert(t('lock_title'), t('lock_pin_removed'));
+    } else {
+      setPinInput('');
+      setPinError(t('lock_pin_wrong'));
+    }
+  }, [pinInput, pinFlow, onVerifyPin, onSetPin, t, closePinFlow]);
+
+  useEffect(() => {
+    if (pinInput.length === 4) {
+      advancePin();
+    }
+  }, [pinInput, advancePin]);
+
+  const pinTitle = (() => {
+    if (!pinFlow) return '';
+    if (pinFlow.kind === 'new' || (pinFlow.kind === 'change' && pinFlow.step !== 'current')) {
+      return pinFlow.kind === 'change' && pinFlow.step === 'confirm'
+        ? t('lock_pin_confirm')
+        : pinFlow.kind === 'new' && pinFlow.step === 'confirm'
+          ? t('lock_pin_confirm')
+          : t('lock_set_pin');
+    }
+    if (pinFlow.kind === 'change') return t('lock_pin_enter');
+    return t('lock_remove_pin');
+  })();
+
+  const pinSub = (() => {
+    if (!pinFlow) return '';
+    if (pinFlow.kind === 'change' && pinFlow.step === 'current') {
+      return t('lock_pin_required_off');
+    }
+    if (pinFlow.kind === 'remove') return t('lock_pin_required_off');
+    return '';
+  })();
+
+  const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      await onExportBackup();
+      Alert.alert(t('set_backup_export'), t('backup_exported'));
+    } catch {
+      Alert.alert(t('set_backup_export'), t('backup_error', { error: '' }));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!importText.trim()) return;
+    const errorKey = await onApplyBackup(importText);
+    if (errorKey == null) {
+      setImportVisible(false);
+      setImportText('');
+      Alert.alert(t('set_backup_import'), t('backup_restored'));
+    } else {
+      Alert.alert(
+        t('set_backup_import'),
+        errorKey === 'invalid'
+          ? t('backup_invalid')
+          : t('backup_error', { error: errorKey }),
+      );
+    }
+  };
+
+  const startPinFlow = (flow: Exclude<PinFlow, null>) => {
+    setPinFlow(flow);
+    setPinInput('');
+    setPinError(null);
+  };
 
   useEffect(() => {
     loadSoundPref()
@@ -477,6 +647,38 @@ const SettingsModal = ({
                 </Pressable>
               </View>
 
+              <View style={[styles.groupRow, rowDivider]}>
+                <View style={[styles.iconChip, { backgroundColor: colors.surfaceAlt }]}>
+                  <Text style={styles.iconChipText}>🎯</Text>
+                </View>
+                <View style={styles.groupText}>
+                  <Text style={[styles.groupLabel, { color: colors.text }]}>
+                    {t('set_mils_title')}
+                  </Text>
+                  <Text style={[styles.groupSub, { color: colors.textMuted }]} numberOfLines={2}>
+                    {t('set_mils_sub')}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={onToggleMils}
+                  style={[
+                    styles.switchTrack,
+                    mils ? styles.switchTrackOn : styles.switchTrackOff,
+                    {
+                      backgroundColor: mils ? colors.primary : colors.surfaceAlt,
+                    },
+                  ]}>
+                  <View
+                    style={[
+                      styles.switchKnob,
+                      {
+                        backgroundColor: mils ? colors.background : colors.textMuted,
+                      },
+                    ]}
+                  />
+                </Pressable>
+              </View>
+
               <Pressable onPress={onOpenWaypoints} style={[styles.groupRow, rowDivider]}>
                 <View style={[styles.iconChip, { backgroundColor: colors.surfaceAlt }]}>
                   <Text style={styles.iconChipText}>📍</Text>
@@ -555,18 +757,128 @@ const SettingsModal = ({
                 )}
               </Pressable>
 
+<Pressable
+                  onPress={() => setWhatsNewVisible(true)}
+                  style={[styles.groupRow, rowDivider]}>
+                  <View style={[styles.iconChip, { backgroundColor: colors.surfaceAlt }]}>
+                    <Text style={styles.iconChipText}>✨</Text>
+                  </View>
+                  <View style={styles.groupText}>
+                    <Text style={[styles.groupLabel, { color: colors.text }]}>
+                      {t('wn_subtitle')}
+                    </Text>
+                    <Text style={[styles.groupSub, { color: colors.textMuted }]}>
+                      {t('wn_title', { version: APP_VERSION })}
+                    </Text>
+                  </View>
+                  <Text style={[styles.chevron, { color: colors.textMuted }]}>›</Text>
+                </Pressable>
+            </View>
+
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+              {t('set_section_security')}
+            </Text>
+            <View style={[styles.groupCard, { backgroundColor: colors.surface }]}>
+              <View style={[styles.groupRow, styles.rowCol]}>
+                <View style={styles.calRow}>
+                  <View style={[styles.iconChip, { backgroundColor: colors.surfaceAlt }]}>
+                    <Text style={styles.iconChipText}>🔐</Text>
+                  </View>
+                  <View style={styles.groupText}>
+                    <Text style={[styles.groupLabel, { color: colors.text }]}>
+                      {t('lock_title')}
+                    </Text>
+                    <Text style={[styles.groupSub, { color: colors.textMuted }]} numberOfLines={2}>
+                      {t('lock_sub')}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() =>
+                      hasPin
+                        ? startPinFlow({ kind: 'remove', step: 'current' })
+                        : startPinFlow({ kind: 'new', step: 'enter', first: '' })
+                    }
+                    style={[
+                      styles.switchTrack,
+                      hasPin ? styles.switchTrackOn : styles.switchTrackOff,
+                      {
+                        backgroundColor: hasPin ? colors.primary : colors.surfaceAlt,
+                      },
+                    ]}>
+                    <View
+                      style={[
+                        styles.switchKnob,
+                        {
+                          backgroundColor: hasPin
+                            ? colors.background
+                            : colors.textMuted,
+                        },
+                      ]}
+                    />
+                  </Pressable>
+                </View>
+              </View>
+
+              {hasPin && (
+                <Pressable
+                  onPress={() =>
+                    startPinFlow({ kind: 'change', step: 'current' })
+                  }
+                  style={[styles.groupRow, rowDivider]}>
+                  <View style={[styles.iconChip, { backgroundColor: colors.surfaceAlt }]}>
+                    <Text style={styles.iconChipText}>🔑</Text>
+                  </View>
+                  <View style={styles.groupText}>
+                    <Text style={[styles.groupLabel, { color: colors.text }]}>
+                      {t('lock_change_pin')}
+                    </Text>
+                    <Text style={[styles.groupSub, { color: colors.textMuted }]}>
+                      {t('lock_pin_confirm')}
+                    </Text>
+                  </View>
+                  <Text style={[styles.chevron, { color: colors.textMuted }]}>›</Text>
+                </Pressable>
+              )}
+            </View>
+
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+              {t('set_section_data')}
+            </Text>
+            <View style={[styles.groupCard, { backgroundColor: colors.surface }]}>
               <Pressable
-                onPress={() => setWhatsNewVisible(true)}
-                style={[styles.groupRow, rowDivider]}>
+                onPress={handleExport}
+                disabled={exporting}
+                style={[styles.groupRow]}>
                 <View style={[styles.iconChip, { backgroundColor: colors.surfaceAlt }]}>
-                  <Text style={styles.iconChipText}>✨</Text>
+                  <Text style={styles.iconChipText}>💾</Text>
                 </View>
                 <View style={styles.groupText}>
                   <Text style={[styles.groupLabel, { color: colors.text }]}>
-                    {t('wn_subtitle')}
+                    {t('set_backup_export')}
                   </Text>
-                  <Text style={[styles.groupSub, { color: colors.textMuted }]}>
-                    {t('wn_title', { version: APP_VERSION })}
+                  <Text style={[styles.groupSub, { color: colors.textMuted }]} numberOfLines={3}>
+                    {t('backup_notes_hint')}
+                  </Text>
+                </View>
+                {exporting ? (
+                  <Text style={[styles.chevron, { color: colors.textMuted }]}>…</Text>
+                ) : (
+                  <Text style={[styles.chevron, { color: colors.textMuted }]}>›</Text>
+                )}
+              </Pressable>
+
+              <Pressable
+                onPress={() => setImportVisible(true)}
+                style={[styles.groupRow, rowDivider]}>
+                <View style={[styles.iconChip, { backgroundColor: colors.surfaceAlt }]}>
+                  <Text style={styles.iconChipText}>📥</Text>
+                </View>
+                <View style={styles.groupText}>
+                  <Text style={[styles.groupLabel, { color: colors.text }]}>
+                    {t('set_backup_import')}
+                  </Text>
+                  <Text style={[styles.groupSub, { color: colors.textMuted }]} numberOfLines={2}>
+                    {t('backup_import_sub')}
                   </Text>
                 </View>
                 <Text style={[styles.chevron, { color: colors.textMuted }]}>›</Text>
@@ -575,6 +887,116 @@ const SettingsModal = ({
           </ScrollView>
         </Pressable>
       </Pressable>
+
+      {pinFlow && (
+        <View style={styles.pinOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closePinFlow} />
+          <View style={[styles.pinCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.pinTitle, { color: colors.text }]}>{pinTitle}</Text>
+            <Text style={[styles.pinSub, { color: colors.textMuted }]}>{pinSub}</Text>
+            <TextInput
+              autoFocus
+              keyboardType="number-pad"
+              value={pinInput}
+              onChangeText={text => {
+                const digits = text.replace(/\D/g, '').slice(0, 4);
+                setPinInput(digits);
+                setPinError(null);
+              }}
+              maxLength={4}
+              secureTextEntry
+              style={[
+                styles.pinInput,
+                { borderColor: colors.border, color: colors.text },
+              ]}
+              placeholder="••••"
+              placeholderTextColor={colors.textMuted}
+            />
+            <View style={styles.pinDots}>
+              {[0, 1, 2, 3].map(i => (
+                <View
+                  key={i}
+                  style={[
+                    styles.pinDot,
+                    { backgroundColor: i < pinInput.length ? colors.primary : colors.border },
+                  ]}
+                />
+              ))}
+            </View>
+            {pinError ? (
+              <Text style={[styles.pinErrorText, { color: colors.danger }]}>
+                {pinError}
+              </Text>
+            ) : (
+              <View style={styles.pinErrorSpacer} />
+            )}
+            <Pressable onPress={closePinFlow} style={styles.pinCancel}>
+              <Text style={[styles.pinCancelText, { color: colors.textMuted }]}>
+                {t('backup_cancel')}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {importVisible && (
+        <View style={styles.pinOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setImportVisible(false)}
+          />
+          <View style={[styles.importCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.pinTitle, { color: colors.text }]}>
+              {t('backup_import_title')}
+            </Text>
+            <Text style={[styles.pinSub, { color: colors.textMuted }]}>
+              {t('backup_import_sub')}
+            </Text>
+            <TextInput
+              multiline
+              autoFocus
+              value={importText}
+              onChangeText={setImportText}
+              style={[
+                styles.importInput,
+                { borderColor: colors.border, color: colors.text },
+              ]}
+              placeholder={t('backup_import_placeholder')}
+              placeholderTextColor={colors.textMuted}
+              textAlignVertical="top"
+            />
+            <View style={styles.importActions}>
+              <Pressable
+                onPress={() => setImportVisible(false)}
+                style={styles.pinCancel}>
+                <Text style={[styles.pinCancelText, { color: colors.textMuted }]}>
+                  {t('backup_cancel')}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  Alert.alert(
+                    t('backup_restore_confirm'),
+                    t('backup_import_sub'),
+                    [
+                      { text: t('backup_cancel'), style: 'cancel' },
+                      { text: t('backup_restore'), onPress: handleRestore },
+                    ],
+                  );
+                }}
+                disabled={!importText.trim()}
+                style={[
+                  styles.restoreButton,
+                  { backgroundColor: colors.primary, opacity: importText.trim() ? 1 : 0.5 },
+                ]}>
+                <Text style={styles.restoreButtonText}>
+                  {t('backup_restore')}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      )}
 
       <UpdateAvailableModal
         visible={update !== null}
@@ -794,6 +1216,113 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     marginLeft: spacing.sm,
+  },
+  pinOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    paddingHorizontal: spacing.xl,
+  },
+  pinCard: {
+    width: '100%',
+    maxWidth: 320,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: '#00000018',
+    padding: spacing.xl,
+    alignItems: 'center',
+  },
+  pinTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  pinSub: {
+    fontSize: 12,
+    marginTop: spacing.xs,
+    marginBottom: spacing.md,
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  pinInput: {
+    width: 160,
+    height: 52,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    fontSize: 26,
+    letterSpacing: 14,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  pinDots: {
+    flexDirection: 'row',
+    marginTop: spacing.md,
+  },
+  pinDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginHorizontal: 6,
+  },
+  pinErrorText: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: spacing.md,
+    textAlign: 'center',
+  },
+  pinErrorSpacer: {
+    marginTop: spacing.md,
+    height: 16,
+  },
+  pinCancel: {
+    marginTop: spacing.md,
+    padding: spacing.sm,
+  },
+  pinCancelText: {
+    fontSize: 14,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  importCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: '#00000018',
+    padding: spacing.lg,
+  },
+  importInput: {
+    width: '100%',
+    height: 140,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    fontSize: 13,
+    marginTop: spacing.sm,
+    fontFamily: 'monospace',
+  },
+  importActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: spacing.sm,
+  },
+  restoreButton: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    marginLeft: spacing.sm,
+  },
+  restoreButtonText: {
+    color: '#000',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });
 

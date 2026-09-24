@@ -100,6 +100,11 @@ export const deleteTrack = async (id: string) => {
   return next;
 };
 
+export const replaceTracks = async (list: RecordedTrack[]) => {
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  return list;
+};
+
 export const simplifyPath = (
   points: TrackPoint[],
   tolerance = 0.00003,

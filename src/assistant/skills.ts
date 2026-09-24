@@ -6,6 +6,8 @@ import { cardinalOf, formatCoord } from '../utils/compass';
 import { haversine, initialBearing, formatDistance } from '../utils/geo';
 import { toDMS, toUTM, formatUTM } from '../utils/coords';
 import type { DisplayMode } from '../services/preferencesService';
+import { getTotals } from '../services/odometerService';
+import { loadTracks, type RecordedTrack } from '../services/trackService';
 import type { AssistantAction, AssistantContextData } from './types';
 
 export type SkillOutput =
@@ -22,7 +24,7 @@ export type Skill = {
     tokens: string[],
     wildcards: string[],
     t: Translator,
-  ) => SkillOutput;
+  ) => SkillOutput | Promise<SkillOutput>;
 };
 
 const nowTime = (): string => {
@@ -69,6 +71,154 @@ const findWaypoint = (
 };
 
 const pick = (list: string[]): string => list[Math.floor(Math.random() * list.length)];
+
+const capitalizeName = (phrase: string): string => {
+  const cleaned = phrase.trim().replace(/[.,;!?]+$/, '');
+  if (!cleaned) {
+    return cleaned;
+  }
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+};
+
+const waypointVoiceSkill: Skill = {
+  id: 'waypoint_voice',
+  patterns: [
+    'marca este ponto como ...',
+    'marque este ponto como ...',
+    'marcar este ponto como ...',
+    'salva este ponto como ...',
+    'salve este ponto como ...',
+    'salvar este ponto como ...',
+    'guarda este ponto como ...',
+    'guarde este ponto como ...',
+    'registra este ponto como ...',
+    'marca um ponto como ...',
+    'salva um ponto como ...',
+    'marca aqui como ...',
+    'marca este ponto',
+    'marque este ponto',
+    'marca um ponto',
+    'salva este ponto',
+    'guarda este ponto',
+    'marca un punto como ...',
+    'guarda este punto como ...',
+    'guardar este punto como ...',
+    'mark this point as ...',
+    'save this point as ...',
+    'registra este punto como ...',
+  ],
+  run: (ctx, _n, _tokens, wildcards, t) => {
+    if (ctx.latitude == null || ctx.longitude == null) {
+      return t('as_wp_voz_waiting');
+    }
+    const captured = wildcards[wildcards.length - 1] || '';
+    const name = captured.trim()
+      ? capitalizeName(captured)
+      : t('as_wp_voz_default');
+    return {
+      text: t('as_wp_voz_added', { name }),
+      action: { type: 'addWaypoint', name },
+    };
+  },
+};
+
+const longestTrackOf = (
+  tracks: RecordedTrack[],
+): RecordedTrack | null => {
+  if (tracks.length === 0) return null;
+  return tracks.reduce<RecordedTrack | null>(
+    (best, track) =>
+      best === null || track.distance > best.distance ? track : best,
+    null,
+  );
+};
+
+const trackHistorySkill: Skill = {
+  id: 'track_history',
+  patterns: [
+    'quanto andei hoje',
+    'quanto eu andei hoje',
+    'quanto caminhei hoje',
+    'quanto andei ontem',
+    'quanto eu andei ontem',
+    'quanto caminhei ontem',
+    'quanto andei esta semana',
+    'quanto andei essa semana',
+    'quanto andei na semana',
+    'quanto eu andei esta semana',
+    'quanto andei nesta semana',
+    'quanto caminhei esta semana',
+    '* andei * semana',
+    '* caminhei * semana',
+    'qual * trilha mais longa',
+    'qual * trilha * grande',
+    'a trilha mais longa',
+    '* mais longa',
+    'quantas trilhas *',
+    'quantas rotas *',
+    '* trilhas salvas',
+    '* rotas salvas',
+    'how much did i walk today',
+    'how far did i walk today',
+    'how much did i walk this week',
+    'which * longest track',
+    'longest track',
+    'how many tracks *',
+    'cuanto camine hoy',
+    'cuanto anduve hoy',
+    'cuanto camine esta semana',
+    'cuanto anduve esta semana',
+    'cual * ruta mas larga',
+    'cuantas rutas *',
+  ],
+  run: async (_ctx, normalized, _tokens, _wildcards, t) => {
+    const totals = await getTotals();
+
+    if (/hoje|today|hoy/.test(normalized) && !/semana|week/.test(normalized)) {
+      return totals.today > 0
+        ? t('as_hist_today', { d: formatDistance(totals.today) })
+        : t('as_hist_today_zero');
+    }
+
+    if (/ontem|yesterday|ayer/.test(normalized)) {
+      const yesterday = totals.lastDays[1]?.meters ?? 0;
+      return yesterday > 0
+        ? t('as_hist_yesterday', { d: formatDistance(yesterday) })
+        : t('as_hist_yesterday_zero');
+    }
+
+    if (/semana|week/.test(normalized)) {
+      return totals.week > 0
+        ? t('as_hist_week', { d: formatDistance(totals.week) })
+        : t('as_hist_week_zero');
+    }
+
+    const tracks = await loadTracks();
+
+    if (/mais longa|mas larga|longest|la mas larga/.test(normalized)) {
+      const longest = longestTrackOf(tracks);
+      return longest
+        ? t('as_hist_longest', {
+            name: longest.name,
+            d: formatDistance(longest.distance),
+          })
+        : t('as_hist_no_tracks');
+    }
+
+    if (/quantas trilhas|quantas rotas|how many tracks|cuantas rutas/.test(normalized)) {
+      if (tracks.length === 0) {
+        return t('as_hist_no_tracks');
+      }
+      const total = tracks.reduce((acc, track) => acc + track.distance, 0);
+      return t('as_hist_tracks', {
+        count: tracks.length,
+        d: formatDistance(total),
+      });
+    }
+
+    return null;
+  },
+};
 
 const jokeSkill: Skill = {
   id: 'joke',
@@ -388,6 +538,10 @@ const MODE_ALIASES: { mode: DisplayMode; terms: string[] }[] = [
     mode: 'notes',
     terms: ['caderneta de campo', 'caderneta', 'fieldbook', 'libreta', 'anotacoes', 'field notes'],
   },
+  {
+    mode: 'odometer',
+    terms: ['odometro', 'odometer', 'odómetro', 'historico de distancia', 'distancia por dia'],
+  },
 ];
 
 const MODE_ARTICLES = new Set([
@@ -662,6 +816,8 @@ const skills: Skill[] = [
   pressureSkill,
   altitudeSkill,
   declinationSkill,
+  waypointVoiceSkill,
+  trackHistorySkill,
   waypointsSkill,
   waypointDistanceSkill,
   odometerSkill,
@@ -678,17 +834,17 @@ const skills: Skill[] = [
   complimentSkill,
 ];
 
-export const runSkills = (
+export const runSkills = async (
   ctx: AssistantContextData,
   normalized: string,
   tokens: string[],
   t: Translator,
-): SkillOutput => {
+): Promise<SkillOutput> => {
   for (const skill of skills) {
     for (const pattern of skill.patterns) {
       const result = matches(pattern, normalized, tokens);
       if (result.matched) {
-        const output = skill.run(ctx, normalized, tokens, result.wildcards, t);
+        const output = await skill.run(ctx, normalized, tokens, result.wildcards, t);
         if (output != null) {
           return output;
         }

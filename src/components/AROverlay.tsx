@@ -3,7 +3,7 @@ import { Animated, View, Text, StyleSheet } from 'react-native';
 import { useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing } from '../theme/colors';
-import { cardinalOf } from '../utils/compass';
+import { cardinalOf, formatAzimuth } from '../utils/compass';
 import { formatDistance } from '../utils/geo';
 import type { CelestialPoint } from '../utils/astro';
 
@@ -16,6 +16,7 @@ type Props = {
   moonIcon: string;
   target: { name: string; bearing: number; distance: number } | null;
   virtual: { name: string; bearing: number; distance: number } | null;
+  mils?: boolean;
   blocked: string | null;
 };
 
@@ -38,6 +39,7 @@ const AROverlay = ({
   moonIcon,
   target,
   virtual,
+  mils = false,
   blocked,
 }: Props) => {
   const colors = useThemeColors();
@@ -168,7 +170,7 @@ const AROverlay = ({
       </View>
 
       <View style={styles.topBar}>
-        <Text style={styles.topHeading}>{Math.round(heading).toString().padStart(3, '0')}°</Text>
+        <Text style={styles.topHeading}>{formatAzimuth(heading, mils)}</Text>
         <Text style={styles.topCardinal}>{cardinal.full}</Text>
       </View>
 

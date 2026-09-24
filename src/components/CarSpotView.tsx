@@ -8,7 +8,7 @@ import {
   initialBearing,
   formatDistance,
 } from '../utils/geo';
-import { cardinalOf, normalizeHeading } from '../utils/compass';
+import { cardinalOf, normalizeHeading, formatAzimuth } from '../utils/compass';
 import { carSpotService, type CarSpot } from '../services/carSpotService';
 
 type Props = {
@@ -17,6 +17,7 @@ type Props = {
   accuracy: number | null;
   heading: number;
   hasFix: boolean;
+  mils?: boolean;
 };
 
 const ARRIVED_M = 25;
@@ -27,6 +28,7 @@ const CarSpotView = ({
   accuracy,
   heading,
   hasFix,
+  mils = false,
 }: Props) => {
   const colors = useThemeColors();
   const { t } = useLanguage();
@@ -137,7 +139,7 @@ const CarSpotView = ({
         {arrived ? t('car_arrived') : distance !== null ? formatDistance(distance) : '—'}
       </Text>
       <Text style={[styles.carSub, { color: colors.textMuted }]}>
-        {arrived ? `🚙 ${formatDistance(distance ?? 0)}` : `${cardinal.full} · ${Math.round(bearingTo)}°`}
+        {arrived ? `🚙 ${formatDistance(distance ?? 0)}` : `${cardinal.full} · ${formatAzimuth(bearingTo, mils)}`}
       </Text>
       <Text style={[styles.time, { color: colors.textMuted }]}>
         {t('car_parked_at', { time: parkedTime })}

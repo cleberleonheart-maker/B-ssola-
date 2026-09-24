@@ -10,7 +10,7 @@ import { useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import { formatDistance, haversine, initialBearing, normalizeAzimuth } from '../utils/geo';
-import { cardinalOf } from '../utils/compass';
+import { cardinalOf, formatAzimuth } from '../utils/compass';
 import { serializeTrackToGpx } from '../utils/gpx';
 import { shareTrackGpx } from '../services/trackShare';
 import TargetNavBar from './TargetNavBar';
@@ -36,11 +36,12 @@ type Props = {
   active: boolean;
   location: LocationFix;
   heading?: number;
+  mils?: boolean;
 };
 
 type DrawPoint = { x: number; y: number; alt: number | null };
 
-const TrackView = ({ active, location, heading = 0 }: Props) => {
+const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
   const colors = useThemeColors();
   const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -428,6 +429,7 @@ const TrackView = ({ active, location, heading = 0 }: Props) => {
                   distance={navTarget.distance}
                   relative={navTarget.relative}
                   arrived={navTarget.arrived}
+                  mils={mils}
                 />
                 <Pressable
                   onPress={() => setShortcut(s => !s)}
@@ -452,11 +454,9 @@ const TrackView = ({ active, location, heading = 0 }: Props) => {
                       </Text>
                       {'  '}
                       <Text style={{ color: colors.accent, fontWeight: '800' }}>
-                        {Math.round(navTarget.straight.bearing).toString().padStart(3, '0')}°
+                        {formatAzimuth(navTarget.straight.bearing, mils)}
                         {cardinalOf(navTarget.straight.bearing).short} {'↩️'}
-                        {((Math.round(navTarget.straight.bearing) + 180) % 360)
-                          .toString()
-                          .padStart(3, '0')}°
+                        {formatAzimuth(navTarget.straight.bearing + 180, mils)}
                         {cardinalOf(navTarget.straight.bearing + 180).short}
                       </Text>
                     </Text>

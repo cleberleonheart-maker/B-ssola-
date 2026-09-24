@@ -17,7 +17,7 @@ import {
 import { useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
-import { cardinalOf, normalizeHeading } from '../utils/compass';
+import { cardinalOf, normalizeHeading, formatAzimuth } from '../utils/compass';
 import { formatDistance } from '../utils/geo';
 import type { CelestialPoint } from '../utils/astro';
 import {
@@ -41,6 +41,7 @@ type Props = {
   target: { name: string; bearing: number; distance: number } | null;
   virtual: { name: string; bearing: number; distance: number } | null;
   active: boolean;
+  mils?: boolean;
 };
 
 type Marker = {
@@ -65,6 +66,7 @@ const CameraARView = ({
   target,
   virtual,
   active,
+  mils = false,
 }: Props) => {
   const colors = useThemeColors();
   const { t } = useLanguage();
@@ -469,7 +471,7 @@ const CameraARView = ({
 
       <View style={styles.headingBlock}>
         <Text style={styles.headingBig}>
-          {Math.round(heading).toString().padStart(3, '0')}°
+          {formatAzimuth(heading, mils)}
         </Text>
         <Text style={styles.headingCardinal}>{cardinal.full}</Text>
       </View>

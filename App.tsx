@@ -10,6 +10,8 @@ import AssistantModal from './src/components/AssistantModal';
 import WhatsNewModal from './src/components/WhatsNewModal';
 import UpdateAvailableModal from './src/components/UpdateAvailableModal';
 import LocationGate from './src/components/LocationGate';
+import LockScreen from './src/components/LockScreen';
+import { loadLockPin } from './src/services/preferencesService';
 import { APP_VERSION_CODE } from './src/version.generated';
 import {
   checkForUpdate,
@@ -25,6 +27,27 @@ function Root() {
   const [showUpdate, setShowUpdate] = useState(false);
   const [availableUpdate, setAvailableUpdate] = useState<AvailableUpdate | null>(
     null,
+  );
+  const [lock, setLock] = useState<{ pin: string | null; unlocked: boolean }>({
+    pin: null,
+    unlocked: true,
+  });
+
+  useEffect(() => {
+    loadLockPin().then(pin =>
+      setLock({ pin, unlocked: pin == null }),
+    );
+  }, []);
+
+  const handleUnlock = useCallback(
+    (entered: string): boolean => {
+      if (lock.pin !== null && entered === lock.pin) {
+        setLock(prev => ({ ...prev, unlocked: true }));
+        return true;
+      }
+      return false;
+    },
+    [lock.pin],
   );
 
   useEffect(() => {
@@ -67,7 +90,7 @@ function Root() {
         <StatusBar
           barStyle={theme === 'dark' ? 'light-content' : 'dark-content'}
         />
-        <CompassScreen />
+        {lock.unlocked ? <CompassScreen /> : null}
         <WhatsNewModal
           visible={showUpdate}
           onClose={() => setShowUpdate(false)}
@@ -80,6 +103,9 @@ function Root() {
           required={availableUpdate?.required ?? false}
           onClose={closeUpdate}
         />
+        {lock.pin !== null && !lock.unlocked && (
+          <LockScreen onUnlock={handleUnlock} />
+        )}
       </View>
     </LocationGate>
   );

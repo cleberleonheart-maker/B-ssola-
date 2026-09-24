@@ -4,15 +4,17 @@ import { useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import { formatDistance } from '../utils/geo';
+import { formatAzimuth } from '../utils/compass';
 
 type Props = {
   name: string;
   distance: number;
   relative: number;
   arrived: boolean;
+  mils?: boolean;
 };
 
-const TargetNavBar = ({ name, distance, relative, arrived }: Props) => {
+const TargetNavBar = ({ name, distance, relative, arrived, mils = false }: Props) => {
   const colors = useThemeColors();
   const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors, arrived), [colors, arrived]);
@@ -35,7 +37,7 @@ const TargetNavBar = ({ name, distance, relative, arrived }: Props) => {
         <Text style={styles.sub} numberOfLines={1}>
           {arrived
             ? t('ui_nav_arrived', { name })
-            : `${formatDistance(distance)} · ${Math.round(relative)}°`}
+            : `${formatDistance(distance)} · ${formatAzimuth(relative, mils)}`}
         </Text>
       </View>
     </View>

@@ -7,10 +7,9 @@ export type ActionResultKind =
   | 'help'
   | 'error';
 
-export type AssistantAction = {
-  type: 'setMode';
-  mode: string;
-};
+export type AssistantAction =
+  | { type: 'setMode'; mode: string }
+  | { type: 'addWaypoint'; name: string };
 
 export type ActionResult = {
   text: string;
@@ -36,6 +35,13 @@ export type KnownWaypoint = {
   bearing: number | null;
 };
 
+export type TrackSummary = {
+  count: number;
+  totalDistance: number;
+  longestDistance: number | null;
+  longestName: string | null;
+};
+
 export type AssistantContextData = {
   heading: number | null;
   cardinal: string | null;
@@ -49,6 +55,9 @@ export type AssistantContextData = {
   declinationEnabled: boolean;
   declination: number;
   odometer: number;
+  todayDistance: number | null;
+  weekDistance: number | null;
+  trackSummary: TrackSummary | null;
   appMode: string;
   displayMode: string;
   theme: string;
@@ -68,6 +77,9 @@ export const buildEmptyContext = (): AssistantContextData => ({
   declinationEnabled: false,
   declination: 0,
   odometer: 0,
+  todayDistance: null,
+  weekDistance: null,
+  trackSummary: null,
   appMode: 'full',
   displayMode: 'compass',
   theme: 'dark',

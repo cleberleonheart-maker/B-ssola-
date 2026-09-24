@@ -87,7 +87,7 @@ export class KeferaEngine {
       return this.response(memoryQuery, 'memory');
     }
 
-    const skill = runSkills(this.ctx, normalized, tokens, t);
+    const skill = await runSkills(this.ctx, normalized, tokens, t);
     if (typeof skill === 'string') {
       return this.response(skill, 'answer');
     }
