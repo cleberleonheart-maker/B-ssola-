@@ -161,6 +161,10 @@
 1. **Rumo de volta sempre visível** (ideia #40) — abaixo do rumo atual aparece a
    direção inversa (graus + ponto cardeal), sem precisar calcular nada.
 
+## ✅ Feitos (v7.13)
+1. **Atalho em linha reta na trilha** (ideia #34) — no retorno, ative "⚡ Ver atalho" e
+   veja a distância e o rumo direto ao início (e o rumo de volta) para cortar caminho.
+
 ## Ideias novas (23/09/2026, 3ª leva — melhorias em modos existentes)
 - [ ] **28. Teodolito com altura direta** — usar a distância do waypoint ativo/marco na
       fórmula de altura (sem digitar) + média de N leituras para estabilizar o ângulo.
@@ -177,7 +181,7 @@
 - [ ] **33. 📸 Waypoint pela câmera** — marcar um ponto distante sem chegar perto: 2+
       avistagens de lugares diferentes cruzam os rumos e **estimam a coordenada**
       (complemento da triangulação #27, usando teodolito + AR).
-- [ ] **34. 🗺️ Atalho de volta (linha reta)** — na trilha, além do retorno pelo trajeto,
+- [x] **34. 🗺️ Atalho de volta (linha reta)** — na trilha, além do retorno pelo trajeto,
       mostrar o rumo direto ao início ("em linha reta") para encurtar quando dá.
 - [ ] **35. 🔲 QR de localização** — gerar QR com as coordenadas para outro aparelho
       escanear e navegar até ali (boneco de rastreio offline).

@@ -10,6 +10,7 @@ import { useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import { formatDistance, haversine, initialBearing, normalizeAzimuth } from '../utils/geo';
+import { cardinalOf } from '../utils/compass';
 import { serializeTrackToGpx } from '../utils/gpx';
 import { shareTrackGpx } from '../services/trackShare';
 import TargetNavBar from './TargetNavBar';
@@ -296,12 +297,26 @@ const TrackView = ({ active, location, heading = 0 }: Props) => {
       : haversine(meLat, meLon, aim.lat, aim.lon);
     const bearing = initialBearing(meLat, meLon, aim.lat, aim.lon);
     const relative = normalizeAzimuth(bearing - heading);
-    return { arrived, distance, relative };
+    const straightBearing = initialBearing(meLat, meLon, home.lat, home.lon);
+    const straightRelative = normalizeAzimuth(straightBearing - heading);
+    return {
+      arrived,
+      distance,
+      relative,
+      straight: {
+        arrived,
+        distance: total,
+        bearing: straightBearing,
+        relative: straightRelative,
+      },
+    };
   }, [navTrack, navPath, location.latitude, location.longitude, heading, hasFix]);
 
   const startNav = useCallback((target: string | 'live') => {
     setNavId(prev => (prev === target ? null : target));
   }, []);
+
+  const [shortcut, setShortcut] = useState(false);
 
   return (
     <ScrollView
@@ -406,12 +421,52 @@ const TrackView = ({ active, location, heading = 0 }: Props) => {
 
         {navActive && navPath.length >= 2 ? (
           <View style={styles.navWrap}>
-            <TargetNavBar
-              name={`🏠 ${navTrack === 'live' ? t('track_back_live') : navTrack ? navTrack.name : ''}`}
-              distance={navTarget ? navTarget.distance : 0}
-              relative={navTarget ? navTarget.relative : 0}
-              arrived={navTarget ? navTarget.arrived : false}
-            />
+            {navTarget && (
+              <>
+                <TargetNavBar
+                  name={`🏠 ${navTrack === 'live' ? t('track_back_live') : navTrack ? navTrack.name : ''}`}
+                  distance={navTarget.distance}
+                  relative={navTarget.relative}
+                  arrived={navTarget.arrived}
+                />
+                <Pressable
+                  onPress={() => setShortcut(s => !s)}
+                  style={[
+                    styles.shortcutBtn,
+                    { borderColor: shortcut ? colors.success : colors.border },
+                  ]}>
+                  <Text
+                    style={[
+                      styles.shortcutBtnText,
+                      { color: shortcut ? colors.success : colors.textMuted },
+                    ]}>
+                    ⚡ {shortcut ? t('track_short_off') : t('track_short_on')}
+                  </Text>
+                </Pressable>
+                {shortcut && (
+                  <View style={[styles.shortcutRow, { borderColor: colors.success + '44' }]}>
+                    <Text style={[styles.shortcutText, { color: colors.text }]}>
+                      ⚡ {t('track_short')}:{' '}
+                      <Text style={{ color: colors.primary, fontWeight: '800' }}>
+                        {formatDistance(navTarget.straight.distance)}
+                      </Text>
+                      {'  '}
+                      <Text style={{ color: colors.accent, fontWeight: '800' }}>
+                        {Math.round(navTarget.straight.bearing).toString().padStart(3, '0')}°
+                        {cardinalOf(navTarget.straight.bearing).short} {'↩️'}
+                        {((Math.round(navTarget.straight.bearing) + 180) % 360)
+                          .toString()
+                          .padStart(3, '0')}°
+                        {cardinalOf(navTarget.straight.bearing + 180).short}
+                      </Text>
+                    </Text>
+                    <Text style={[styles.shortcutHint, { color: colors.textMuted }]}>
+                      {t('track_short_hint')}
+                    </Text>
+                  </View>
+                )}
+              </>
+            )}
             <Pressable
               onPress={() => setNavId(null)}
               style={[styles.navStop, { borderColor: colors.border }]}>
@@ -664,6 +719,36 @@ const createStyles = (colors: {
     navStopText: {
       fontSize: 12,
       fontWeight: '800',
+    },
+    shortcutBtn: {
+      alignSelf: 'center',
+      borderRadius: radius.full,
+      borderWidth: 1,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 4,
+      marginTop: spacing.xs,
+    },
+    shortcutBtnText: {
+      fontSize: 12,
+      fontWeight: '800',
+    },
+    shortcutRow: {
+      borderWidth: 1,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      marginTop: spacing.sm,
+    },
+    shortcutText: {
+      fontSize: 14,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    shortcutHint: {
+      fontSize: 11,
+      fontWeight: '600',
+      textAlign: 'center',
+      marginTop: 2,
     },
     primaryButton: {
       borderRadius: radius.full,
