@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Publica a versao atual na tabela Supabase 'app_version'.
-# Sem SUPABASE_SERVICE_ROLE_KEY gera o SQL para colar no SQL editor do dashboard.
+# Atualiza a tabela 'app_version' do Supabase com a versao publicada.
+# A chave vem de SUPABASE_SERVICE_ROLE_KEY (env) ou de ~/.supabase-service-key.
+# Sem chave, apenas gera scripts/app_version.sql para copiar/colar no dashboard.
 set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -10,6 +11,9 @@ PROPS="$ROOT/android/app/version.properties"
 
 SUPABASE_URL="${SUPABASE_URL:-https://wotzcykrvidbjkonaawx.supabase.co}"
 SERVICE_KEY="${SUPABASE_SERVICE_ROLE_KEY:-}"
+if [ -z "$SERVICE_KEY" ] && [ -f "$HOME/.supabase-service-key" ]; then
+  SERVICE_KEY="$(cat "$HOME/.supabase-service-key")"
+fi
 
 VERSION_CODE=$(grep -E '^versionCode=' "$PROPS" | cut -d'=' -f2)
 VERSION_NAME=$(grep -E '^versionName=' "$PROPS" | cut -d'=' -f2)
@@ -54,12 +58,12 @@ if [ -n "$SERVICE_KEY" ]; then
   fi
 else
   echo
-  echo "Sem SUPABASE_SERVICE_ROLE_KEY -- atualize manualmente no dashboard."
-  echo "Abra scripts/app_version.sql (enviado ao GitHub) e cole o conteudo no"
-  echo "SQL editor do projeto ($SUPABASE_URL)."
+  echo "Sem chave de escrita. Para automatizar de vez, guarde a chave uma unica vez:"
+  echo "  1. Supabase > Settings > API keys > service_role (fica em \"reveal\")."
+  echo "  2. echo 'SUA_CHAVE' > ~/.supabase-service-key && chmod 600 ~/.supabase-service-key"
+  echo "A proxima publicacao grava sozinha. Sem a chave, use scripts/app_version.sql."
 fi
 
 printf '%s\n' "$SQL" > "$ROOT/scripts/app_version.sql"
 echo
-echo "SQL salvo em scripts/app_version.sql (copie e cole no SQL editor)."
-echo "Depois de publicar, envie de volta: git add scripts/app_version.sql && git commit -m ..."
+echo "SQL salvo em scripts/app_version.sql (se nada foi gravado, copie no SQL editor)."
