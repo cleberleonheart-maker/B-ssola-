@@ -239,12 +239,12 @@ const CompassScreen = () => {
 
   const dialSize = useMemo(() => {
     const maxByWidth = width - spacing.lg * 2 - spacing.md;
-    const reservedHeading = 100;
-    const fallbackBudget = appMode === 'full' ? 500 : 460;
+    const reservedHeading = 128;
+    const fallbackBudget = appMode === 'full' ? 520 : 480;
     const maxByHeight =
       dialAreaH > 0 ? dialAreaH - reservedHeading : height - fallbackBudget;
     const fit = Math.floor(Math.min(maxByWidth, maxByHeight));
-    return Math.max(168, Math.min(252, fit));
+    return Math.max(168, Math.min(232, fit));
   }, [width, height, dialAreaH, appMode]);
 
   const [baroPressure, setBaroPressure] = useState<number | null>(null);
