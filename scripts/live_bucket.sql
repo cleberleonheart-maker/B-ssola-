@@ -1,4 +1,9 @@
--- 1) Cria o bucket publico 'live' (idempotente)
+-- ============================================================
+-- Bucket publico do viewer de rastreio ao vivo (#24)
+-- Rode no Supabase > SQL Editor > New query. Idempotente.
+-- ============================================================
+
+-- 1) Cria o bucket publico 'live' (1 MB, so HTML)
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('live', 'live', true, 1048576, array['text/html', 'text/plain'])
 on conflict (id) do update
@@ -6,33 +11,25 @@ on conflict (id) do update
       file_size_limit = 1048576,
       allowed_mime_types = array['text/html', 'text/plain'];
 
--- 2) Sobe o viewer. NOTE: storage.objects nao tem coluna content_type;
---    o mime type fica em metadata (jsonb).
-insert into storage.objects (bucket_id, name, owner, metadata, content)
-select
-  'live',
-  'live.html',
-  (select auth.uid()),
-  jsonb_build_object(
-    'mtime', now(),
-    'cacheControl', '3600',
-    'contentType', 'text/html'
-  ),
-  convert_from(
-    extensions.http_get(
-      'https://raw.githubusercontent.com/cleberleonheart-maker/B-ssola-/main/web/live.html'
-    )::bytea,
-    'UTF8'
-  )
-on conflict (bucket_id, name) do update
-  set content    = excluded.content,
-      metadata   = excluded.metadata,
-      updated_at = now();
+-- 2) Conferir bucket
+select id, name, public, file_size_limit
+from storage.buckets
+where id = 'live';
 
--- Como conferir:
---   select id, public from storage.buckets where id = 'live';
---   select name, length(content) as bytes from storage.objects where bucket_id = 'live';
-
--- Se extensions.http_get nao existir: baixe
---   https://raw.githubusercontent.com/cleberleonheart-maker/B-ssola-/main/web/live.html
--- e faca upload manual em Storage > live > New file.
+-- ============================================================
+-- IMPORTANTE: o upload do arquivo NAO pode ser feito por SQL.
+-- Since o Supabase guarda o conteudo na S3, storage.objects
+-- nao tem mais a coluna 'content' (daria erro 42703).
+--
+-- Faca o upload de UMA destas formas:
+--
+-- (A) Painel do Supabase
+--     Storage > live > New file > envie web/live.html
+--     (baixe em: https://raw.githubusercontent.com/cleberleonheart-maker/B-ssola-/main/web/live.html)
+--
+-- (B) API do Storage (curl), usando a service_role key:
+--     curl -X POST \"\$SUPABASE_URL/storage/v1/object/live/live.html\"
+--       -H \"Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY\"
+--       -H \"Content-Type: text/html\"
+--       --data-binary @web/live.html
+-- ============================================================
