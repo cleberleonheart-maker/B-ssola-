@@ -30,6 +30,11 @@ jobs:
 
       - run: npm ci
 
+      - name: Lint e testes
+        run: |
+          npx eslint .
+          npm test -- --ci --runInBand
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

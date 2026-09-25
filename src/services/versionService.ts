@@ -16,8 +16,8 @@ export type AvailableUpdate = {
   required: boolean;
 };
 
-const GITHUB_LATEST_RELEASE =
-  'https://api.github.com/repos/cleberleonheart-maker/B-ssola-/releases/latest';
+const GITHUB_RELEASE_URL =
+  'https://api.github.com/repos/cleberleonheart-maker/B-ssola-/releases/tags/bussola-apk';
 
 type ReleaseAsset = {
   code: number;
@@ -47,7 +47,12 @@ const pickBestDirectAsset = (
 
 const fetchLatestDirectAsset = async (): Promise<ReleaseAsset | null> => {
   try {
-    const res = await fetch(GITHUB_LATEST_RELEASE);
+    const res = await fetch(GITHUB_RELEASE_URL, {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'Bussola-App',
+      },
+    });
     if (!res.ok) {
       return null;
     }

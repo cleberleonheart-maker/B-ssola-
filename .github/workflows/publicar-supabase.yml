@@ -18,15 +18,17 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           set -euo pipefail
-          REPO="cleberleonheart-maker/B-ssola-"
+          REPO="${{ github.repository }}"
           TAG="bussola-apk"
           : "${SUPABASE_URL:?defina o secret SUPABASE_PROJECT_URL}"
           : "${SUPABASE_SERVICE_ROLE_KEY:?defina o secret SUPABASE_SERVICE_ROLE_KEY}"
 
-          RELEASE="$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.')"
+          RELEASE_URL="repos/$REPO/releases/tags/$TAG"
+          RELEASE="$(gh api "$RELEASE_URL" --jq '.')"
+          RELEASE_NAME="$(jq -r '.name // ""' <<<"$RELEASE")"
 
           ASSET="$(jq -r '.assets[] | .name' <<<"$RELEASE" \
-            | grep -oE 'bussola-v[0-9]+(-[0-9.]+)?\.apk' \
+            | grep -oE 'bussola-v[0-9]+\.apk' \
             | sort -t'v' -k2 -n \
             | tail -1 || true)"
 
@@ -36,8 +38,8 @@ jobs:
           fi
 
           CODE="$(sed -E 's/bussola-v([0-9]+).*/\1/' <<<"$ASSET")"
-          NAME="$(sed -E 's/bussola-v[0-9]+-([0-9.]+)\.apk/\1/' <<<"$ASSET")"
-          if [ "$NAME" = "$ASSET" ]; then
+          NAME="$(sed -nE 's/.*\(([^,]+), cod [0-9]+.*/\1/p' <<<"$RELEASE_NAME" || true)"
+          if [ -z "$NAME" ]; then
             NAME="$(curl -fsS \
               -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
               -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
