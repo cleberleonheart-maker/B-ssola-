@@ -269,3 +269,141 @@ export const fetchLatestAppVersion = async (): Promise<AppVersion | null> => {
     return null;
   }
 };
+
+export type LiveShareRow = {
+  token: string;
+  user_id: string;
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+  heading: number | null;
+  speed: number | null;
+  altitude: number | null;
+  started_at: string;
+  expires_at: string;
+  updated_at: string;
+};
+
+export const upsertLiveShare = async (
+  userId: string,
+  token: string,
+  pos: {
+    latitude: number;
+    longitude: number;
+    accuracy?: number | null;
+    heading?: number | null;
+    speed?: number | null;
+    altitude?: number | null;
+  },
+  expiresAt: number,
+): Promise<void> => {
+  if (!client) return;
+  try {
+    await withTimeout(
+      client.from('live_shares').upsert(
+        {
+          token,
+          user_id: userId,
+          latitude: pos.latitude,
+          longitude: pos.longitude,
+          accuracy: pos.accuracy ?? null,
+          heading: pos.heading ?? null,
+          speed: pos.speed ?? null,
+          altitude: pos.altitude ?? null,
+          expires_at: new Date(expiresAt).toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'token' },
+      ),
+    );
+  } catch {
+    // offline: tenta no proximo intervalo
+  }
+};
+
+export const deleteLiveShare = async (
+  userId: string,
+  token: string,
+): Promise<void> => {
+  if (!client) return;
+  try {
+    await withTimeout(
+      client
+        .from('live_shares')
+        .delete()
+        .eq('token', token)
+        .eq('user_id', userId),
+    );
+  } catch {
+    // offline: apenas remove o link local
+  }
+};
+export const pushLivePosition = async (
+  token: string,
+  userId: string,
+  lat: number,
+  lng: number,
+  acc: number | null,
+  hdg: number | null,
+  expiresAt: number,
+): Promise<boolean> => {
+  if (!client) return false;
+  try {
+    await withTimeout(
+      client.from('live_shares').upsert(
+        {
+          token,
+          user_id: userId,
+          latitude: lat,
+          longitude: lng,
+          accuracy: acc,
+          heading: hdg,
+          expires_at: new Date(expiresAt).toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'token' },
+      ),
+    );
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const deleteLiveShareRow = async (
+  token: string,
+  userId: string,
+): Promise<boolean> => {
+  if (!client) return false;
+  try {
+    await withTimeout(
+      client.from('live_shares').delete().eq('token', token).eq('user_id', userId),
+    );
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const fetchLiveShareRow = async (
+  token: string,
+): Promise<{
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+  heading: number | null;
+  expires_at: string | null;
+} | null> => {
+  if (!client) return null;
+  try {
+    const { data } = await withTimeout(
+      client.from('live_shares').select('*').eq('token', token).maybeSingle(),
+    );
+    return (data as unknown as {
+      latitude: number; longitude: number;
+      accuracy: number | null; heading: number | null; expires_at: string | null;
+    }) ?? null;
+  } catch {
+    return null;
+  }
+};

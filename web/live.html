@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0b1220" />
+<title>Rastreio ao vivo · Bussola</title>
+<style>
+  :root {
+    --bg: #0b1220; --card: #121b31; --line: #1e2b46;
+    --text: #eaf0fb; --muted: #93a3c4;
+    --accent: #4da3ff; --ok: #2fd66b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; align-items: center; justify-content: center;
+    padding: 18px;
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 18px; max-width: 400px; width: 100%;
+    padding: 26px 22px; text-align: center;
+  }
+  .emoji { font-size: 40px; line-height: 1; }
+  h1 { font-size: 20px; font-weight: 800; margin: 10px 0 4px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+  .liveTag {
+    display: inline-block; background: rgba(47,214,107,.14);
+    color: var(--ok); font-size: 12px; font-weight: 800;
+    letter-spacing: .8px; border-radius: 999px; padding: 5px 12px;
+    margin-bottom: 16px;
+  }
+  .coords { font: 700 24px/1.4 ui-monospace, Menlo, monospace; letter-spacing: .5px; }
+  .meta { color: var(--muted); font-size: 13px; margin: 8px 0 2px; }
+  .count { color: var(--accent); font-size: 15px; font-weight: 700; margin: 10px 0 18px; }
+  .btn {
+    display: block; width: 100%; text-align: center;
+    background: var(--accent); color: #0b1220; font-weight: 800;
+    font-size: 15px; padding: 14px 0; border-radius: 12px;
+    text-decoration: none; margin-top: 8px;
+  }
+  .stale, .empty { color: var(--muted); font-size: 14px; line-height: 1.6; padding: 14px 0; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="emoji">🔴</div>
+    <h1>Rastreio ao vivo</h1>
+    <div class="sub">Localização em tempo real · expira sozinha</div>
+
+    <span class="liveTag hidden">● AO VIVO</span>
+    <div class="coords">—</div>
+    <div class="meta"></div>
+    <div class="count"></div>
+    <a class="btn hidden" href="#" target="_blank" rel="noopener">Abrir no Google Maps</a>
+    <div class="stale hidden">⏳ Link expirado. Peça um novo link à pessoa.</div>
+  </div>
+<script>
+'use strict';
+var CFG = {
+  url: 'https://wotzcykrvidbjkonaawx.supabase.co',
+  anon: 'PLACEHOLDER_ANON_KEY'
+};
+var API = (CFG.url.indexOf('PLACEHOLDER') === -1) ? CFG.url : '';
+var KEY = (CFG.anon.indexOf('PLACEHOLDER') === -1) ? CFG.anon : '';
+var tkn = (window.location.hash.match(/(?:t|tkn|token)=([^&]+)/) || [])[1] || '';
+function q(s) { return document.querySelector(s); }
+function show(id) {
+  ['coordsRow','liveTag','expiredRow'].forEach(function(i){
+    q('#'+i).classList.toggle('hidden', i !== id);
+  });
+}
+function gmap(lat,lng) { return 'https://www.google.com/maps?q=' + lat + ',' + lng; }
+function metros(acc) { return '±' + Math.round(acc) + ' m'; }
+<script>
+function el(i){ return document.getElementById(i); }
+function show(k){ ['coordsRow','liveTag','expiredRow'].forEach(function(id){ el(id).classList.toggle('hidden', id!==k); }); }
+function fmt(n,isLat){ n=Number(n); var d=Math.floor(isLat?n/100:n%100); var m=Math.floor(((isLat?n/100:n)%1)*100); return (isLat?'S':'W')+' '+d+'\u00b0'+String(m).padStart(2,'0')+"'"; }
+function meta(r){ return 'atualizado '+(r.updated_at?r.updated_at.slice(11,19):'--')+' \u00b7 precis\u00e3o '+(r.accuracy?r.accuracy+'m':'--'); }
+function url(t){ return '/live.html#tkn='+t; }
+var mapHref = null;
+function poll(){
+  fetch(API+'/rest/v1/rpc/get_live_position', { method:'POST', headers:{ 'Content-Type':'application/json', apikey:KEY, Authorization:'Bearer '+KEY }, body: JSON.stringify({ share_token: tkn }) })
+    .then(function(r){ return r.json(); })
+    .then(function(row){
+      var pos;
+      if (row && row.length) pos = row[0];
+      else if (row && row.latitude != null) pos = row;
+      if (!pos){ show('expiredRow'); return; }
+      show('coordsRow');
+      el('coords').textContent = fmt(pos.latitude, true) + '  ' + fmt(pos.longitude, false);
+      el('meta').textContent = meta(pos);
+      mapHref = 'https://maps.google.com/?q=' + pos.latitude + ',' + pos.longitude;
+      el('mapBtn').href = mapHref;
+    })
+    .catch(function(){ show('expiredRow'); });
+}
+if (tkn && API) { poll(); setInterval(poll, 5000); } else { show('expiredRow'); }
+</script></body>
+</html>

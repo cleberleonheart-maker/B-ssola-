@@ -10,6 +10,12 @@ import {
   Platform,
   Alert,
 } from 'react-native';
+import {
+  startLiveShare,
+  stopLiveShare,
+  pushLiveFix,
+  liveLink,
+} from '../services/liveShareService';
 import { useTheme } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
@@ -86,6 +92,38 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
     }
   };
 
+  const [liveUrl, setLiveUrl] = React.useState<string | null>(null);
+  const [liveBusy, setLiveBusy] = React.useState(false);
+
+  const startLive = async () => {
+    if (!hasFix || liveBusy) return;
+    setLiveBusy(true);
+    try {
+      const s = await startLiveShare('', 30);
+      if (!s) {
+        Alert.alert(t('live_title'), t('live_need_cloud'));
+        return;
+      }
+      const url = liveLink(s);
+      setLiveUrl(url);
+      await pushLiveFix(s, location);
+      const timer = setInterval(() => {
+        if (Date.now() > s.expiresAt) {
+          clearInterval(timer);
+          void stopLiveShare(s.token);
+          setLiveUrl(null);
+          return;
+        }
+        void pushLiveFix(s, location);
+      }, 10000);
+      await Share.share({ message: t('live_shared') + ' ' + url });
+    } catch {
+      Alert.alert(t('live_title'), t('live_error'));
+    } finally {
+      setLiveBusy(false);
+    }
+  };
+
   const openSms = async () => {
     if (!hasFix) return;
     const text = encodeURIComponent(shareText);
@@ -140,6 +178,23 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
                   {t('em_share_btn')}
                 </Text>
               </Pressable>
+
+              <Pressable
+                onPress={startLive}
+                disabled={liveBusy}
+                style={styles.shareButton}
+              >
+                <Text style={styles.shareEmoji}>📡</Text>
+                <Text style={[styles.shareText, { color: colors.background }]}>
+                  {t('live_btn')}
+                </Text>
+              </Pressable>
+
+              {liveUrl ? (
+                <Text style={[styles.shareHint, { color: colors.textMuted }]}>
+                  {liveUrl}
+                </Text>
+              ) : null}
 
               <Text style={[styles.directLabel, { color: colors.textMuted }]}>
                 {t('em_send_direct')}
