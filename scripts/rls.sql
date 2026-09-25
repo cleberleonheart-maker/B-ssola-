@@ -117,6 +117,21 @@ using (user_id::text = auth.uid()::text);
 -- app_version: leitura publica (o app consulta sem login);
 -- gravacao fica so com service_role (bypassa RLS).
 -- =====...=============================================================
+-- Pode nao existir ainda (o workflow usa PATCH com service_role).
+create table if not exists public.app_version (
+  id integer not null,
+  version_code integer not null,
+  version_name text,
+  update_url text,
+  message text,
+  required boolean not null default false,
+  constraint app_version_pkey primary key (id)
+ melting scope
+);
+insert into public.app_version (id, version_code)
+values (1, 0)
+on conflict (id) do nothing;
+
 alter table app_version enable row level security;
 
 drop policy if exists "public_read_app_version" on app_version;

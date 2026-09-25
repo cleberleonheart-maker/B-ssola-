@@ -1,7 +1,18 @@
-update app_version
-set version_code = 148,
-    version_name = '7.17',
-    update_url = 'https://github.com/cleberleonheart-maker/B-ssola-/releases/download/bussola-apk/bussola-v148.apk',
-    message = 'Nova versão disponível',
-    required = false
-where id = 1;
+-- =====================================================================
+-- app_version: app consulta via REST sem login (anon key).
+-- Estrutura minima que o repom.yml/curl PATCH espera. Roda no SQL Editor.
+-- O proximo trecho (app_version público RLS) ja vem no rls.sql.
+-- =====================================================================
+create table if not exists public.app_version (
+  id integer not null,
+  version_code integer not null,
+  version_name text,
+  update_url text,
+  message text,
+  required boolean not null default false,
+  constraint app_version_pkey primary key (id)
+);
+
+insert into public.app_version (id, version_code, version_name)
+values (1, 148, 'v7.17')
+on conflict (id) do nothing;
