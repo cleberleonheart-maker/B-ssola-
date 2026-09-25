@@ -3,9 +3,10 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex" />
 <title>Rastreio ao vivo</title>
 <style>
-  :root { --bg:#0b1220; --card:#121b31; --line:#1e2b46; --text:#eaf0fb; --muted:#93a3c4; --ok:#2fd66b; --accent:#4da3ff; }
+  :root { --bg:#0b1220; --card:#121b31; --line:#1e2b46; --text:#eaf0fb; --muted:#93a3c4; --ok:#2fd66b; --warn:#f5b544; --accent:#4da3ff; }
   * { box-sizing:border-box; margin:0; padding:0; }
   body { background:var(--bg); color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:18px;
          font-family:-apple-system,"Segoe UI",Roboto,sans-serif; }
@@ -14,12 +15,15 @@
   .sub { color:var(--muted); font-size:14px; margin-bottom:16px; }
   .tag { display:inline-block; background:rgba(47,214,107,.14); color:var(--ok); font-size:12px; font-weight:800;
          letter-spacing:.8px; border-radius:999px; padding:5px 12px; margin-bottom:14px; }
+  .tag.warn { background:rgba(245,181,68,.16); color:var(--warn); }
   .coords { font:700 23px/1.45 ui-monospace,Menlo,monospace; }
   .meta { color:var(--muted); font-size:13px; margin:8px 0 0; }
   .count { color:var(--accent); font-size:15px; font-weight:700; margin:12px 0 16px; }
   .btn { display:block; background:var(--accent); color:#08111f; font-weight:800; font-size:15px; padding:14px 0;
          border-radius:12px; text-decoration:none; }
-  .note { color:var(--muted); font-size:14px; line-height:1.6; padding:12px 0; }
+  .note { color:var(--muted); font-size:14px; line-height:1.6; padding:14px 0 0; }
+  .retry { background:transparent; border:1px solid var(--line); color:var(--muted); font:700 13px -apple-system,"Segoe UI",Roboto,sans-serif;
+           padding:10px 18px; border-radius:999px; margin-top:12px; }
   .hidden { display:none !important; }
 </style>
 </head>
@@ -28,29 +32,37 @@
     <h1>Rastreio ao vivo</h1>
     <div class="sub">Localização em tempo real · expira sozinha</div>
     <span class="tag hidden" id="liveTag">● AO VIVO</span>
-    <div id="coordsRow">
+    <div id="coordsRow" class="hidden">
       <div class="coords" id="coords">—</div>
       <div class="meta" id="meta"></div>
       <div class="count" id="count"></div>
       <a class="btn" id="mapBtn" target="_blank" rel="noopener">Abrir no Google Maps</a>
     </div>
-    <div class="note hidden" id="expiredRow">⏳ Este link expirou ou ainda não tem posição. Peça um novo link à pessoa.</div>
+    <div class="note" id="note">Carregando…</div>
+    <button class="retry hidden" id="retry" type="button">Atualizar agora</button>
   </div>
   <script>
   'use strict';
   var API = 'https://wotzcykrvidbjkonaawx.supabase.co';
   var KEY = 'sb_publishable_g8EcCQe4YPGaeMz1V-8gIw_OxF3iLNv';
-  var tkn = (location.hash.match(/[#?&]tkn=([^&]+)/) || [])[1] || '';
+  var raw = (location.hash.match(/[#?&]tkn=([^&]+)/) || [])[1] || '';
+  var tkn = '';
+  try { tkn = decodeURIComponent(raw); } catch (e) { tkn = raw; }
+
+  var POLL_MS = 5000;
+  var STALE_MS = 25000;
+  var MAX_WAIT_MS = 35 * 60 * 1000;
   var expiresAt = 0;
-  var lastFix = 0;
+  var lastFixAt = 0;
+  var everHad = false;
+  var errors = 0;
+  var startedAt = Date.now();
   var timer = null;
+  var tickTimer = null;
+  var busy = false;
+  var done = false;
 
   function $(id) { return document.getElementById(id); }
-  function show(which) {
-    $('coordsRow').classList.toggle('hidden', which !== 'coordsRow');
-    $('expiredRow').classList.toggle('hidden', which !== 'expiredRow');
-    $('liveTag').classList.toggle('hidden', which !== 'coordsRow');
-  }
   function fmt(v, isLat) {
     var hemi = isLat ? (v >= 0 ? 'N' : 'S') : (v >= 0 ? 'E' : 'W');
     var a = Math.abs(Number(v));
@@ -63,38 +75,147 @@
     var t = Math.max(0, Math.floor(ms / 1000));
     return Math.floor(t / 3600) + ':' + String(Math.floor((t % 3600) / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
   }
+  function ago(ms) {
+    if (!ms) return 'algum tempo';
+    var s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+    if (s < 60) return s + ' s atrás';
+    if (s < 3600) return Math.floor(s / 60) + ' min atrás';
+    return Math.floor(s / 3600) + ' h atrás';
+  }
+  function setNote(text) { $('note').textContent = text; }
+  function showRetry(on) { $('retry').classList.toggle('hidden', !on); }
+  function showCoords(on) { $('coordsRow').classList.toggle('hidden', !on); }
+  function setTag(text, warn) {
+    var el = $('liveTag');
+    if (!text) { el.classList.add('hidden'); return; }
+    el.textContent = text;
+    el.classList.toggle('warn', !!warn);
+    el.classList.remove('hidden');
+  }
+  function stop() {
+    done = true;
+    if (timer) { clearTimeout(timer); timer = null; }
+    if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+  }
+  function schedule(ms) {
+    if (done) return;
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(poll, ms);
+  }
   function tick() {
     if (!expiresAt) return;
     var left = expiresAt - Date.now();
-    if (left <= 0) { show('expiredRow'); clearInterval(timer); return; }
+    if (left <= 0) { expired(); return; }
     $('count').textContent = '⏳ expira em ' + hms(left);
   }
+  function expired() {
+    stop();
+    showCoords(false);
+    setTag(null);
+    $('count').textContent = '';
+    showRetry(false);
+    setNote('⏳ Este link expirou. Peça um novo link à pessoa.');
+  }
+  function ended() {
+    stop();
+    setTag(null);
+    $('count').textContent = '';
+    showRetry(false);
+    setNote(everHad
+      ? '🛑 O rastreio foi encerrado pela pessoa. A posição abaixo é a última recebida.'
+      : '🛑 O rastreio foi encerrado.');
+  }
+  function render(p) {
+    everHad = true;
+    expiresAt = p.expires_at ? new Date(p.expires_at).getTime() : 0;
+    lastFixAt = p.updated_at ? new Date(p.updated_at).getTime() : 0;
+    if (expiresAt && expiresAt <= Date.now()) { expired(); return; }
+    showCoords(true);
+    $('coords').textContent = fmt(p.latitude, true) + '   ' + fmt(p.longitude, false);
+    var bits = [];
+    if (p.accuracy != null) bits.push('±' + Math.round(p.accuracy) + ' m');
+    if (p.heading != null) bits.push('rumo ' + Math.round(p.heading) + '°');
+    if (p.speed != null) bits.push((p.speed * 3.6).toFixed(0) + ' km/h');
+    if (p.altitude != null) bits.push(Math.round(p.altitude) + ' m');
+    $('meta').textContent = bits.join(' · ');
+    $('mapBtn').href = 'https://www.google.com/maps?q=' + p.latitude + ',' + p.longitude;
+    if (lastFixAt && Date.now() - lastFixAt > STALE_MS) {
+      setTag('● SEM SINAL', true);
+      setNote('📡 Sem posições novas há ' + ago(lastFixAt) + '. O aparelho pode estar sem sinal ou com a tela apagada.');
+    } else {
+      setTag('● AO VIVO', false);
+      setNote('Atualizando a cada poucos segundos.');
+    }
+    tick();
+  }
   function poll() {
+    if (done || busy) return;
+    busy = true;
+    var ctl = ('AbortController' in window) ? new AbortController() : null;
+    var guard = setTimeout(function () { if (ctl) ctl.abort(); }, 8000);
     fetch(API + '/rest/v1/rpc/get_live_position', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', apikey: KEY, Authorization: 'Bearer ' + KEY },
       body: JSON.stringify({ p_token: tkn }),
+      signal: ctl ? ctl.signal : undefined,
     })
-      .then(function (r) { return r.status === 204 || r.status === 404 ? [] : r.json(); })
-      .then(function (rows) {
-        if (!rows || !rows.length) { show('expiredRow'); return; }
-        var p = rows[0];
-        show('coordsRow');
-        $('coords').textContent = fmt(p.latitude, true) + '   ' + fmt(p.longitude, false);
-        var bits = [];
-        if (p.accuracy != null) bits.push('±' + Math.round(p.accuracy) + ' m');
-        if (p.heading != null) bits.push('rumo ' + Math.round(p.heading) + '°');
-        if (p.speed != null) bits.push((p.speed * 3.6).toFixed(0) + ' km/h');
-        $('meta').textContent = bits.join(' · ');
-        $('mapBtn').href = 'https://www.google.com/maps?q=' + p.latitude + ',' + p.longitude;
-        expiresAt = new Date(p.expires_at).getTime();
-        lastFix = Date.now();
-        tick();
+      .then(function (r) {
+        clearTimeout(guard);
+        if (!r.ok) throw new Error('http ' + r.status);
+        return r.status === 204 ? [] : r.json();
       })
-      .catch(function () { $('meta').textContent = 'sem conexão — tentando de novo…'; });
+      .then(function (rows) {
+        errors = 0;
+        showRetry(false);
+        if (!rows || !rows.length) {
+          if (everHad) { ended(); return; }
+          if (Date.now() - startedAt > MAX_WAIT_MS) { expired(); return; }
+          setTag(null);
+          showCoords(false);
+          setNote('⌛ Aguardando a primeira posição…');
+          schedule(POLL_MS);
+          return;
+        }
+        render(rows[0]);
+        schedule(POLL_MS);
+      })
+      .catch(function () {
+        clearTimeout(guard);
+        errors += 1;
+        showRetry(true);
+        if (everHad) {
+          setTag('● SEM SINAL', true);
+          setNote('📡 Sem conexão — última posição de ' + ago(lastFixAt) + '.');
+        } else {
+          setTag(null);
+          showCoords(false);
+          setNote('📡 Sem conexão — tentando de novo…');
+        }
+        schedule(Math.min(POLL_MS * Math.pow(2, errors), 30000));
+      })
+      .then(function () { busy = false; });
   }
-  if (!tkn) { show('expiredRow'); }
-  else { poll(); timer = setInterval(poll, 5000); }
+
+  $('retry').addEventListener('click', function () {
+    errors = 0;
+    poll();
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) {
+      if (timer) { clearTimeout(timer); timer = null; }
+    } else if (!done) {
+      errors = 0;
+      poll();
+    }
+  });
+
+  if (!tkn) {
+    done = true;
+    setNote('🔗 Link inválido: falta o código de rastreio.');
+  } else {
+    tickTimer = setInterval(tick, 1000);
+    poll();
+  }
   </script>
 </body>
 </html>
