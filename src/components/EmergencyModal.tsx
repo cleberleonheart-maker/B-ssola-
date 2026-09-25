@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
   View,
@@ -15,6 +15,9 @@ import {
   stopLiveShare,
   pushLiveFix,
   liveLink,
+  liveCountdown,
+  getActiveLiveSession,
+  type LiveSession,
 } from '../services/liveShareService';
 import { useTheme } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -97,11 +100,60 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
     }
   };
 
-  const [liveUrl, setLiveUrl] = React.useState<string | null>(null);
-  const [liveBusy, setLiveBusy] = React.useState(false);
+  const [liveSession, setLiveSession] = useState<LiveSession | null>(null);
+  const [liveBusy, setLiveBusy] = useState(false);
+  const [, setTick] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sessionRef = useRef<LiveSession | null>(null);
+
+  const clearTicker = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const endSession = useCallback(
+    (s: LiveSession) => {
+      clearTicker();
+      sessionRef.current = null;
+      setLiveSession(null);
+      void stopLiveShare(s.token);
+    },
+    [clearTicker],
+  );
+
+  const startTicker = useCallback(
+    (s: LiveSession) => {
+      clearTicker();
+      sessionRef.current = s;
+      setLiveSession(s);
+      timerRef.current = setInterval(() => {
+        if (Date.now() > s.expiresAt) {
+          endSession(s);
+          return;
+        }
+        setTick(v => v + 1);
+        void pushLiveFix(s, locationRef.current);
+      }, 10000);
+    },
+    [clearTicker, endSession],
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const active = await getActiveLiveSession();
+      if (mounted && active) startTicker(active);
+    })();
+    return () => {
+      mounted = false;
+      clearTicker();
+    };
+  }, [clearTicker, startTicker]);
 
   const startLive = async () => {
-    if (!hasFix || liveBusy) return;
+    if (!hasFix || liveBusy || sessionRef.current) return;
     setLiveBusy(true);
     try {
       const s = await startLiveShare('', 30);
@@ -116,19 +168,26 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
         Alert.alert(t('live_title'), t('live_error'));
         return;
       }
-      setLiveUrl(url);
-      const timer = setInterval(() => {
-        if (Date.now() > s.expiresAt) {
-          clearInterval(timer);
-          void stopLiveShare(s.token);
-          setLiveUrl(null);
-          return;
-        }
-        void pushLiveFix(s, locationRef.current);
-      }, 10000);
-      await Share.share({ message: t('live_shared') + ' ' + url });
+      startTicker(s);
+      try {
+        await Share.share({ message: t('live_shared') + ' ' + url });
+      } catch {}
     } catch {
       Alert.alert(t('live_title'), t('live_error'));
+    } finally {
+      setLiveBusy(false);
+    }
+  };
+
+  const stopLive = async () => {
+    const s = sessionRef.current;
+    if (!s) return;
+    setLiveBusy(true);
+    try {
+      await stopLiveShare(s.token);
+      clearTicker();
+      sessionRef.current = null;
+      setLiveSession(null);
     } finally {
       setLiveBusy(false);
     }
@@ -189,22 +248,35 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
                 </Text>
               </Pressable>
 
-              <Pressable
-                onPress={startLive}
-                disabled={liveBusy}
-                style={styles.shareButton}
-              >
-                <Text style={styles.shareEmoji}>📡</Text>
-                <Text style={[styles.shareText, { color: colors.background }]}>
-                  {t('live_btn')}
-                </Text>
-              </Pressable>
-
-              {liveUrl ? (
-                <Text style={[styles.shareHint, { color: colors.textMuted }]}>
-                  {liveUrl}
-                </Text>
-              ) : null}
+              {liveSession ? (
+                <>
+                  <Text style={[styles.liveActive, { color: colors.textMuted }]}>
+                    {t('live_active', { time: liveCountdown(liveSession) })}
+                  </Text>
+                  <Text style={[styles.shareHint, { color: colors.textMuted }]}>
+                    {liveLink(liveSession)}
+                  </Text>
+                  <Pressable
+                    onPress={stopLive}
+                    disabled={liveBusy}
+                    style={[styles.shareButton, styles.stopButton]}>
+                    <Text style={styles.shareEmoji}>🛑</Text>
+                    <Text style={[styles.shareText, { color: colors.background }]}>
+                      {t('live_stop_btn')}
+                    </Text>
+                  </Pressable>
+                </>
+              ) : (
+                <Pressable
+                  onPress={startLive}
+                  disabled={liveBusy}
+                  style={styles.shareButton}>
+                  <Text style={styles.shareEmoji}>📡</Text>
+                  <Text style={[styles.shareText, { color: colors.background }]}>
+                    {t('live_btn')}
+                  </Text>
+                </Pressable>
+              )}
 
               <Text style={[styles.directLabel, { color: colors.textMuted }]}>
                 {t('em_send_direct')}
@@ -289,6 +361,15 @@ const styles = StyleSheet.create({
   shareEmoji: {
     fontSize: 18,
     marginRight: spacing.sm,
+  },
+  stopButton: {
+    backgroundColor: '#334155',
+  },
+  liveActive: {
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: spacing.md,
   },
   shareText: {
     fontSize: 16,

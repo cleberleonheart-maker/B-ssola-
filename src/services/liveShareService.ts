@@ -3,10 +3,12 @@ import {
   isCloudEnabled,
   ensureCloudUser,
   pushLivePosition,
+  deleteLiveShareRow,
 } from './cloud';
 import type { LocationFix } from './locationService';
 
 const PREFIX = 'bussola:live:';
+const ACTIVE_KEY = 'bussola:live:active';
 const MS = 60000;
 
 export interface LiveSession {
@@ -43,6 +45,7 @@ export const startLiveShare = async (
   };
   try {
     await AsyncStorage.setItem(PREFIX + token, JSON.stringify(session));
+    await AsyncStorage.setItem(ACTIVE_KEY, JSON.stringify(session));
   } catch {}
   return session;
 };
@@ -50,7 +53,32 @@ export const startLiveShare = async (
 export const stopLiveShare = async (token: string): Promise<void> => {
   try {
     await AsyncStorage.removeItem(PREFIX + token);
+    const raw = await AsyncStorage.getItem(ACTIVE_KEY);
+    if (!raw) return;
+    const active = JSON.parse(raw) as LiveSession | null;
+    if (!active || !active.token || active.token === token) {
+      await AsyncStorage.removeItem(ACTIVE_KEY);
+    }
   } catch {}
+  try {
+    const userId = await ensureCloudUser();
+    if (userId) await deleteLiveShareRow(token, userId);
+  } catch {}
+};
+
+export const getActiveLiveSession = async (): Promise<LiveSession | null> => {
+  try {
+    const raw = await AsyncStorage.getItem(ACTIVE_KEY);
+    if (!raw) return null;
+    const session = JSON.parse(raw) as LiveSession | null;
+    if (!session || !session.token || session.expiresAt <= Date.now()) {
+      await AsyncStorage.removeItem(ACTIVE_KEY);
+      return null;
+    }
+    return session;
+  } catch {
+    return null;
+  }
 };
 
 export const pushLiveFix = async (

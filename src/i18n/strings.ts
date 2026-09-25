@@ -512,6 +512,8 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     live_shared: '📍 Estou ao vivo aqui (expira em 30 min):',
     live_need_cloud: 'Ative o login na nuvem para usar o rastreio ao vivo.',
     live_error: 'Não foi possível iniciar o rastreio ao vivo.',
+    live_stop_btn: '🛑 Parar rastreio',
+    live_active: 'Rastreio ativo por {time}',
     em_share_hint: 'Abre o compartilhamento do sistema para enviar por SMS, WhatsApp, e-mail e outros.',
     em_no_fix: 'Sem fix de GPS ainda. Aguarde o aparelho obter sua localização e tente de novo.',
 
@@ -1194,6 +1196,8 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     live_shared: '📍 I am live here (expires in 30 min):',
     live_need_cloud: 'Sign in to the cloud to use live tracking.',
     live_error: 'Could not start live tracking.',
+    live_stop_btn: '🛑 Stop live tracking',
+    live_active: 'Live tracking on for {time}',
     em_share_hint: 'Opens the system share sheet to send via SMS, WhatsApp, email and more.',
     em_no_fix: 'No GPS fix yet. Wait for your position and try again.',
 
@@ -1874,6 +1878,8 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     live_shared: '📍 Estoy en vivo aquí (expira en 30 min):',
     live_need_cloud: 'Inicia sesión en la nube para usar el rastreo en vivo.',
     live_error: 'No se pudo iniciar el rastreo en vivo.',
+    live_stop_btn: '🛑 Detener rastreo',
+    live_active: 'Rastreo activo por {time}',
     em_share_hint: 'Abre el compartir del sistema para enviar por SMS, WhatsApp, correo y más.',
     em_no_fix: 'Sin señal de GPS todavía. Espera tu posición e inténtalo de nuevo.',
 
