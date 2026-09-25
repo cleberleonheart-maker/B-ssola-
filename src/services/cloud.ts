@@ -349,7 +349,7 @@ export const pushLivePosition = async (
 ): Promise<boolean> => {
   if (!client) return false;
   try {
-    await withTimeout(
+    const { error } = await withTimeout(
       client.from('live_shares').upsert(
         {
           token,
@@ -364,7 +364,7 @@ export const pushLivePosition = async (
         { onConflict: 'token' },
       ),
     );
-    return true;
+    return !error;
   } catch {
     return false;
   }

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   Modal,
   View,
@@ -35,6 +35,11 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
   const { t } = useLanguage();
 
   const hasFix = location.latitude !== 0 && location.longitude !== 0;
+  const locationRef = useRef(location);
+
+  useEffect(() => {
+    locationRef.current = location;
+  }, [location]);
 
   const shareText = useMemo(() => {
     if (!hasFix) return '🆘';
@@ -105,8 +110,13 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
         return;
       }
       const url = liveLink(s);
+      const sent = await pushLiveFix(s, locationRef.current);
+      if (!sent) {
+        await stopLiveShare(s.token);
+        Alert.alert(t('live_title'), t('live_error'));
+        return;
+      }
       setLiveUrl(url);
-      await pushLiveFix(s, location);
       const timer = setInterval(() => {
         if (Date.now() > s.expiresAt) {
           clearInterval(timer);
@@ -114,7 +124,7 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
           setLiveUrl(null);
           return;
         }
-        void pushLiveFix(s, location);
+        void pushLiveFix(s, locationRef.current);
       }, 10000);
       await Share.share({ message: t('live_shared') + ' ' + url });
     } catch {
