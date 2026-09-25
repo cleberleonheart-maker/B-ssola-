@@ -76,6 +76,27 @@ jobs:
           echo "apk_name=bussola-v${CODE}.apk" >> "$GITHUB_OUTPUT"
           echo "version_code=$CODE" >> "$GITHUB_OUTPUT"
 
+      - name: Grava app_version no Supabase
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+        run: |
+          set -euo pipefail
+          : "${SUPABASE_SERVICE_ROLE_KEY:?defina o secret SUPABASE_SERVICE_ROLE_KEY}"
+          : "${SUPABASE_URL:?defina o secret SUPABASE_PROJECT_URL}"
+          CODE=$(grep -E '^versionCode=' android/app/version.properties | cut -d'=' -f2)
+          NAME=$(grep -E '^versionName=' android/app/version.properties | cut -d'=' -f2)
+          URL="https://github.com/$GITHUB_REPOSITORY/releases/download/bussola-apk/bussola-v${CODE}.apk"
+          BODY="{\"version_code\":$CODE,\"version_name\":\"$NAME\",\"update_url\":\"$URL\",\"message\":\"Nova versão disponível\",\"required\":false}"
+          curl -fsS -X PATCH "$SUPABASE_URL/rest/v1/app_version?id=eq.1" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=representation" \
+            -d "$BODY" -o /tmp/app_version.json
+          echo "app_version -> $CODE ($NAME)"
+          echo "URL: $URL"
+
       - name: Upload APK (artifact)
         uses: actions/upload-artifact@v4
         with:
