@@ -59,6 +59,17 @@ using (user_id::text = auth.uid()::text);
 -- =====================================================================
 -- notes: notas de campo
 -- =====================================================================
+-- O app faz upsert com onConflict('id') em {user_id, id, data, updated_at}.
+-- A tabela pode nao existir ainda: texto abaixo a cria se preciso.
+create table if not exists public.notes (
+  user_id text not null,
+  id text not null,
+  data jsonb,
+  updated_at timestamptz not null default now(),
+  constraint notes_pkey primary key (id)
+);
+create index if not exists notes_user_id_idx on public.notes (user_id);
+
 alter table notes enable row level security;
 
 drop policy if exists "own_select_notes" on notes;
