@@ -16,7 +16,7 @@ export interface LiveSession {
 }
 
 export const liveLink = (s: LiveSession): string =>
-  'https://wotzcykrvidbjkonaawx.supabase.co/storage/v1/object/public/live/live.html#tkn=' +
+  'https://cleberleonheart-maker.github.io/B-ssola-/live.html#tkn=' +
   encodeURIComponent(s.token);
 
 export const liveCountdown = (s: LiveSession): string => {
