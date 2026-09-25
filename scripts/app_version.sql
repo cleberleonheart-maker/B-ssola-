@@ -14,5 +14,5 @@ create table if not exists public.app_version (
 );
 
 insert into public.app_version (id, version_code, version_name)
-values (1, 148, 'v7.17')
+values (1, 149, 'v7.18')
 on conflict (id) do nothing;
