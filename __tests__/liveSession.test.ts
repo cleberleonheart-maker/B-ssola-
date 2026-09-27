@@ -9,12 +9,25 @@ const loadService = (now: number) => {
       store.delete(key);
     }),
   };
-  const deleteLiveShareRow = jest.fn(async () => true);
+  const deleteLiveShareRow = jest.fn(
+    async (_token: string, _userId: string) => true,
+  );
+  const pushLivePosition = jest.fn(
+    async (
+      _token: string,
+      _userId: string,
+      _lat: number,
+      _lng: number,
+      _acc: number | null,
+      _heading: number | null,
+      _expiresAt: number,
+    ) => true,
+  );
   jest.doMock('@react-native-async-storage/async-storage', () => ({ __esModule: true, default: AsyncStorage }));
   jest.doMock('../src/services/cloud', () => ({
     isCloudEnabled: jest.fn(() => true),
     ensureCloudUser: jest.fn(async () => 'user-1'),
-    pushLivePosition: jest.fn(async () => true),
+    pushLivePosition,
     deleteLiveShareRow,
   }));
   jest.spyOn(Date, 'now').mockReturnValue(now);
@@ -22,7 +35,7 @@ const loadService = (now: number) => {
   jest.isolateModules(() => {
     service = jest.requireActual('../src/services/liveShareService') as typeof import('../src/services/liveShareService');
   });
-  return { service, store, deleteLiveShareRow };
+  return { service, store, deleteLiveShareRow, pushLivePosition };
 };
 
 const MS = 60000;
@@ -41,7 +54,7 @@ describe('sessão de live', () => {
 
   it('guarda a sessão ativa e permite retomar', async () => {
     const { service, store } = loadService(1000);
-    const s = await service.startLiveShare('', 30);
+    const s = await service.startLiveShare(30);
     expect(s).not.toBeNull();
     expect(store.has('bussola:live:active')).toBe(true);
     const resumed = await service.getActiveLiveSession();
@@ -50,7 +63,7 @@ describe('sessão de live', () => {
 
   it('descarta sessão expirada', async () => {
     const { service, store } = loadService(1000);
-    const s = await service.startLiveShare('', 5);
+    const s = await service.startLiveShare(5);
     jest.spyOn(Date, 'now').mockReturnValue(1000 + 6 * MS);
     expect(await service.getActiveLiveSession()).toBeNull();
     expect(store.has('bussola:live:active')).toBe(false);
@@ -59,7 +72,7 @@ describe('sessão de live', () => {
 
   it('limpa a sessão ativa ao parar', async () => {
     const { service, store, deleteLiveShareRow } = loadService(1000);
-    const s = await service.startLiveShare('', 30);
+    const s = await service.startLiveShare(30);
     await service.stopLiveShare(s!.token);
     expect(store.has('bussola:live:active')).toBe(false);
     expect(store.has('bussola:live:' + s!.token)).toBe(false);
@@ -69,9 +82,70 @@ describe('sessão de live', () => {
 
   it('não apaga uma sessão ativa mais nova', async () => {
     const { service, store } = loadService(1000);
-    await service.startLiveShare('', 30);
+    await service.startLiveShare(30);
     const older = 'lnv-antiga';
     await service.stopLiveShare(older);
     expect(store.has('bussola:live:active')).toBe(true);
+  });
+
+  it('envia o rumo do fix para o push', async () => {
+    const { service, pushLivePosition } = loadService(1000);
+    const s = await service.startLiveShare(30);
+    const sent = await service.pushLiveFix(s!, {
+      latitude: -15.8,
+      longitude: -47.9,
+      accuracy: 5,
+      altitude: 1100,
+      speed: 1.4,
+      provider: 'gps',
+      updatedAt: 1000,
+      heading: 90,
+    });
+    expect(sent).toBe(true);
+    // token, userId, lat, lng, accuracy, heading, expiresAt
+    expect(pushLivePosition).toHaveBeenCalledWith(
+      s!.token,
+      'user-1',
+      -15.8,
+      -47.9,
+      5,
+      90,
+      s!.expiresAt,
+    );
+  });
+
+  it('envia heading nulo quando o GPS não informa rumo', async () => {
+    const { service, pushLivePosition } = loadService(1000);
+    const s = await service.startLiveShare(30);
+    await service.pushLiveFix(s!, {
+      latitude: -15.8,
+      longitude: -47.9,
+      accuracy: null,
+      altitude: null,
+      speed: null,
+      provider: null,
+      updatedAt: null,
+      heading: null,
+    });
+    expect(pushLivePosition.mock.calls[0][5]).toBeNull();
+  });
+
+  it('usa o mesmo userId no push e na remoção da linha', async () => {
+    const { service, pushLivePosition, deleteLiveShareRow } = loadService(1000);
+    const s = await service.startLiveShare(30);
+    await service.pushLiveFix(s!, {
+      latitude: -15.8,
+      longitude: -47.9,
+      accuracy: null,
+      altitude: null,
+      speed: null,
+      provider: null,
+      updatedAt: null,
+      heading: null,
+    });
+    await service.stopLiveShare(s!.token);
+    const pushedUser = pushLivePosition.mock.calls[0][1];
+    const deletedUser = deleteLiveShareRow.mock.calls[0][1];
+    expect(pushedUser).toBe(deletedUser);
   });
 });

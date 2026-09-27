@@ -195,6 +195,7 @@ const CompassScreen = () => {
     speed: null,
     provider: null,
     updatedAt: null,
+    heading: null,
   });
   const [place, setPlace] = useState<{ name: string; cep: string | null } | null>(null);
   const geoLastRef = useRef<{ lat: number; lon: number; at: number } | null>(null);

@@ -51,6 +51,8 @@ export type LocationFix = {
   speed: number | null;
   provider: string | null;
   updatedAt: number | null;
+  /** Rumo sobre o solo em graus do norte verdadeiro, quando o GPS informa. */
+  heading: number | null;
 };
 
 export type LocationMode = 'satellite' | 'network' | 'tower';
@@ -69,6 +71,10 @@ const toFix = (position: any): LocationFix => ({
   speed: position.coords.speed ?? null,
   provider: position.coords.provider ?? null,
   updatedAt: position.timestamp ?? Date.now(),
+  heading:
+    typeof position.coords.heading === 'number' && position.coords.heading >= 0
+      ? position.coords.heading
+      : null,
 });
 
 const buildOptions = (opts: WatchOptions): GeolocationOptions => {

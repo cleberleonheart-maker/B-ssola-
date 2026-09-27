@@ -13,7 +13,6 @@ const MS = 60000;
 
 export interface LiveSession {
   token: string;
-  userId: string;
   expiresAt: number;
 }
 
@@ -30,7 +29,6 @@ export const liveCountdown = (s: LiveSession): string => {
 };
 
 export const startLiveShare = async (
-  userId: string,
   minutes: number,
 ): Promise<LiveSession | null> => {
   if (!isCloudEnabled()) return null;
@@ -40,7 +38,6 @@ export const startLiveShare = async (
     Math.random().toString(36).slice(2, 10);
   const session: LiveSession = {
     token,
-    userId,
     expiresAt: Date.now() + Math.max(5, minutes) * MS,
   };
   try {
@@ -86,7 +83,10 @@ export const pushLiveFix = async (
   fix: LocationFix,
 ): Promise<boolean> => {
   if (!isCloudEnabled()) return false;
-  const userId = s.userId || (await ensureCloudUser());
+  // A identidade vem sempre daqui, e nao da sessao: o stopLiveShare tambem usa
+  // ensureCloudUser(), e um id guardado na sessao poderia nao bater com o dele
+  // — a linha ficaria orfa na tabela.
+  const userId = await ensureCloudUser();
   if (!userId) return false;
   return pushLivePosition(
     s.token,
@@ -94,7 +94,7 @@ export const pushLiveFix = async (
     fix.latitude,
     fix.longitude,
     fix.accuracy ?? null,
-    null,
+    fix.heading,
     s.expiresAt,
   );
 };

@@ -156,7 +156,7 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
     if (!hasFix || liveBusy || sessionRef.current) return;
     setLiveBusy(true);
     try {
-      const s = await startLiveShare('', 30);
+      const s = await startLiveShare(30);
       if (!s) {
         Alert.alert(t('live_title'), t('live_need_cloud'));
         return;
