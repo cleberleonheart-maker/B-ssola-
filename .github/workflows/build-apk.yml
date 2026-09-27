@@ -7,6 +7,10 @@ on:
     paths:
       - '.github/workflows/build-apk.yml'
       - 'src/**'
+      - '__tests__/**'
+      - 'jest.config.js'
+      - 'jest.setup.js'
+      - '.eslintrc.js'
       - 'App.tsx'
       - 'android/app/src/**'
       - 'android/app/build.gradle'
