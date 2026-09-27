@@ -281,13 +281,14 @@ foram encontrados de verdade, não ideias soltas.
       um keep-alive.
 - [ ] **56. 💥 Relatório de crash** — hoje um erro em produção é invisível; o usuário
       simplesmente vê o app fechar. Sentry daria o stack real.
-- [ ] **57. 🧪 Testes dos componentes extraídos** — as primitivas de
-      `settings/primitives.tsx` (`SwitchRow`, `RadioRow`, `ChevronRow`, `GridOption`) são
-      puras e seria trivial testar, o que dá uma rede real para as próximas refatorações
-      de tela.
-- [ ] **58. 🧪 Teste do `live.html`** — a lógica de stale/expirado/backoff do viewer é JS
-      puro e não tem teste nenhum. É a peça que o link público mostra, sem rede de
-      proteção.
+- [x] **57. 🧪 Testes dos componentes extraídos** — feito. 12 testes para as primitivas de
+      `settings/primitives.tsx`, cobrindo a fiação de `onPress` (que é onde a refatoração
+      poderia ter quebrado em silêncio), a área clicável de cada linha, `disabled` e as
+      cores Selected/unselected. Sete mutações foram aplicadas no fonte de propósito
+      para conferir que os testes detectam: as sete derrubaram a suíte.
+- [x] **58. 🧪 Teste do `live.html`** — já existia. `__tests__/liveViewer.test.js` tem 13
+      casos cobrindo stale, expiração, erro de rede, polls sobrepostos e aba oculta. Este
+      item foi anotado como pendência por engano e está encerrado.
 - [ ] **59. 🏗️ Build local do Android** — hoje o `assembleRelease` local não roda (o
       `io.invertase.gradle.build:1.5` não resolve offline) e o CI é o único caminho, o
       que torna todo ciclo de release lento e opaco. Se funcionar local, o debug de
