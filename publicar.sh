@@ -45,6 +45,28 @@ cp "$APK" "$TMP_APK"
 SIZE=$(du -h "$TMP_APK" | cut -f1)
 echo "==> APK: $SIZE (codigo $VERSION_CODE, nome $VERSION_NAME)"
 
+echo "==> CONFERINDO a assinatura"
+CERTS="$ROOT_GRADLE/app/release-cert.sha256"
+APKSIGNER=$(ls -1d "${ANDROID_HOME:-$HOME/android-sdk}"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1 || true)
+if [ -z "$APKSIGNER" ]; then
+  echo "apksigner nao encontrado; instale build-tools ou defina ANDROID_HOME"
+  exit 1
+fi
+# $NF: o prefixo da linha varia entre versoes do apksigner
+# ("Signer #1 certificate..." vs "V2 Signer: certificate...").
+norm() { tr -d ' \n\r:' | tr 'A-Z' 'a-z'; }
+EXPECTED=$(norm < "$CERTS")
+FOUND=$("$APKSIGNER" verify --print-certs "$TMP_APK" \
+  | awk -F': ' '/certificate SHA-256 digest/ {print $NF}' | norm)
+if [ "$FOUND" != "$EXPECTED" ]; then
+  echo "APK assinado com a chave errada."
+  echo "  esperado: $EXPECTED"
+  echo "  obtido:   $FOUND"
+  echo "Um APK com outra chave nao atualiza por cima do app ja instalado."
+  exit 1
+fi
+echo "assinatura conferida: $EXPECTED"
+
 echo "==> PUBLICANDO no GitHub"
 if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
   gh release upload "$TAG" "$TMP_APK" --repo "$REPO" --clobber

@@ -248,10 +248,14 @@ Saem de uma revisão de código feita na v7.22. As três primeiras fecham riscos
 foram encontrados de verdade, não ideias soltas.
 
 ### Risco / processo
-- [ ] **50. 🔏 O CI confere a assinatura do APK** — o `assembleRelease` passa porque as env
-      vars existem, não porque a chave é a certa. Um passo com `apksigner verify
-      --print-certs` comparando o SHA-256 com um valor esperado falha o build se sair a
-      chave de debug ou qualquer outra. Hoje essa conferência foi feita à mão.
+- [x] **50. 🔏 O CI confere a assinatura do APK** — feito. O `assembleRelease` passava
+      porque as env vars existiam, não porque a chave era a certa. Agora há um passo
+      "Confere a assinatura do APK" **antes** de publicar, e o mesmo gate no
+      `publicar.sh`: `apksigner verify --print-certs` compara o SHA-256 com
+      `android/app/release-cert.sha256` e aborta se não bater. O fingerprint esperado
+      entrou no filtro de paths do CI, então trocar o valor também dispara build.
+      Testado nos três caminhos: APK de produção passa, APK assinado com outra chave
+      aborta, SDK ausente aborta.
 - [ ] **51. 🔗 `version.properties` × `version.generated.ts` podem divergir** — são dois
       arquivos para editar a cada bump e nada verifica a coerência. Um passo no CI
       comparando os dois (ou um `pre-commit`) elimina a chance de publicar um APK que se

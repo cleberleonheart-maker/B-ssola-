@@ -10,6 +10,7 @@ on:
       - 'android/app/src/**'
       - 'android/app/build.gradle'
       - 'android/app/version.properties'
+      - 'android/app/release-cert.sha256'
       - 'android/gradle.properties'
       - 'android/build.gradle'
       - 'package.json'
@@ -57,6 +58,47 @@ jobs:
           fi
           cd android
           ./gradlew assembleRelease -x lint -x test
+
+      - name: Confere a assinatura do APK
+        run: |
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          CERTS=android/app/release-cert.sha256
+
+          if [ ! -f "$APK" ]; then
+            echo "::error::APK nao encontrado: $APK"
+            exit 1
+          fi
+          if [ ! -f "$CERTS" ]; then
+            echo "::error::fingerprint esperado nao encontrado: $CERTS"
+            exit 1
+          fi
+
+          APKSIGNER=$(ls -1d "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1 || true)
+          if [ -z "$APKSIGNER" ]; then
+            echo "::error::apksigner nao encontrado em \$ANDROID_HOME/build-tools"
+            exit 1
+          fi
+
+          # $NF: o prefixo da linha varia entre versoes do apksigner
+          # ("Signer #1 certificate..." vs "V2 Signer: certificate...").
+          norm() { tr -d ' \n\r:' | tr 'A-Z' 'a-z'; }
+          EXPECTED=$(norm < "$CERTS")
+          FOUND=$("$APKSIGNER" verify --print-certs "$APK" \
+            | awk -F': ' '/certificate SHA-256 digest/ {print $NF}' | norm || true)
+
+          if [ -z "$FOUND" ]; then
+            echo "::error::nao foi possivel ler o certificado de $APK"
+            exit 1
+          fi
+          if ! printf '%s' "$FOUND" | grep -qx "$EXPECTED"; then
+            echo "::error::APK assinado com a chave errada"
+            echo "::error::esperado: $EXPECTED"
+            echo "::error::obtido:   $(echo "$FOUND" | tr '\n' ' ')"
+            echo "::error::um APK com outra chave nao atualiza por cima do app ja instalado"
+            exit 1
+          fi
+          echo "assinatura conferida: $EXPECTED"
 
       - name: Publicar APK no release
         env:
