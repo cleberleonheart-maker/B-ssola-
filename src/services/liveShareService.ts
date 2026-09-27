@@ -9,7 +9,7 @@ import type { LocationFix } from './locationService';
 
 const PREFIX = 'bussola:live:';
 const ACTIVE_KEY = 'bussola:live:active';
-const MS = 60000;
+const MS_PER_MIN = 60000;
 
 export interface LiveSession {
   token: string;
@@ -23,8 +23,8 @@ export const liveLink = (s: LiveSession): string =>
 export const liveCountdown = (s: LiveSession): string => {
   const left = s.expiresAt - Date.now();
   if (left <= 0) return '0:00';
-  const m = Math.floor(left / MS) % 60;
-  const h = Math.floor(left / (MS * 60));
+  const m = Math.floor(left / MS_PER_MIN) % 60;
+  const h = Math.floor(left / (MS_PER_MIN * 60));
   return `${h}:${String(m).padStart(2, '0')}`;
 };
 
@@ -38,7 +38,7 @@ export const startLiveShare = async (
     Math.random().toString(36).slice(2, 10);
   const session: LiveSession = {
     token,
-    expiresAt: Date.now() + Math.max(5, minutes) * MS,
+    expiresAt: Date.now() + Math.max(5, minutes) * MS_PER_MIN,
   };
   try {
     await AsyncStorage.setItem(PREFIX + token, JSON.stringify(session));

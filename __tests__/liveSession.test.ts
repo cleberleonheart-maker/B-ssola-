@@ -38,7 +38,7 @@ const loadService = (now: number) => {
   return { service, store, deleteLiveShareRow, pushLivePosition };
 };
 
-const MS = 60000;
+const MS_PER_MIN = 60000;
 
 describe('sessão de live', () => {
   beforeEach(() => {
@@ -64,10 +64,10 @@ describe('sessão de live', () => {
   it('descarta sessão expirada', async () => {
     const { service, store } = loadService(1000);
     const s = await service.startLiveShare(5);
-    jest.spyOn(Date, 'now').mockReturnValue(1000 + 6 * MS);
+    jest.spyOn(Date, 'now').mockReturnValue(1000 + 6 * MS_PER_MIN);
     expect(await service.getActiveLiveSession()).toBeNull();
     expect(store.has('bussola:live:active')).toBe(false);
-    expect(s?.expiresAt).toBe(1000 + 5 * MS);
+    expect(s?.expiresAt).toBe(1000 + 5 * MS_PER_MIN);
   });
 
   it('limpa a sessão ativa ao parar', async () => {
