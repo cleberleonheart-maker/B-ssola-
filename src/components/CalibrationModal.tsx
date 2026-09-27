@@ -22,6 +22,9 @@ import {
   computeCalibration,
   saveCalibration,
   resetCalibration,
+  saveVerification,
+  solarDelta,
+  solarOk,
 } from '../services/calibrationService';
 import { solarPosition } from '../utils/astro';
 import { normalizeHeading } from '../utils/compass';
@@ -31,7 +34,6 @@ const MIN_SAMPLES = 100;
 const MIN_COVERAGE = 0.6;
 const MEASURE_N = 12;
 const MEASURE_STEP_MS = 250;
-const SOLAR_TOLERANCE = 6;
 
 type Props = {
   visible: boolean;
@@ -42,13 +44,6 @@ type Props = {
   longitude: number;
   declinationEnabled: boolean;
   declinationDegrees: number;
-};
-
-const wrap180 = (deg: number) => {
-  let v = deg % 360;
-  if (v > 180) v -= 360;
-  if (v < -180) v += 360;
-  return v;
 };
 
 const CalibrationModal = ({
@@ -168,6 +163,13 @@ const CalibrationModal = ({
     }
   }, [visible, start, stop]);
 
+  // Só uma conferência que deu certo conta. Marcar na tentativa faria o app
+  // calar justamente quando o norte está torto, que é o caso que importa.
+  useEffect(() => {
+    if (!measureResult || !solarOk(measureResult)) return;
+    saveVerification().catch(() => {});
+  }, [measureResult]);
+
   const concluir = useCallback(async () => {
     setSaving(true);
     const cal = computeCalibration(collectorRef.current);
@@ -273,10 +275,8 @@ const CalibrationModal = ({
                 </Pressable>
                 {measureResult &&
                   (() => {
-                    const delta = Math.round(
-                      wrap180(measureResult.avg - measureResult.expected),
-                    );
-                    const ok = Math.abs(delta) <= SOLAR_TOLERANCE;
+                    const delta = Math.round(solarDelta(measureResult));
+                    const ok = solarOk(measureResult);
                     const label = ok ? 'cal_sun_good' : 'cal_sun_bad';
                     const params = ok
                       ? undefined

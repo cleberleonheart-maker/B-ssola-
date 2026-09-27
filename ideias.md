@@ -293,6 +293,15 @@ foram encontrados de verdade, não ideias soltas.
       `io.invertase.gradle.build:1.5` não resolve offline) e o CI é o único caminho, o
       que torna todo ciclo de release lento e opaco. Se funcionar local, o debug de
       build para de custar 6 min por tentativa.
+- [x] **60. ☀️ Lembrar de conferir o norte pelo Sol** — feito na v7.23. A conferência
+      exige apontar o aparelho para o Sol e segurar 12 leituras por 3 s, então não dá
+      para rodá-la sozinha: o app só pode lembrar. Ele guarda quando foi a última
+      conferência que deu certo e, passados 30 dias sem uma, mostra um banner
+      dispensável com atalho para a calibração. Três decisões vieram do caso de um
+      sensor ruim: (1) só conta a conferência que deu certo, senão o app cala justamente
+      quando o norte está torto; (2) o banner só aparece com GPS e Sol acima do
+      horizonte, senão volta sem que o usuário possa fazer nada; (3) quem nunca calibrou
+      continua recebendo o modal de sempre — o banner é para quem já tem calibração.
 
 ## Ideias novas (23/09/2026, 3ª leva — melhorias em modos existentes)
 - [ ] **28. Teodolito com altura direta** — usar a distância do waypoint ativo/marco na

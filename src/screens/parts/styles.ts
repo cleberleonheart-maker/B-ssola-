@@ -62,6 +62,30 @@ export const createStyles = (colors: ColorScheme) =>
   homeContent: {
     paddingBottom: spacing.lg,
   },
+  verifyBanner: {
+    marginTop: spacing.sm,
+    marginHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: spacing.xs,
+  },
+  verifyBannerText: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  verifyBannerActions: {
+    flexDirection: 'row',
+    gap: spacing.lg,
+  },
+  verifyBannerCta: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  verifyBannerDismiss: {
+    paddingVertical: 2,
+  },
   homeHeader: {
     flexDirection: 'row',
     alignItems: 'center',

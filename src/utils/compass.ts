@@ -5,6 +5,14 @@ export const normalizeHeading = (deg: number) => {
   return value < 0 ? value + 360 : value;
 };
 
+/** Normaliza para o intervalo -180..180. Usado para desvios de rumo. */
+export const wrap180 = (deg: number) => {
+  let v = deg % 360;
+  if (v > 180) v -= 360;
+  if (v < -180) v += 360;
+  return v;
+};
+
 export const MILS_PER_DEG = 6400 / 360;
 
 /**

@@ -45,8 +45,11 @@ import {
 import { reverseGeocode } from '../services/geocodingService';
 import {
   loadCalibration,
+  loadVerification,
+  verifyStatus,
   applyCalibration,
   type MagCalibration,
+  type VerifyStatus,
 } from '../services/calibrationService';
 import {
   watchBarometer,
@@ -320,6 +323,7 @@ const CompassScreen = () => {
     const id = setTimeout(() => setCalibrationVisible(true), 1500);
     return () => clearTimeout(id);
   }, [calibrated, calibrationVisible, displayMode, launcherVisible]);
+
 
   const toggleVoiceGuide = useCallback(() => {
     setVoiceGuide(prev => {
@@ -840,6 +844,76 @@ const CompassScreen = () => {
   const hasFix =
     location.latitude !== 0 || location.longitude !== 0 || location.provider !== null;
 
+  // A conferência pelo Sol só é possível com GPS e Sol acima do horizonte.
+  // Sem esta checagem o banner voltaria sempre para quem abre o app de
+  // noite, sem que houvesse nada a fazer a respeito.
+  const sunViable = useMemo(() => {
+    if (!hasFix) return false;
+    return solarPosition(
+      new Date(),
+      location.latitude,
+      location.longitude,
+    ).visible;
+  }, [hasFix, location.latitude, location.longitude]);
+
+  // A conferência pelo Sol exige apontar o aparelho para o Sol e segurar
+  // firme, então não dá para rodá-la sozinha. O app guarda quando foi a
+  // última vez que deu certo e lembra, uma vez por sessão. Quem nunca
+  // calibrou já recebe o modal acima; aqui só quem já tem calibração.
+  const [verify, setVerify] = useState<VerifyStatus>({
+    state: 'fresh',
+    days: 0,
+  });
+  const [verifyBanner, setVerifyBanner] = useState(false);
+  const verifyPromptedRef = useRef(false);
+
+  useEffect(() => {
+    let alive = true;
+    loadVerification()
+      .then(at => {
+        if (alive) setVerify(verifyStatus(at));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [calibrated]);
+
+  useEffect(() => {
+    if (
+      !calibrated ||
+      verify.state === 'fresh' ||
+      verifyPromptedRef.current ||
+      calibrationVisible
+    ) {
+      return;
+    }
+    if (displayMode !== 'compass' || launcherVisible) {
+      return;
+    }
+    // Deixa o ref intacto de propósito: assim, se o Sol estiver abaixo do
+    // horizonte agora, a chance volta a ser avaliada mais tarde na sessão.
+    if (!sunViable) {
+      return;
+    }
+    verifyPromptedRef.current = true;
+    setVerifyBanner(true);
+  }, [
+    calibrated,
+    verify.state,
+    calibrationVisible,
+    displayMode,
+    launcherVisible,
+    sunViable,
+  ]);
+
+  useEffect(() => {
+    if (calibrationVisible && verifyBanner) {
+      setVerifyBanner(false);
+    }
+  }, [calibrationVisible, verifyBanner]);
+
+
   const gMag = Math.sqrt(accel.x ** 2 + accel.y ** 2 + accel.z ** 2) || 1;
   const tiltX = accel.x / gMag;
   const tiltY = -accel.y / gMag;
@@ -1143,6 +1217,35 @@ const CompassScreen = () => {
           <Text style={styles.roundButtonIcon}>⚙</Text>
         </Pressable>
       </View>
+
+      {verifyBanner && (
+        <View
+          style={[
+            styles.verifyBanner,
+            { backgroundColor: colors.surfaceAlt, borderColor: colors.border },
+          ]}>
+          <Text style={[styles.verifyBannerText, { color: colors.text }]}>
+            {verify.state === 'never'
+              ? t('cal_verify_never')
+              : t('cal_verify_stale', { days: verify.days })}
+          </Text>
+          <View style={styles.verifyBannerActions}>
+            <Pressable onPress={openCalibration} hitSlop={8}>
+              <Text style={[styles.verifyBannerCta, { color: colors.primary }]}>
+                {t('cal_verify_cta')}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setVerifyBanner(false)}
+              hitSlop={8}
+              style={styles.verifyBannerDismiss}>
+              <Text style={[styles.verifyBannerCta, { color: colors.textMuted }]}>
+                {t('cal_verify_later')}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
 
       {launcherVisible && (
         <ScrollView

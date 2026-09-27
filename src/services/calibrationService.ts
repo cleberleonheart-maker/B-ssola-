@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { wrap180 } from '../utils/compass';
 
 export type Vector3 = { x: number; y: number; z: number };
 
@@ -110,4 +111,69 @@ export const loadCalibration = async (): Promise<MagCalibration | null> => {
 
 export const resetCalibration = async () => {
   await AsyncStorage.removeItem(STORAGE_KEY);
+  await clearVerification();
+};
+
+/** Tolerância de desvio aceita na conferência pelo Sol, em graus. */
+export const SOLAR_TOLERANCE = 6;
+
+/** Desvio entre a leitura e o azimute solar esperado, em -180..180. */
+export const solarDelta = (m: { avg: number; expected: number }) =>
+  wrap180(m.avg - m.expected);
+
+export const solarOk = (m: { avg: number; expected: number }) =>
+  Math.abs(solarDelta(m)) <= SOLAR_TOLERANCE;
+
+const VERIFY_KEY = '@bussola/magCalVerified';
+
+/** Dias até o app voltar a sugerir conferir o norte pelo Sol. */
+export const VERIFY_INTERVAL_DAYS = 30;
+
+export type VerifyState = 'never' | 'fresh' | 'stale';
+
+export type VerifyStatus = {
+  state: VerifyState;
+  /** Dias desde a última conferência; 0 quando nunca houve. */
+  days: number;
+};
+
+/**
+ * Decide se o app deve sugerir conferir o norte pelo Sol.
+ *
+ * A conferência exige apontar o aparelho para o Sol e segurar firme, então
+ * não dá para rodá-la sozinha. O app só sabe dizer que está na hora.
+ */
+export const verifyStatus = (
+  lastVerifiedAt: number | null,
+  now: number = Date.now(),
+  intervalDays: number = VERIFY_INTERVAL_DAYS,
+): VerifyStatus => {
+  if (lastVerifiedAt === null || !Number.isFinite(lastVerifiedAt)) {
+    return { state: 'never', days: 0 };
+  }
+  // Relógio andou para trás (troca de data, fuso): não é motivo para nagging.
+  if (lastVerifiedAt > now) {
+    return { state: 'fresh', days: 0 };
+  }
+  const days = Math.floor((now - lastVerifiedAt) / 86_400_000);
+  return { state: days >= intervalDays ? 'stale' : 'fresh', days };
+};
+
+export const saveVerification = async (at: number = Date.now()) => {
+  await AsyncStorage.setItem(VERIFY_KEY, String(Math.round(at)));
+};
+
+export const loadVerification = async (): Promise<number | null> => {
+  try {
+    const raw = await AsyncStorage.getItem(VERIFY_KEY);
+    if (raw === null) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+};
+
+export const clearVerification = async () => {
+  await AsyncStorage.removeItem(VERIFY_KEY);
 };
