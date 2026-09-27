@@ -19,6 +19,10 @@ import {
   getActiveLiveSession,
   type LiveSession,
 } from '../services/liveShareService';
+import {
+  startLiveTracking,
+  stopLiveTracking,
+} from '../services/liveTracking';
 import { useTheme } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
@@ -118,6 +122,7 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
       clearTicker();
       sessionRef.current = null;
       setLiveSession(null);
+      void stopLiveTracking();
       void stopLiveShare(s.token);
     },
     [clearTicker],
@@ -169,6 +174,10 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
         return;
       }
       startTicker(s);
+      const tracking = await startLiveTracking(s.expiresAt);
+      if (!tracking.backgroundLocation) {
+        Alert.alert(t('live_title'), t('live_bg_denied'));
+      }
       try {
         await Share.share({ message: t('live_shared') + ' ' + url });
       } catch {}
@@ -186,6 +195,7 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
     try {
       await stopLiveShare(s.token);
       clearTicker();
+      void stopLiveTracking();
       sessionRef.current = null;
       setLiveSession(null);
     } finally {

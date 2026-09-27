@@ -29,6 +29,7 @@ class MainApplication : Application(), ReactApplication {
           add(WidgetBridgePackage())
           add(GeofencePackage())
           add(TrackSharePackage())
+          add(LiveTrackingPackage())
         },
     )
   }

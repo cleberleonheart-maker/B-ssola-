@@ -3,6 +3,12 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Rastreio ao vivo com a tela apagada: sem isso o LocationManager para
+         de entregar fix quando o app vai para background, e quem assiste ao
+         link vê "SEM SINAL" durante uma emergência. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <!-- Reconhecimento de voz da assistente Virgin -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Câmera para o modo de visão AR -->
@@ -40,6 +46,12 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
       </activity>
+
+      <!-- Mantem o processo em foreground durante o rastreio ao vivo -->
+      <service
+        android:name=".LiveTrackingService"
+        android:exported="false"
+        android:foregroundServiceType="location" />
 
       <receiver
         android:name=".BussolaWidgetProvider"

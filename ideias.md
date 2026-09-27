@@ -275,10 +275,16 @@ foram encontrados de verdade, não ideias soltas.
 - [ ] **54. 🧭 Rumo magnético como reserva** — o `heading` do GPS só vem quando há
       deslocamento. O `EmergencyModal` já recebe o rumo magnético da bússola; usar como
       fallback quando o GPS não tem *bearing* deixa o viewer com rumo quase sempre.
-- [ ] **55. ⏱️ Tirar o "SEM SINAL" piscando** — o app empurra a cada 10 s e o viewer
-      considera stale acima de 25 s, mas o Android estrangula timers em background, então
-      o "SEM SINAL" pisca. Ou o viewer considera stale com folga maior, ou o app manda
-      um keep-alive.
+- [ ] **55. ⏱️ Tirar o "SEM SINAL" piscando** — app empurra a cada 10 s e o viewer
+      considera stale acima de 25 s. **Causa raiz confirmada: não era folga do viewer.**
+      Com o app em background o Android estrangula o `setInterval` e o `LocationManager`
+      para de entregar fix — o caso de uso real (aparelho no bolso durante uma emergência).
+      Implementado na 155: `LiveTrackingService` (foreground service `location`) + módulo
+      `LiveTracking` + `ACCESS_BACKGROUND_LOCATION`/`FOREGROUND_SERVICE_LOCATION`, com
+      notificação persistente e ação "Parar"; sem a permissão o app avisa em vez de prometer
+      que funciona. 9 testes em `__tests__/liveTracking.test.ts`.
+      **Falta: testar com a tela apagada no aparelho antes de fechar como concluída.**
+      Não aumentar o stale do viewer — isso só mascara o sumiço.
 - [ ] **56. 💥 Relatório de crash** — hoje um erro em produção é invisível; o usuário
       simplesmente vê o app fechar. Sentry daria o stack real.
 - [x] **57. 🧪 Testes dos componentes extraídos** — feito. 12 testes para as primitivas de
