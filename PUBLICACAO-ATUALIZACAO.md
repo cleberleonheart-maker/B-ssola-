@@ -38,8 +38,8 @@ Teste isolado: `/root/android-sdk/aapt2emu/aapt2 version` → funciona rápido
 ## Próximos passos
 1. Build manual com mais margem de memória e sem paralelismo:
    `cd android && ./gradlew assembleRelease --no-parallel --max-workers=1 -x lint -x test`
-   (após `versionCode` deve ser **126**, pois o build incrementa 1 automaticamente —
-   `android/app/build.gradle`).
+   (o `versionCode` **não** sobe sozinho — edite `android/app/version.properties`
+   antes de buildar; o `build.gradle` só reescreve `src/version.generated.ts`).
 2. Publicar o APK no GitHub:
    `gh release upload bussola-apk /tmp/bussola-v{code}.apk --repo cleberleonheart-maker/B-ssola- --clobber`
 3. Atualizar a tabela `app_version` no Supabase com a URL direta do novo APK
@@ -49,5 +49,44 @@ Teste isolado: `/root/android-sdk/aapt2emu/aapt2 version` → funciona rápido
 4. Reinstalar no celular → o app passa a oferecer a nova versão.
 
 ## Observações
-- `publicar.sh` faz build + bump automático de `versionCode` + upload via `gh`.
-- Não é repositório git em /root (sem ci/cd); publicação é manual.
+- Hoje a publicação é **automática**: `.github/workflows/build-apk.yml` roda em push na
+  `main` (e manualmente), valida `eslint` + `tsc --noEmit` + `jest`, gera o APK
+  assinado, sobe na tag `bussola-apk` e grava `app_version` no Supabase.
+  `publicar.sh` continua existindo para build local.
+- **Assinatura de release é obrigatória**: `android/app/build.gradle` aborta o
+  `assembleRelease` se `ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`,
+  `ANDROID_KEY_ALIAS` ou `ANDROID_KEY_PASSWORD` estiverem faltando. Não há mais
+  fallback para o keystore de debug — um APK assinado com a chave de debug não
+  poderia ser atualizado por cima de uma instalação já publicada.
+  - No CI as quatro variáveis vêm dos *secrets* do repositório.
+  - Localmente, `publicar.sh` lê o keystore de produção de `~/.bussola-keystore/`
+    (`bussola-release.keystore`, `password.txt`, alias `bussola`).
+- `web/live.html` (viewer do rastreio ao vivo) é publicado no **GitHub Pages** por
+  `.github/workflows/pages.yml`. Os antigos `scripts/live_bucket.sql` e
+  `scripts/live_content_type.sql` foram removidos: a alternativa via Supabase Storage
+  foi abandonada (o SQL Editor revertia o batch ao tocar em
+  `storage.objects.content_type`, que não existe). O que vale é `scripts/live_rls.sql`.
+
+---
+
+# Como publicar a atualização
+
+Referência atual (o registro da v125 abaixo é histórico e ficou desatualizado).
+
+## Fluxo automático (recomendado)
+1. Edite `android/app/version.properties` (`versionCode` e `versionName`).
+2. Atualize o changelog em `src/components/WhatsNewModal.tsx` (entrada para o novo
+   `versionCode`) e as chaves `wn_*` em `src/i18n/strings.ts` nos 3 idiomas.
+3. `npm run lint && npm run typecheck && npm test` — o CI repete os três como gate.
+4. `git push` na `main`: o workflow builda, assina, publica na tag `bussola-apk`
+   e grava `app_version` no Supabase.
+
+## Fluxo local
+`./publicar.sh` faz build + upload via `gh` + `scripts/publicar-supabase.sh`
+(precisa de `SUPABASE_SERVICE_ROLE_KEY` no ambiente ou em `~/.supabase-service-key`;
+sem a chave, gere `scripts/app_version.sql` para colar no SQL Editor).
+
+## Tabela `app_version`
+Uma única linha (`id=1`) com `version_code`, `version_name`, `update_url`, `message`
+e `required`. É ela que faz o app exibir o prompt de atualização. Schema e RLS em
+`scripts/rls.sql`.

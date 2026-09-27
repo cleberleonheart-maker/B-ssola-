@@ -16,6 +16,22 @@ import type { Translator } from '../i18n/strings';
 type Entry = { icon: string; title: string; desc: string };
 
 const CHANGELOG: Record<number, (t: Translator) => Entry[]> = {
+  152: t => [
+    { icon: '🛡️', title: t('wn_updatefix_title'), desc: t('wn_updatefix_desc') },
+    { icon: '🧹', title: t('wn_tidy_title'), desc: t('wn_tidy_desc') },
+  ],
+  151: t => [
+    { icon: '📡', title: t('wn_live_title'), desc: t('wn_live_desc') },
+    { icon: '🛑', title: t('wn_livestop_title'), desc: t('wn_livestop_desc') },
+    { icon: '🗺️', title: t('wn_liveview_title'), desc: t('wn_liveview_desc') },
+  ],
+  150: t => [
+    { icon: '📡', title: t('wn_live_title'), desc: t('wn_live_desc') },
+  ],
+  149: t => [
+    { icon: '🔄', title: t('wn_updcheck_title'), desc: t('wn_updcheck_desc') },
+    { icon: '🧭', title: t('wn_dialcompact_title'), desc: t('wn_dialcompact_desc') },
+  ],
   148: t => [
     { icon: '🗣', title: t('wn_voz_title'), desc: t('wn_voz_desc') },
     { icon: '📏', title: t('wn_odo_title'), desc: t('wn_odo_desc') },
@@ -73,6 +89,18 @@ const CHANGELOG: Record<number, (t: Translator) => Entry[]> = {
   ],
 };
 
+const changelogFor = (code: number, t: Translator): Entry[] => {
+  const build = CHANGELOG[code];
+  if (build) {
+    return build(t);
+  }
+  const nearest = Object.keys(CHANGELOG)
+    .map(Number)
+    .filter(known => known < code)
+    .sort((a, b) => b - a)[0];
+  return nearest ? CHANGELOG[nearest](t) : [];
+};
+
 type Props = {
   visible: boolean;
   onClose: () => void;
@@ -81,8 +109,7 @@ type Props = {
 const WhatsNewModal = ({ visible, onClose }: Props) => {
   const colors = useThemeColors();
   const { t } = useLanguage();
-  const build = CHANGELOG[APP_VERSION_CODE];
-  const features = build ? build(t) : [];
+  const features = changelogFor(APP_VERSION_CODE, t);
 
   return (
     <Modal

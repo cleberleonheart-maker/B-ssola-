@@ -112,6 +112,42 @@ def getVersionName() {
 def _injectVersionCode = getVersionCode()
 def _injectVersionName = getVersionName()
 
+// Assinatura de release: exige credenciais de producao. Sem elas o build
+// falha em vez de cair silenciosamente no keystore de debug (que geraria um
+// APK que nao pode ser atualizado pelos usuarios ja instalados).
+ext.releaseKeystoreFile = System.getenv("ANDROID_KEYSTORE_FILE")
+ext.releaseKeystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+ext.releaseKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
+ext.releaseKeyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+ext.hasReleaseKeystore = [
+    releaseKeystoreFile,
+    releaseKeystorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+].every { it != null && !it.isEmpty() }
+
+gradle.taskGraph.whenReady { graph ->
+    def missing = [
+        ANDROID_KEYSTORE_FILE: releaseKeystoreFile,
+        ANDROID_KEYSTORE_PASSWORD: releaseKeystorePassword,
+        ANDROID_KEY_ALIAS: releaseKeyAlias,
+        ANDROID_KEY_PASSWORD: releaseKeyPassword,
+    ].findAll { key, value -> value == null || value.isEmpty() }.keySet()
+    if (!missing.isEmpty()) {
+        // Tarefas de variante release bringam "Release" no nome (assembleRelease,
+        // packageRelease, lintVitalRelease...); as de debug nunca.
+        def releaseTasks = graph.allTasks.any {
+            it.project == project && it.name.contains("Release")
+        }
+        if (releaseTasks) {
+            throw new GradleException(
+                "Build de release sem keystore de producao. Faltam: ${missing.join(', ')}.\n" +
+                "Defina as variaveis de ambiente ou use ./publicar.sh, que le ~/.bussola-keystore/.\n" +
+                "Nao ha fallback para o keystore de debug de proposito.")
+        }
+    }
+}
+
 tasks.configureEach { task ->
     if (task.name == "processReleaseManifest") {
         task.outputs.upToDateWhen { false }
@@ -160,17 +196,11 @@ android {
             keyPassword 'android'
         }
         release {
-            def ksFile = System.getenv("ANDROID_KEYSTORE_FILE")
-            if (ksFile != null && !ksFile.isEmpty()) {
-                storeFile file(ksFile)
-                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
-                keyAlias System.getenv("ANDROID_KEY_ALIAS")
-                keyPassword System.getenv("ANDROID_KEY_PASSWORD")
-            } else {
-                storeFile file('debug.keystore')
-                storePassword 'android'
-                keyAlias 'androiddebugkey'
-                keyPassword 'android'
+            if (hasReleaseKeystore) {
+                storeFile file(releaseKeystoreFile)
+                storePassword releaseKeystorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
             }
         }
     }
@@ -179,7 +209,8 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            // Assina com o keystore de producao via env (CI/segredo); sem env, cai no debug.
+            // Assina com o keystore de producao via env (CI/segredo ou publicar.sh).
+            // A validacao de que as credenciais existem fica no taskGraph acima.
             signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"

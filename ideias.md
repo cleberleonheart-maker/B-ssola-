@@ -1,6 +1,6 @@
 # Ideias — Próximos recursos da Bússola
 
-> Atualizado em 21/09/2026. Backlog antigo **concluído** (v7.3). Novas ideias (v7.4+)
+> Atualizado em 27/09/2026. Backlog antigo **concluído** (v7.3). Novas ideias (v7.4+)
 > listadas abaixo —**GPX** e **retorno pela trilha** já implementados em v7.4.
 
 ## ✅ Feitos (v7.4)
@@ -180,6 +180,56 @@
 1. **EMF: ambiente, vibração e ponto quente** — botão "🍃 Ambiente" fixa a referência e
    a barra passa a escalar pelo Δ (variação fica visível); vibração a cada pulso mesmo
    sem som; "📌 Ponto quente" guarda um waypoint na sua posição com a leitura atual.
+
+## ✅ Feitos (v7.17 · code 148)
+1. **Ponto por voz** (#4) — "marca este ponto como X" salva a posição atual sem tirar
+   as mãos do caminho.
+2. **Odômetro** (#5) — distância de hoje, da semana e dos últimos 7 dias.
+3. **Kefera conta o histórico** (#10) — a assistente responde sobre hoje, ontem, a semana
+   e a trilha mais longa já percorrida.
+4. **Bloqueio por PIN** (#31) — PIN de 4 dígitos ao abrir o app (criar, trocar, remover).
+5. **Backup completo** (#38) — exportar/restaurar pontos, trilhas, notas, declinação e
+   configurações em um JSON.
+6. **Leitura em mil** (#32) — azimute também em milésimos (6400).
+
+## ✅ Feitos (v7.18 · code 149)
+1. **Aviso de atualização corrigido** — `versionService.ts` volta a identificar a build
+   corrente; o `version.generated.ts` passa a ser sincronizado no commit, então o
+   "prompt de update" funciona.
+2. **Dial mais compacto** — mostrador menor e cabeçalho com mais espaço, para o link do
+   Painel não cobrir a tela.
+3. **Infra de CI/CD** (sem mudança visível no app) — RLS do Supabase para
+   `virgin_memory`/`tracks`/`notes`/`app_version`, gate de lint+teste no build do APK e
+   gravação automática de `app_version` no Supabase ao publicar.
+
+## ✅ Feitos (v7.19 · code 150)
+1. **Rastreio ao vivo por link** (#24) — botão 📡 no SOS abre uma sessão de 30 min e gera
+   um link que qualquer pessoa abre no navegador para acompanhar a posição. O app faz
+   push da posição a cada 10 s para a tabela `live_shares`; o viewer
+   (`web/live.html`, publicado no GitHub Pages) consulta a RPC `get_live_position` a
+   cada 5 s. Sem websocket: é polling.
+
+## ✅ Feitos (v7.20 · code 151)
+1. **Controle único de sessão** — botão para **parar** o rastreio, retomada da sessão ao
+   reabrir o app e primeiro fix enviado antes de o timer começar (falha de upsert aborta).
+2. **Viewer com estado do sinal** — `● AO VIVO`, `● SEM SINAL` (fix > 25 s), `🛑`
+   encerrado, `⏳` expirado, `⌛` aguardando o primeiro fix e `📡` offline, com backoff
+   exponencial até 30 s e pausa quando a aba fica em segundo plano.
+
+## ✅ Feitos (v7.21 · code 152)
+1. **Assinatura de release sem fallback** — o `build.gradle` não cai mais no keystore de
+   debug: se `ANDROID_KEYSTORE_FILE`/`PASSWORD`/`KEY_ALIAS`/`KEY_PASSWORD` faltarem, o
+   `assembleRelease` aborta com a lista do que falta. `publicar.sh` passa a carregar o
+   keystore de `~/.bussola-keystore/`. Motivo: build local e CI assinavam com chaves
+   diferentes, e um APK assinado com a chave errada não atualiza por cima do instalado.
+2. **Typecheck no CI** — `npm run typecheck` (`tsc --noEmit`) entra no gate junto com
+   lint e testes.
+3. **Refatoração de telas** — `CompassScreen` (2058 → 1293 linhas) e `SettingsModal`
+   (1328 → 449) foram quebrados em componentes e estilos, eliminando ~8 blocos de
+   switch/radio repetidos à mão. Sem mudança visual: os 115 blocos de estilo extraídos
+   são idênticos aos originais.
+4. **Limpeza** — APIs duplicadas de live-share e 2 scripts SQL abandonedos removidos;
+   changelog das versões 149–151 escrito.
 
 ## Ideias novas (23/09/2026, 3ª leva — melhorias em modos existentes)
 - [ ] **28. Teodolito com altura direta** — usar a distância do waypoint ativo/marco na

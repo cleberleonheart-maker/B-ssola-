@@ -12,6 +12,26 @@ if ! command -v gh >/dev/null; then
   echo "gh (GitHub CLI) nao instalado."; exit 1
 fi
 
+# O build.gradle nao tem fallback para o keystore de debug: sem estas variaveis
+# o assembleRelease aborta. O keystore local de producao vive em
+# ~/.bussola-keystore/ (fora do repo, junto de password.txt e do alias).
+KEYSTORE_DIR="${BUSSOLA_KEYSTORE_DIR:-$HOME/.bussola-keystore}"
+if [ -z "${ANDROID_KEYSTORE_FILE:-}" ]; then
+  [ -f "$KEYSTORE_DIR/bussola-release.keystore" ] || {
+    echo "Keystore de producao nao encontrado em $KEYSTORE_DIR." >&2
+    echo "Use o CI (secrets) ou defina ANDROID_KEYSTORE_* no ambiente." >&2
+    exit 1
+  }
+  [ -f "$KEYSTORE_DIR/password.txt" ] || {
+    echo "Senha do keystore nao encontrada: $KEYSTORE_DIR/password.txt" >&2
+    exit 1
+  }
+  export ANDROID_KEYSTORE_FILE="$KEYSTORE_DIR/bussola-release.keystore"
+  export ANDROID_KEYSTORE_PASSWORD="$(cat "$KEYSTORE_DIR/password.txt")"
+  export ANDROID_KEY_ALIAS="${ANDROID_KEY_ALIAS:-bussola}"
+  export ANDROID_KEY_PASSWORD="${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}"
+fi
+
 echo "==> BUILD (assembleRelease)"
 cd "$ROOT_GRADLE"
 ./gradlew assembleRelease -x lint -x test

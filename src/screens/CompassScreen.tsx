@@ -2,8 +2,6 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import {
   View,
   Text,
-  StyleSheet,
-  ActivityIndicator,
   BackHandler,
   Pressable,
   ScrollView,
@@ -20,30 +18,12 @@ import {
   setUpdateIntervalForType,
   SensorTypes,
 } from 'react-native-sensors';
-import CompassDial from '../components/CompassDial';
 import CalibrationModal from '../components/CalibrationModal';
 import SettingsModal from '../components/SettingsModal';
-import BarometerPanel from '../components/BarometerPanel';
-import BubbleLevel from '../components/BubbleLevel';
 import WaypointModal from '../components/WaypointModal';
-import AROverlay from '../components/AROverlay';
-import CameraARView from '../components/CameraARView';
-import ErrorBoundary from '../components/ErrorBoundary';
 import AlertsModal from '../components/AlertsModal';
-import MetalDetectorView from '../components/MetalDetectorView';
-import EmfReaderView from '../components/EmfReaderView';
 import EmergencyModal from '../components/EmergencyModal';
-import TheodoliteView from '../components/TheodoliteView';
-import HeightView from '../components/HeightView';
-import CarSpotView from '../components/CarSpotView';
-import SunWatchView from '../components/SunWatchView';
-import TriangulationView from '../components/TriangulationView';
-import WindView from '../components/WindView';
-import TargetNavBar from '../components/TargetNavBar';
-import TrackView from '../components/TrackView';
-import FieldNotesSheet from '../components/FieldNotesSheet';
 import CoordModal from '../components/CoordModal';
-import OdometerView from '../components/OdometerView';
 import {
   fetchCivilAlerts,
   isSevere,
@@ -55,7 +35,7 @@ import { speak } from '../assistant/voice';
 import KeferaAvatar from '../components/KeferaAvatar';
 import { useLanguage } from '../i18n/LanguageContext';
 import type { KnownWaypoint, TrackSummary } from '../assistant/types';
-import { spacing, radius } from '../theme/colors';
+import { spacing } from '../theme/colors';
 import {
   watchLocation,
   getLocationOnce,
@@ -118,7 +98,6 @@ import {
   normalizeHeading,
   cardinalOf,
   formatCoord,
-  formatTime,
   formatAzimuth,
 } from '../utils/compass';
 import {
@@ -143,6 +122,10 @@ import {
   requestNotificationPermission,
   geofenceSupported,
 } from '../services/geofenceService';
+import { createStyles } from './parts/styles';
+import { buildModeCards } from './parts/modeCards';
+import StatusPanels from './parts/StatusPanels';
+import ModeView from './parts/ModeView';
 
 const SENSOR_INTERVAL = 200;
 const SMOOTHING_FAST = 0.45;
@@ -676,6 +659,11 @@ const CompassScreen = () => {
     setLocationMode(mode);
   }, []);
 
+  const resetOdometer = useCallback(() => {
+    distTotalRef.current = 0;
+    setOdometer(0);
+  }, []);
+
   const openCalibration = useCallback(() => {
     setSettingsVisible(false);
     setCalibrationVisible(true);
@@ -847,18 +835,6 @@ const CompassScreen = () => {
   const cardinal = cardinalOf(heading);
   const fullView = displayMode === 'compass' || displayMode === 'level';
   const showPanels = launcherVisible || fullView;
-  const providerLabel =
-    locationMode === 'satellite'
-      ? t('ui_provider_satellite')
-      : locationMode === 'tower'
-      ? t('ui_provider_tower')
-      : t('ui_provider_wifi');
-  const providerAccent =
-    locationMode === 'satellite'
-      ? colors.primary
-      : locationMode === 'tower'
-      ? colors.accent
-      : colors.success;
 
   const hasFix =
     location.latitude !== 0 || location.longitude !== 0 || location.provider !== null;
@@ -1084,232 +1060,39 @@ const CompassScreen = () => {
     };
   }, [waypoints, location.latitude, location.longitude, t]);
 
-  const modeCards: {
-    key: DisplayMode;
-    icon: string;
-    label: string;
-    sub: string;
-  }[] = [
-    { key: 'compass', icon: '🧭', label: t('ui_mode_compass').replace(/^\S+\s*/, ''), sub: t('ui_card_compass') },
-    { key: 'level', icon: '◉', label: t('ui_mode_level').replace(/^\S+\s*/, ''), sub: t('ui_card_level') },
-    { key: 'metal', icon: '🧲', label: t('ui_mode_metal').replace(/^\S+\s*/, ''), sub: t('ui_card_metal') },
-    { key: 'emf', icon: '📡', label: t('ui_mode_emf').replace(/^\S+\s*/, ''), sub: t('ui_card_emf') },
-    { key: 'ar', icon: '✨', label: t('ui_mode_ar').replace(/^\S+\s*/, ''), sub: t('ui_card_ar') },
-    { key: 'camera', icon: '📷', label: t('ui_mode_camera').replace(/^\S+\s*/, ''), sub: t('ui_card_camera') },
-    { key: 'theodolite', icon: '📐', label: t('ui_mode_theodolite').replace(/^\S+\s*/, ''), sub: t('ui_card_theodolite') },
-    { key: 'sun', icon: '☀️', label: t('ui_mode_sun').replace(/^\S+\s*/, ''), sub: t('ui_card_sun') },
-    { key: 'wind', icon: '🍃', label: t('ui_mode_wind').replace(/^\S+\s*/, ''), sub: t('ui_card_wind') },
-    { key: 'track', icon: '🗺️', label: t('ui_mode_track').replace(/^\S+\s*/, ''), sub: t('ui_card_track') },
-    { key: 'notes', icon: '📓', label: t('ui_mode_notes').replace(/^\S+\s*/, ''), sub: t('ui_card_notes') },
-    { key: 'odometer', icon: '📏', label: t('ui_mode_odometer').replace(/^\S+\s*/, ''), sub: t('ui_card_odometer') },
-    { key: 'height', icon: '⌖', label: t('ui_mode_height').replace(/^\S+\s*/, ''), sub: t('ui_card_height') },
-    { key: 'car', icon: '🚗', label: t('ui_mode_car').replace(/^\S+\s*/, ''), sub: t('ui_card_car') },
-    { key: 'tri', icon: '📐', label: t('ui_mode_tri').replace(/^\S+\s*/, ''), sub: t('ui_card_tri') },
-  ];
+  const modeCards = useMemo(() => buildModeCards(t), [t]);
 
   const statusPanels = (
-    <>
-      {showInstrumentPanels && celestial && (
-        <View style={styles.celestialBar}>
-          <View style={styles.celestialPill}>
-            <Text style={styles.celestialText}>
-              {t('ui_sun_item', {
-                deg: Math.round(celestial.sun.azimuth),
-                state: t(celestial.sun.elevation >= 0 ? 'ui_sun_high' : 'ui_sun_low'),
-              })}
-            </Text>
-          </View>
-          <View style={styles.celestialPill}>
-            <Text style={styles.celestialText}>
-              {t('ui_moon_item', {
-                icon: celestial.moonIcon,
-                deg: Math.round(celestial.moon.azimuth),
-                state: t(celestial.moon.elevation >= 0 ? 'ui_sun_high' : 'ui_sun_low'),
-              })}
-            </Text>
-          </View>
-        </View>
-      )}
-
-      {showPanels &&
-        issueWarnings.length > 0 && (
-          <View style={styles.warningBox}>
-            {issueWarnings.map((err, index) => (
-              <Text key={index} style={styles.warningText}>
-                {err}
-              </Text>
-            ))}
-          </View>
-        )}
-
-      {showPanels &&
-        appMode === 'full' &&
-        (showInstrumentPanels ? (
-          <BarometerPanel
-            pressure={baroPressure}
-            altitude={baroAlt}
-            baseline={baroBaseline}
-            available={baroAvailable}
-            onSetBaseline={() => {
-              if (baroPressure != null) setBaroBaseline(baroPressure);
-            }}
-            onResetBaseline={() => setBaroBaseline(null)}
-          />
-        ) : null)}
-
-      {appMode === 'full' && showPanels && (
-        <View style={styles.locationCard}>
-          <Pressable
-            style={styles.locationHeader}
-            onPress={() => setLocExpanded(prev => !prev)}>
-            <View style={styles.locationHeaderLeft}>
-              <Text style={styles.locationTitle}>{t('ui_loc_card')}</Text>
-              <View
-                style={[
-                  styles.providerBadge,
-                  { borderColor: providerAccent + '55' },
-                ]}>
-                <View style={[styles.providerDot, { backgroundColor: providerAccent }]} />
-                <Text style={[styles.providerText, { color: providerAccent }]}>
-                  {providerLabel}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.locationActions}>
-              <Pressable
-                onPress={() => setCoordVisible(true)}
-                disabled={!hasFix}
-                hitSlop={8}
-                style={styles.refreshButton}>
-                <Text style={styles.refreshText}>🧭</Text>
-              </Pressable>
-              <Pressable
-                onPress={refreshLocation}
-                disabled={locLoading}
-                hitSlop={8}
-                style={styles.refreshButton}>
-                {locLoading ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : (
-                  <Text style={styles.refreshText}>↻</Text>
-                )}
-              </Pressable>
-              <Text style={[styles.chevron, { color: providerAccent }]}>
-                {locExpanded ? '⌃' : '⌄'}
-              </Text>
-            </View>
-          </Pressable>
-
-          {locError ? (
-            <Text style={styles.locationError}>{locError}</Text>
-          ) : !hasFix ? (
-            <View style={styles.locBar}>
-              <ActivityIndicator size="small" color={providerAccent} />
-              <Text style={styles.locWaiting}>{t('ui_loc_waiting')}</Text>
-            </View>
-          ) : locExpanded ? (
-            <>
-              {place && place.name ? (
-                <View style={styles.placeRow}>
-                  <Text style={styles.placeName} numberOfLines={2}>
-                    {place.name}
-                  </Text>
-                  {place.cep ? (
-                    <View style={styles.cepChip}>
-                      <Text style={styles.cepChipText}>CEP {place.cep}</Text>
-                    </View>
-                  ) : null}
-                </View>
-              ) : null}
-              <View style={styles.coordGrid}>
-                <View style={styles.coordCell}>
-                  <Text style={styles.coordLabel}>{t('ui_lat')}</Text>
-                  <Text style={styles.coordValue}>
-                    {formatCoord(location.latitude, true)}
-                  </Text>
-                </View>
-                <View style={[styles.coordCell, styles.coordCellDivider]}>
-                  <Text style={styles.coordLabel}>{t('ui_lon')}</Text>
-                  <Text style={styles.coordValue}>
-                    {formatCoord(location.longitude, false)}
-                  </Text>
-                </View>
-                <View style={styles.coordCell}>
-                  <Text style={styles.coordLabel}>{t('ui_altitude')}</Text>
-                  <Text style={styles.coordValue}>
-                    {location.altitude != null
-                      ? `${Math.round(location.altitude)} m`
-                      : '—'}
-                  </Text>
-                </View>
-                <View style={[styles.coordCell, styles.coordRowDivider]}>
-                  <Text style={styles.coordLabel}>{t('ui_accuracy')}</Text>
-                  <Text style={styles.coordValue}>
-                    {location.accuracy != null
-                      ? `± ${Math.round(location.accuracy)} m`
-                      : '—'}
-                  </Text>
-                </View>
-                <View style={[styles.coordCell, styles.coordCellDivider, styles.coordRowDivider]}>
-                  <Text style={styles.coordLabel}>{t('ui_speed')}</Text>
-                  <Text style={styles.coordValue}>
-                    {location.speed != null && location.speed > 0
-                      ? `${((location.speed ?? 0) * 3.6).toFixed(1)} km/h`
-                      : '—'}
-                  </Text>
-                </View>
-                <View style={[styles.coordCell, styles.coordRowDivider]}>
-                  <Text style={styles.coordLabel}>{t('ui_odometer')}</Text>
-                  <Pressable onPress={() => {
-                    distTotalRef.current = 0;
-                    setOdometer(0);
-                  }}>
-                    <Text style={[styles.coordValue, { color: colors.primary }]}>
-                      {odometer > 0 ? formatDistance(odometer) : '0 m'}
-                    </Text>
-                  </Pressable>
-                </View>
-                <View style={[styles.coordCell, styles.coordRowDivider]}>
-                  <Text style={styles.coordLabel}>{t('ui_updated')}</Text>
-                  <Text style={styles.coordValue}>
-                    {location.updatedAt != null
-                      ? formatTime(location.updatedAt)
-                      : '—'}
-                  </Text>
-                </View>
-                <View style={[styles.coordCell, styles.coordCellDivider, styles.coordRowDivider]}>
-                  <Text style={styles.coordLabel}>{t('ui_destination')}</Text>
-                  <Text style={styles.coordValue}>
-                    {activeTarget
-                      ? `${formatAzimuth(activeTarget.bearing, useMils)} · ${formatDistance(activeTarget.distance)}`
-                      : '—'}
-                  </Text>
-                </View>
-                <View style={[styles.coordCell, styles.coordRowDivider]}>
-                  <Text style={styles.coordLabel}>{t('ui_declination')}</Text>
-                  <Text style={styles.coordValue}>
-                    {declination.enabled ? `${declination.degrees}°` : t('ui_off')}
-                  </Text>
-                </View>
-              </View>
-            </>
-          ) : (
-            <View style={styles.locSummary}>
-              <Text style={styles.locSummaryMain} numberOfLines={1}>
-                {place?.name ??
-                  `${formatCoord(location.latitude, true)} · ${formatCoord(location.longitude, false)}`}
-              </Text>
-              <Text style={styles.locSummarySub} numberOfLines={1}>
-                {(place?.cep ? `CEP ${place.cep}` : '') +
-                  (location.accuracy != null
-                    ? `${place?.cep ? '  ·  ' : ''}±${Math.round(location.accuracy)} m`
-                    : '')}
-              </Text>
-            </View>
-          )}
-        </View>
-      )}
-    </>
+    <StatusPanels
+      showPanels={showPanels}
+      showInstrumentPanels={showInstrumentPanels}
+      appMode={appMode}
+      celestial={celestial}
+      issueWarnings={issueWarnings}
+      baroPressure={baroPressure}
+      baroAlt={baroAlt}
+      baroBaseline={baroBaseline}
+      baroAvailable={baroAvailable}
+      onSetBaseline={() => {
+        if (baroPressure != null) setBaroBaseline(baroPressure);
+      }}
+      onResetBaseline={() => setBaroBaseline(null)}
+      location={location}
+      hasFix={hasFix}
+      locError={locError}
+      locLoading={locLoading}
+      locExpanded={locExpanded}
+      onToggleLocExpanded={() => setLocExpanded(prev => !prev)}
+      onOpenCoords={() => setCoordVisible(true)}
+      onRefreshLocation={refreshLocation}
+      locationMode={locationMode}
+      place={place}
+      odometer={odometer}
+      onResetOdometer={resetOdometer}
+      activeTarget={activeTarget}
+      useMils={useMils}
+      declination={declination}
+    />
   );
 
   return (
@@ -1403,158 +1186,32 @@ const CompassScreen = () => {
       )}
 
       {!launcherVisible && (
-        <>
-      {displayMode === 'compass' ? (
-        <View style={styles.dialArea} onLayout={handleDialAreaLayout}>
-          <CompassDial
-            rotation={rotation}
-            size={dialSize}
-            sun={sunMarker}
-            moon={moonMarker}
-            moonIcon={celestial?.moonIcon}
-            target={targetMarker ? { bearing: targetMarker.bearing, name: targetMarker.name } : null}
-          />
-
-          <View style={styles.headingBlock}>
-            <Text style={styles.headingBig}>
-              {formatAzimuth(heading, useMils)}
-            </Text>
-            <Text style={styles.headingCardinal}>{cardinal.full}</Text>
-            <Text style={styles.backBearing}>
-              {t('ui_back_bearing')}{' '}
-              {formatAzimuth(heading + 180, useMils)}{' '}
-              {cardinalOf(heading + 180).short}
-            </Text>
-          </View>
-
-          {activeTarget && targetMarker ? (
-            <TargetNavBar
-              name={activeTarget.name}
-              distance={activeTarget.distance}
-              relative={targetRelative}
-              arrived={arrived}
-              mils={useMils}
-            />
-          ) : null}
-        </View>
-      ) : displayMode === 'level' ? (
-        <View style={styles.dialArea} onLayout={handleDialAreaLayout}>
-          <BubbleLevel x={accel.x} y={accel.y} z={accel.z} size={dialSize} />
-          <View style={styles.headingBlock}>
-            <Text style={[styles.headingCardinal, styles.levelHint]}>
-              {t('ui_level_hint')}
-            </Text>
-          </View>
-        </View>
-      ) : displayMode === 'camera' ? (
-        <View style={styles.arArea}>
-          <ErrorBoundary>
-            <CameraARView
-              heading={heading}
-              sun={sunMarker}
-              moon={moonMarker}
-              moonIcon={celestial?.moonIcon ?? '🌙'}
-              target={targetMarker}
-              virtual={virtualMarker}
-              mils={useMils}
-              active
-            />
-          </ErrorBoundary>
-        </View>
-      ) : displayMode === 'metal' ? (
-        <View style={styles.arArea}>
-          <MetalDetectorView active />
-        </View>
-      ) : displayMode === 'emf' ? (
-        <View style={styles.arArea}>
-          <EmfReaderView active hasFix={hasFix} onAdd={addWaypoint} />
-        </View>
-      ) : displayMode === 'theodolite' ? (
-        <View style={styles.arArea}>
-          <TheodoliteView
-            heading={heading}
-            declination={declination}
-            accel={accel}
-          />
-        </View>
-      ) : displayMode === 'height' ? (
-        <View style={styles.arArea}>
-          <HeightView
-            accel={accel}
-            targetDistance={targetMarker ? targetMarker.distance : null}
-          />
-        </View>
-      ) : displayMode === 'car' ? (
-        <View style={styles.arArea}>
-          <CarSpotView
-            latitude={location.latitude}
-            longitude={location.longitude}
-            accuracy={location.accuracy}
-            heading={heading}
-            hasFix={hasFix}
-            mils={useMils}
-          />
-        </View>
-      ) : displayMode === 'tri' ? (
-        <View style={styles.arArea}>
-          <TriangulationView
-            heading={heading}
-            latitude={location.latitude}
-            longitude={location.longitude}
-            hasFix={hasFix}
-            declinationEnabled={declination.enabled}
-            declinationDegrees={declination.degrees}
-            mils={useMils}
-            onAdd={addRemoteWaypoint}
-          />
-        </View>
-      ) : displayMode === 'sun' ? (
-        <View style={styles.arArea}>
-          <SunWatchView
-            lat={location.latitude}
-            lon={location.longitude}
-          />
-        </View>
-      ) : displayMode === 'wind' ? (
-        <View style={styles.arArea}>
-          <WindView active />
-        </View>
-      ) : displayMode === 'track' ? (
-        <View style={styles.trackArea}>
-          <TrackView active location={location} heading={heading} mils={useMils} />
-        </View>
-      ) : displayMode === 'notes' ? (
-        <View style={styles.trackArea}>
-          <FieldNotesSheet
-            latitude={location.latitude}
-            longitude={location.longitude}
-            altitude={location.altitude}
-            hasFix={hasFix}
-          />
-        </View>
-      ) : displayMode === 'odometer' ? (
-        <View style={styles.trackArea}>
-          <OdometerView />
-        </View>
-      ) : (
-        <View style={styles.arArea}>
-          <AROverlay
-            heading={heading}
-            rotation={rotation}
-            size={arSize}
-            sun={sunMarker}
-            moon={moonMarker}
-            moonIcon={celestial?.moonIcon ?? '🌙'}
-            target={targetMarker}
-            virtual={virtualMarker}
-            mils={useMils}
-            blocked={arBlocked}
-          />
-        </View>
-      )}
-
-      {statusPanels}
-      </>
+        <ModeView
+          displayMode={displayMode}
+          heading={heading}
+          rotation={rotation}
+          dialSize={dialSize}
+          arSize={arSize}
+          onDialAreaLayout={handleDialAreaLayout}
+          cardinalFull={cardinal.full}
+          useMils={useMils}
+          sun={sunMarker}
+          moon={moonMarker}
+          moonIcon={celestial?.moonIcon}
+          target={targetMarker}
+          virtual={virtualMarker}
+          activeTarget={activeTarget}
+          targetRelative={targetRelative}
+          arrived={arrived}
+          accel={accel}
+          arBlocked={arBlocked}
+          location={location}
+          hasFix={hasFix}
+          declination={declination}
+          onAddWaypoint={addWaypoint}
+          onAddRemoteWaypoint={addRemoteWaypoint}
+          statusPanels={statusPanels}
+        />
       )}
 
       <SettingsModal
@@ -1633,426 +1290,5 @@ const CompassScreen = () => {
     </SafeAreaView>
   );
 };
-
-const createStyles = (colors: {
-  background: string;
-  surface: string;
-  surfaceAlt: string;
-  text: string;
-  textMuted: string;
-  primary: string;
-  accent: string;
-  north: string;
-  border: string;
-  success: string;
-  danger: string;
-}) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-      paddingHorizontal: spacing.lg,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginTop: spacing.md,
-    },
-    headerText: {
-      flex: 1,
-      alignItems: 'center',
-    },
-    headerTitle: {
-      fontSize: 28,
-      fontWeight: '800',
-      color: colors.text,
-      letterSpacing: 3,
-      textShadowColor: colors.primary + '88',
-      textShadowOffset: { width: 0, height: 0 },
-      textShadowRadius: 16,
-    },
-    headerSubtitle: {
-      fontSize: 13,
-      color: colors.textMuted,
-      marginTop: spacing.xs,
-    },
-    roundButton: {
-      width: 40,
-      height: 40,
-      borderRadius: radius.full,
-      backgroundColor: colors.surface + 'B3',
-      borderWidth: 1,
-      borderColor: colors.primary + '44',
-      alignItems: 'center',
-      justifyContent: 'center',
-      shadowColor: colors.primary,
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.25,
-      shadowRadius: 8,
-      elevation: 3,
-    },
-    roundButtonIcon: {
-      fontSize: 18,
-    },
-    homeLink: {
-      color: colors.primary,
-      fontWeight: '800',
-      letterSpacing: 1,
-    },
-    homeScroll: {
-      flex: 1,
-      marginTop: spacing.md,
-    },
-    homeContent: {
-      paddingBottom: spacing.lg,
-    },
-    homeHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.md,
-    },
-    homeTitle: {
-      fontSize: 13,
-      fontWeight: '900',
-      color: colors.textMuted,
-      letterSpacing: 5,
-    },
-    statusPill: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.surface + 'CC',
-      borderWidth: 1,
-      borderColor: colors.primary + '44',
-      borderRadius: radius.full,
-      paddingVertical: spacing.xs,
-      paddingHorizontal: spacing.sm,
-    },
-    statusPillDot: {
-      width: 7,
-      height: 7,
-      borderRadius: 3.5,
-      marginRight: spacing.xs,
-    },
-    statusPillText: {
-      fontSize: 11,
-      fontWeight: '800',
-      color: colors.text,
-      letterSpacing: 1,
-    },
-    cardGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'space-between',
-      rowGap: spacing.md,
-      marginBottom: spacing.lg,
-    },
-    modeCard: {
-      width: '48.4%',
-      backgroundColor: colors.surface,
-      borderRadius: radius.lg,
-      borderWidth: 1,
-      borderColor: colors.primary + '33',
-      padding: spacing.md,
-      overflow: 'hidden',
-      shadowColor: colors.primary,
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.28,
-      shadowRadius: 12,
-      elevation: 4,
-    },
-    modeCardPressed: {
-      borderColor: colors.primary,
-      shadowOpacity: 0.5,
-      elevation: 8,
-    },
-    cardAccent: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      height: 3,
-    },
-    cardIcon: {
-      width: 46,
-      height: 46,
-      borderRadius: 14,
-      borderWidth: 1.5,
-      backgroundColor: colors.surfaceAlt,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: spacing.sm,
-    },
-    cardIconText: {
-      fontSize: 24,
-    },
-    cardLabel: {
-      fontSize: 16,
-      fontWeight: '900',
-      color: colors.text,
-      letterSpacing: 1,
-      marginBottom: 2,
-    },
-    cardSub: {
-      fontSize: 11,
-      lineHeight: 15,
-      color: colors.textMuted,
-      fontWeight: '600',
-    },
-    dialArea: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    arArea: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    trackArea: {
-      flex: 1,
-    },
-    headingBlock: {
-      marginTop: spacing.md,
-      alignItems: 'center',
-    },
-    headingBig: {
-      fontSize: 48,
-      fontWeight: '900',
-      color: colors.text,
-      letterSpacing: 3,
-      textShadowColor: colors.primary + '88',
-      textShadowOffset: { width: 0, height: 0 },
-      textShadowRadius: 18,
-    },
-    headingCardinal: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: colors.primary,
-      marginTop: spacing.xs,
-      textShadowColor: colors.primary + '66',
-      textShadowOffset: { width: 0, height: 0 },
-      textShadowRadius: 8,
-    },
-    backBearing: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: colors.text + 'aa',
-      marginTop: spacing.xs,
-      letterSpacing: 1,
-    },
-    levelHint: {
-      fontSize: 14,
-      color: colors.textMuted,
-    },
-    warningBox: {
-      backgroundColor: colors.surface,
-      borderColor: colors.north,
-      borderWidth: 1,
-      borderRadius: radius.md,
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.md,
-      marginBottom: spacing.md,
-      alignItems: 'center',
-    },
-    warningText: {
-      color: colors.north,
-      textAlign: 'center',
-      fontSize: 12,
-      fontWeight: '600',
-      marginVertical: 1,
-    },
-    celestialBar: {
-      flexDirection: 'row',
-      marginBottom: spacing.md,
-      gap: spacing.sm,
-    },
-    celestialPill: {
-      flex: 1,
-      backgroundColor: colors.surface + 'B3',
-      borderRadius: radius.full,
-      borderWidth: 1,
-      borderColor: colors.primary + '33',
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.sm,
-    },
-    celestialText: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: colors.textMuted,
-      textAlign: 'center',
-    },
-    targetBanner: {
-      backgroundColor: colors.surface,
-      borderColor: colors.success,
-      borderWidth: 1,
-      borderRadius: radius.md,
-      padding: spacing.md,
-      marginBottom: spacing.md,
-    },
-    targetText: {
-      color: colors.success,
-      textAlign: 'center',
-      fontSize: 13,
-      fontWeight: '700',
-    },
-    locationCard: {
-      backgroundColor: colors.surface + 'B3',
-      borderRadius: radius.lg,
-      borderWidth: 1,
-      borderColor: colors.primary + '33',
-      padding: spacing.md,
-      marginBottom: spacing.lg,
-      shadowColor: colors.primary,
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.14,
-      shadowRadius: 14,
-      elevation: 3,
-    },
-    locationHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.sm,
-    },
-    locationHeaderLeft: {
-      flex: 1,
-      marginRight: spacing.sm,
-    },
-    chevron: {
-      fontSize: 18,
-      fontWeight: '700',
-      marginLeft: spacing.sm,
-    },
-    locSummary: {
-      marginTop: spacing.xs,
-    },
-    locSummaryMain: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: colors.text,
-    },
-    locSummarySub: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: colors.textMuted,
-      marginTop: 2,
-    },
-    placeRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      backgroundColor: colors.surfaceAlt + 'B3',
-      borderRadius: radius.md,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
-      marginBottom: spacing.md,
-      borderWidth: 1,
-      borderColor: colors.primary + '2E',
-    },
-    placeName: {
-      flex: 1,
-      fontSize: 15,
-      fontWeight: '800',
-      color: colors.text,
-      marginRight: spacing.sm,
-    },
-    cepChip: {
-      backgroundColor: colors.primary,
-      borderRadius: radius.full,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.xs,
-    },
-    cepChipText: {
-      fontSize: 12,
-      fontWeight: '800',
-      color: colors.background,
-    },
-    locationTitle: {
-      fontSize: 15,
-      fontWeight: '700',
-      color: colors.text,
-      letterSpacing: 1,
-    },
-    locationActions: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    providerBadge: {
-      backgroundColor: colors.surfaceAlt,
-      borderWidth: 1,
-      borderRadius: radius.full,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.xs,
-      marginRight: spacing.sm,
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    providerDot: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
-      marginRight: spacing.xs,
-    },
-    providerText: {
-      fontSize: 11,
-      fontWeight: '700',
-    },
-    refreshButton: {
-      width: 34,
-      height: 34,
-      borderRadius: radius.full,
-      backgroundColor: colors.surfaceAlt,
-      borderWidth: 1,
-      borderColor: colors.border,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    refreshText: {
-      fontSize: 18,
-      color: colors.primary,
-    },
-    coordGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-    },
-    coordCell: {
-      width: '33.33%',
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.sm,
-    },
-    coordCellDivider: {
-      borderLeftWidth: StyleSheet.hairlineWidth,
-      borderLeftColor: colors.border,
-    },
-    coordRowDivider: {
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: colors.border,
-    },
-    coordLabel: {
-      fontSize: 12,
-      color: colors.textMuted,
-    },
-    coordValue: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.text,
-      marginTop: 2,
-    },
-    locationError: {
-      color: colors.danger,
-      fontSize: 13,
-    },
-    locBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: spacing.sm,
-    },
-    locWaiting: {
-      marginLeft: spacing.sm,
-      fontSize: 13,
-      color: colors.textMuted,
-    },
-  });
 
 export default CompassScreen;
