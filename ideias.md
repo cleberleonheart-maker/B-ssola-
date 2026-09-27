@@ -231,6 +231,62 @@
 4. **Limpeza** — APIs duplicadas de live-share e 2 scripts SQL abandonedos removidos;
    changelog das versões 149–151 escrito.
 
+## ✅ Feitos (v7.22 · code 153)
+1. **Rumo no rastreio ao vivo** — o `LocationFix` passou a carregar o rumo sobre o solo
+   (`coords.heading`) e o `pushLiveFix` o repassa. O viewer já mostrava "rumo NN°"
+   quando `p.heading != null` (`web/live.html:137`), mas o app mandava `null` fixo: o
+   recurso existia na tabela, na RPC e no viewer sem nunca poder aparecer. Parado, o
+   Android não fornece *bearing* e o campo vai `null` — omitido de propósito.
+2. **`LiveSession.userId` removido** — o campo saía sempre como `''` e só era lido com
+   fallback para `ensureCloudUser()`. Era armadilha: com um id na sessão, o insert usaria
+   um usuário e o `stopLiveShare` outro, e a linha ficaria órfã na tabela. Agora a
+   identidade tem fonte única, a mesma no push e na remoção. 3 testes novos, todos
+   verificados por mutação.
+
+## Ideias novas (27/09/2026, 6ª leva — outras ideias e melhorias)
+Saem de uma revisão de código feita na v7.22. As três primeiras fecham riscos que
+foram encontrados de verdade, não ideias soltas.
+
+### Risco / processo
+- [ ] **50. 🔏 O CI confere a assinatura do APK** — o `assembleRelease` passa porque as env
+      vars existem, não porque a chave é a certa. Um passo com `apksigner verify
+      --print-certs` comparando o SHA-256 com um valor esperado falha o build se sair a
+      chave de debug ou qualquer outra. Hoje essa conferência foi feita à mão.
+- [ ] **51. 🔗 `version.properties` × `version.generated.ts` podem divergir** — são dois
+      arquivos para editar a cada bump e nada verifica a coerência. Um passo no CI
+      comparando os dois (ou um `pre-commit`) elimina a chance de publicar um APK que se
+      anuncia com uma versão e se comporta como outra.
+- [ ] **52. 🔐 Assinar só no CI** — o aparelho é `f2fs` e não aplica bits de permissão
+      (testado: um arquivo `600` de root é legível por `nobody`), então a senha do
+      keystore fica exposta a qualquer processo no aparelho. Movendo o keystore para
+      fora — o `--clobber` e os secrets já funcionam — o aparelho nunca vê a chave.
+
+### Produto
+- [ ] **53. 📜 Changelog acumulado** — o `changelogFor` mostra só a entrada da versão
+      atual. Quem salta do cod 80 para o 153 vê uma linha e não sabe o que houve no
+      meio. Acumular as entradas entre a última versão vista (guardada no
+      AsyncStorage) e a atual.
+- [ ] **54. 🧭 Rumo magnético como reserva** — o `heading` do GPS só vem quando há
+      deslocamento. O `EmergencyModal` já recebe o rumo magnético da bússola; usar como
+      fallback quando o GPS não tem *bearing* deixa o viewer com rumo quase sempre.
+- [ ] **55. ⏱️ Tirar o "SEM SINAL" piscando** — o app empurra a cada 10 s e o viewer
+      considera stale acima de 25 s, mas o Android estrangula timers em background, então
+      o "SEM SINAL" pisca. Ou o viewer considera stale com folga maior, ou o app manda
+      um keep-alive.
+- [ ] **56. 💥 Relatório de crash** — hoje um erro em produção é invisível; o usuário
+      simplesmente vê o app fechar. Sentry daria o stack real.
+- [ ] **57. 🧪 Testes dos componentes extraídos** — as primitivas de
+      `settings/primitives.tsx` (`SwitchRow`, `RadioRow`, `ChevronRow`, `GridOption`) são
+      puras e seria trivial testar, o que dá uma rede real para as próximas refatorações
+      de tela.
+- [ ] **58. 🧪 Teste do `live.html`** — a lógica de stale/expirado/backoff do viewer é JS
+      puro e não tem teste nenhum. É a peça que o link público mostra, sem rede de
+      proteção.
+- [ ] **59. 🏗️ Build local do Android** — hoje o `assembleRelease` local não roda (o
+      `io.invertase.gradle.build:1.5` não resolve offline) e o CI é o único caminho, o
+      que torna todo ciclo de release lento e opaco. Se funcionar local, o debug de
+      build para de custar 6 min por tentativa.
+
 ## Ideias novas (23/09/2026, 3ª leva — melhorias em modos existentes)
 - [ ] **28. Teodolito com altura direta** — usar a distância do waypoint ativo/marco na
       fórmula de altura (sem digitar) + média de N leituras para estabilizar o ângulo.
