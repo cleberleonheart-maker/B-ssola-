@@ -5,6 +5,7 @@ on:
   push:
     branches: [main]
     paths:
+      - '.github/workflows/build-apk.yml'
       - 'src/**'
       - 'App.tsx'
       - 'android/app/src/**'
@@ -31,6 +32,32 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      - name: Confere coerencia da versao
+        run: |
+          set -euo pipefail
+          PROPS=android/app/version.properties
+          GEN=src/version.generated.ts
+
+          # O "|| true" e necessario: com pipefail, um grep sem match aborta o
+          # script em silencio, e a falha aparece sem nenhuma mensagem util.
+          CODE=$(grep -E '^versionCode=' "$PROPS" | cut -d'=' -f2 || true)
+          NAME=$(grep -E '^versionName=' "$PROPS" | cut -d'=' -f2 || true)
+          GEN_CODE=$(grep -E '^export const APP_VERSION_CODE' "$GEN" | grep -oE '[0-9]+' || true)
+          GEN_NAME=$(grep -E "^export const APP_VERSION =" "$GEN" | sed -E "s/.*= 'v([^']+)'.*/\1/" || true)
+
+          if [ -z "$CODE" ] || [ -z "$NAME" ] || [ -z "$GEN_CODE" ] || [ -z "$GEN_NAME" ]; then
+            echo "::error::nao consegui ler a versao de $PROPS e $GEN"
+            exit 1
+          fi
+          if [ "$CODE" != "$GEN_CODE" ] || [ "$NAME" != "$GEN_NAME" ]; then
+            echo "::error::$PROPS e $GEN divergem"
+            echo "::error::$PROPS: code=$CODE name=$NAME"
+            echo "::error::$GEN: code=$GEN_CODE name=$GEN_NAME"
+            echo "::error::o app anunciaria uma versao que nao corresponde ao build"
+            exit 1
+          fi
+          echo "versao coerente: $CODE ($NAME)"
 
       - name: Lint, tipos e testes
         run: |

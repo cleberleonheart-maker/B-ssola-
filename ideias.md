@@ -256,10 +256,12 @@ foram encontrados de verdade, não ideias soltas.
       entrou no filtro de paths do CI, então trocar o valor também dispara build.
       Testado nos três caminhos: APK de produção passa, APK assinado com outra chave
       aborta, SDK ausente aborta.
-- [ ] **51. 🔗 `version.properties` × `version.generated.ts` podem divergir** — são dois
-      arquivos para editar a cada bump e nada verifica a coerência. Um passo no CI
-      comparando os dois (ou um `pre-commit`) elimina a chance de publicar um APK que se
-      anuncia com uma versão e se comporta como outra.
+- [x] **51. 🔗 `version.properties` × `version.generated.ts` podem divergir** — feito. Um
+      passo "Confere coerencia da versao" compara os dois no CI, antes de qualquer build.
+      O arquivo gerado é reescrito a cada build pelo Gradle, mas é versionado: o valor
+      commitado podia divergir do `version.properties` e o app anunciaria uma versão que
+      não corresponde ao que foi compilado. Também entrou no filtro de paths o próprio
+      workflow, para que mudar o pipeline dispare build em vez de ficar sem teste.
 - [ ] **52. 🔐 Assinar só no CI** — o aparelho é `f2fs` e não aplica bits de permissão
       (testado: um arquivo `600` de root é legível por `nobody`), então a senha do
       keystore fica exposta a qualquer processo no aparelho. Movendo o keystore para
