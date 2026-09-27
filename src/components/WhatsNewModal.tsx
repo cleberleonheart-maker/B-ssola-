@@ -16,6 +16,9 @@ import type { Translator } from '../i18n/strings';
 type Entry = { icon: string; title: string; desc: string };
 
 const CHANGELOG: Record<number, (t: Translator) => Entry[]> = {
+  153: t => [
+    { icon: '🧭', title: t('wn_livesrumo_title'), desc: t('wn_livesrumo_desc') },
+  ],
   152: t => [
     { icon: '🛡️', title: t('wn_updatefix_title'), desc: t('wn_updatefix_desc') },
     { icon: '🧹', title: t('wn_tidy_title'), desc: t('wn_tidy_desc') },
