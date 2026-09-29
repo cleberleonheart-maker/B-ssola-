@@ -389,6 +389,23 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       bússola é mais estável; (3) sem calibração magnética o painel **avisa** em vez
       de reprovar, porque aí a culpa é da calibração e não do sensor. 23 testes,
       com 4 mutações confirmadas.
+
+      **Correção em campo (v7.26, code 157):** o primeiro teste reprovou no
+      aparelho do usuário com `1,05–1,4 g`. Duas coisas saíram disso. A boa:
+      ler 1,05 e não 9,8 confirmou que a **detecção de escala funcionou** — é
+      a parte que eu mais temia, porque errá-la reprovaria qualquer aparelho.
+      A má: `1,4` é aceleração real, não sensor ruim, e o painelPuniu o
+      sensor por um toque do usuário. Duas correções, ambas de projeto e não
+      de número: (1) a janela passou a **descartar 1 s de acomodação**
+      (`WARMUP`), porque a coleta começava no instante do toque; (2) o
+      veredito deixou de ser booleano e virou `ok`/`moved`/`fault`. Reprovar
+      "o aparelho mexeu" mandava o usuário atrás de um defeito que não
+      existe. A classificação usa **mediana**, não média: um pico isolado de
+      1,4 g numa janela de 8 amostras joga a média para 1,06 e acusaria um
+      sensor perfeito — a mediana responde onde o aparelho estava parado, que
+      é a pergunta certa. `MOVED_SPREAD_G` (0,5 g) existe para o caso de
+      nível errado *e* dispersão larga, que é movimento, não ganho torto.
+      10 testes novos, 4 mutações confirmadas.
 - [ ] **63. 🔇 Relatório de bug com dados de sensores** — ao relatar um problema, o
       app pode anexar um trecho anônimo (30–60 s) dos últimos logs de sensores (mag/accel,
       GPS, heading). Dá reproduzibilidade sem vazar localização sensível (pode filtrar

@@ -457,6 +457,8 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     wn_mils_desc: 'Mostra o azimute também em milésimos (6400) — padrão usado nas forças armadas.',
     wn_livebg_title: 'Rastreio ao vivo com a tela apagada',
     wn_livebg_desc: 'O rastreio agora pede permissao de segundo plano e mostra uma notificacao ativa, para continuar enviando sua posicao com a tela desligada.',
+    wn_selftestfix_title: '🧪 Autoteste: "mexeu" não é defeito',
+    wn_selftestfix_desc: 'O autoteste agora descarta o movimento do toque e separa o aparelho que mexeu do sensor quebrado, com mensagem própria para cada caso.',
     wn_selftest_title: '🧪 Autoteste dos sensores',
     wn_selftest_desc:
       'Novo modo que verifica no seu aparelho se o acelerometro, o magnetometro e a inclinacao estao funcionando, e mostra os numeros medidos.',
@@ -696,6 +698,7 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     sd_expect: 'esperado',
     sd_all_pass: '✅ Tudo certo: os sensores estão funcionando.',
     sd_some_fail: '⚠️ Reprovou: {list}',
+    sd_moved: '⚠️ O aparelho mexeu durante a leitura. Encosta numa superfície plana e aperte Repetir — isso não é defeito do sensor.',
     sd_mag_error: 'Magnetômetro indisponível',
     sd_accel_error: 'Acelerômetro indisponível',
     sd_uncalibrated: 'Sem calibração magnética: o teste do norte pode reprovar mesmo com o sensor bom.',
@@ -1189,6 +1192,8 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     wn_mils_desc: 'Show headings also in mils (6400) — the standard used by the armed forces.',
     wn_livebg_title: 'Live tracking with the screen off',
     wn_livebg_desc: 'Live tracking now asks for background permission and shows an ongoing notification, so it keeps sending your location while the screen is off.',
+    wn_selftestfix_title: '🧪 Self-test: "moved" is not a fault',
+    wn_selftestfix_desc: 'The self-test now discards the movement from your tap and tells a phone that moved apart from a broken sensor, with its own message for each case.',
     wn_selftest_title: '🧪 Sensor self-test',
     wn_selftest_desc:
       'New mode that checks on your own phone whether the accelerometer, the magnetometer and the tilt reading actually work, and shows the measured numbers.',
@@ -1426,6 +1431,7 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     sd_expect: 'expected',
     sd_all_pass: '✅ All good: the sensors are working.',
     sd_some_fail: '⚠️ Failed: {list}',
+    sd_moved: '⚠️ The phone moved during the reading. Lay it on a flat surface and press Repeat — this is not a sensor fault.',
     sd_mag_error: 'Magnetometer unavailable',
     sd_accel_error: 'Accelerometer unavailable',
     sd_uncalibrated:
@@ -1920,6 +1926,8 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     wn_mils_desc: 'Muestra el azimut también en milésimas (6400), el estándar usado por las fuerzas armadas.',
     wn_livebg_title: 'Rastreo en vivo con la pantalla apagada',
     wn_livebg_desc: 'El rastreo en vivo ahora pide permiso en segundo plano y muestra una notificacion activa, para seguir enviando tu posicion con la pantalla apagada.',
+    wn_selftestfix_title: '🧪 Autotest: "se movió" no es un fallo',
+    wn_selftestfix_desc: 'El autotest ahora descarta el movimiento del toque y distingue un teléfono que se movió de un sensor roto, con su propio mensaje para cada caso.',
     wn_selftest_title: '🧪 Autotest de sensores',
     wn_selftest_desc:
       'Nuevo modo que comprueba en tu propio telefono si el acelerometro, el magnetometro y la inclinacion funcionan, y muestra los numeros medidos.',
@@ -2157,6 +2165,7 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     sd_expect: 'esperado',
     sd_all_pass: '✅ Todo bien: los sensores funcionan.',
     sd_some_fail: '⚠️ Falló: {list}',
+    sd_moved: '⚠️ El teléfono se movió durante la lectura. Apóyalo en una superficie plana y pulsa Repetir — no es un fallo del sensor.',
     sd_mag_error: 'Magnetómetro no disponible',
     sd_accel_error: 'Acelerómetro no disponible',
     sd_uncalibrated:

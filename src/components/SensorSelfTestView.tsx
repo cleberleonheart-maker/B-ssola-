@@ -19,16 +19,24 @@ import { spacing, radius } from '../theme/colors';
 import { verticalAngle } from './HeightView';
 import {
   analyzeRest,
+  dropWarmup,
   headingSpread,
   tiltResponse,
   REST_MAX_G,
   REST_MIN_G,
   STABILITY_MAX_DEG,
+  WARMUP,
 } from '../services/sensorSelfTest';
 
 const SAMPLE_MS = 200;
 /** 25 amostras a 200 ms dão uma janela de 5 s. */
 const WINDOW = 25;
+/**
+ * Total de amostras coletadas: janela útil + acomodação. `evaluate` só roda
+ * depois de WARMUP + WINDOW, senão o corte de `dropWarmup` tiraria parte da
+ * janela de dentro.
+ */
+const TOTAL = WINDOW + WARMUP;
 const DEFAULT_RATE = 200;
 
 type Vec3 = { x: number; y: number; z: number };
@@ -88,7 +96,7 @@ const SensorSelfTestView = ({
   const evaluate = useCallback(() => {
     const s = samplesRef.current;
     setResults({
-      rest: analyzeRest(s.accel),
+      rest: analyzeRest(dropWarmup(s.accel)),
       spread: headingSpread(s.heading),
       tilt: tiltResponse(s.tilt),
     });
@@ -137,7 +145,7 @@ const SensorSelfTestView = ({
         const s = samplesRef.current;
         s.accel.push(Math.sqrt(x * x + y * y + z * z));
         s.tilt.push(verticalAngle({ x, y, z }, landscapeRef.current));
-        if (s.accel.length >= WINDOW) {
+        if (s.accel.length >= TOTAL) {
           setSampled(n => n + 1);
           evaluate();
         }
@@ -161,7 +169,10 @@ const SensorSelfTestView = ({
             ? `${results.rest.min.toFixed(2)}–${results.rest.max.toFixed(2)} g`
             : '—',
           expect: `${REST_MIN_G}–${REST_MAX_G} g`,
-          ok: results.rest ? results.rest.inRange : false,
+          // `moved` não reprova: reprovar puniria o sensor por um toque do
+          // usuário. O teste do repouso exige o aparelho quieto, e o painel
+          // diz que não ficou quieto em vez de accuse o sensor.
+          ok: results.rest ? results.rest.verdict === 'ok' : false,
         },
         {
           label: t('sd_stable'),
@@ -184,6 +195,8 @@ const SensorSelfTestView = ({
     : [];
 
   const failed = rows.filter(r => !r.ok);
+  const restVerdict = results?.rest?.verdict;
+  const moved = restVerdict === 'moved';
 
   return (
     <View style={styles.container}>
@@ -231,11 +244,21 @@ const SensorSelfTestView = ({
           <Text
             style={[
               styles.verdict,
-              { color: failed.length ? colors.danger : colors.success },
+              {
+                color: failed.length === 0
+                  ? colors.success
+                  : moved
+                    ? colors.warning
+                    : colors.danger,
+              },
             ]}>
             {failed.length === 0
               ? t('sd_all_pass')
-              : t('sd_some_fail', { list: failed.map(r => r.label).join(', ') })}
+              : moved
+                ? t('sd_moved')
+                : t('sd_some_fail', {
+                    list: failed.map(r => r.label).join(', '),
+                  })}
           </Text>
         </ScrollView>
       )}

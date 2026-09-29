@@ -1,6 +1,7 @@
 import {
   analyzeRest,
   detectAccelScale,
+  dropWarmup,
   headingSpread,
   tiltResponse,
   toG,
@@ -150,6 +151,80 @@ describe('autoteste: resposta a inclinacao', () => {
 
   it('precisa de pelo menos duas amostras', () => {
     expect(tiltResponse([0])).toBeNull();
+  });
+});
+
+describe('autoteste: o aparelho mexeu nao e defeito do sensor', () => {
+  // o caso reportado em campo: 1,05-1,4 g. Media em 1,00, entao o sensor
+  // estava certo e o aparelho se moveu.
+  const moved = [1.05, 1.0, 1.02, 1.4, 1.01, 0.99, 1.03, 1.0];
+
+  it('classifica pico isolado com a mediana no lugar como movimento', () => {
+    const r = analyzeRest(moved);
+    expect(r?.verdict).toBe('moved');
+    expect(r?.inRange).toBe(false);
+    // a mediana responde "onde o aparelho estava parado"; a média nao, e e
+    // por isso que a decisao usa a mediana
+    expect(r?.median).toBeGreaterThanOrEqual(REST_MIN_G);
+    expect(r?.median).toBeLessThanOrEqual(REST_MAX_G);
+    expect(r?.mean).toBeGreaterThan(REST_MAX_G);
+  });
+
+  it('classifica media fora da faixa como defeito do sensor', () => {
+    // mesmo padrao de dispersao, mas a media esta errada: gain torto
+    const r = analyzeRest([1.4, 1.5, 1.6, 1.45, 1.55]);
+    expect(r?.verdict).toBe('fault');
+  });
+
+  it('janela dentro da faixa e ok', () => {
+    expect(analyzeRest([1.0, 1.01, 0.99, 1.0])?.verdict).toBe('ok');
+  });
+
+  it('sensor travado em zero e defeito, nunca movimento', () => {
+    expect(analyzeRest([0, 0, 0])?.verdict).toBe('fault');
+  });
+
+  it('sensores mortos sao defeito nas duas unidades', () => {
+    // a deteccao de escala normaliza antes de julgar, entao o mesmo defeito
+    // precisa aparecer com o aparelho entregando g ou m/s2
+    expect(analyzeRest([0, 0, 0])?.verdict).toBe('fault');
+    expect(analyzeRest([0, 0, 0])?.scale).toBe('g');
+    // ganho torto: 0,2 g constante, entregue na unidade errada
+    const torto = analyzeRest([1.96, 1.97, 1.95]);
+    expect(torto?.verdict).toBe('fault');
+  });
+
+  it('a correcao de escala impede falso defeito: 9,8 vira 1,00 g', () => {
+    // o caso de escala errada nao chega a ser julgado: o servico detecta e
+    // corrige, que e o motivo de ele ser scale-agnostic
+    const r = analyzeRest([9.8, 9.9, 9.7]);
+    expect(r?.scale).toBe('ms2');
+    expect(r?.median).toBeCloseTo(1, 2);
+    expect(r?.verdict).toBe('ok');
+  });
+});
+
+describe('autoteste: acomodacao antes da janela', () => {
+  it('descarta as primeiras amostras', () => {
+    expect(dropWarmup([1, 2, 3, 4, 5, 6, 7], 3)).toEqual([4, 5, 6, 7]);
+  });
+
+  it('devolve vazio quando a janela toda e transitório', () => {
+    expect(dropWarmup([1, 2], 5)).toEqual([]);
+  });
+
+  it('o transitório do toque deixa de reprovar o sensor', () => {
+    // 5 amostras do toque movendo o aparelho, depois repouso de verdade
+    const toque = [1.4, 1.6, 1.3, 1.5, 1.45];
+    const repouso = [1.0, 1.01, 0.99, 1.0, 1.0];
+    const comTransit = [...toque, ...repouso];
+    expect(analyzeRest(comTransit)?.verdict).toBe('moved');
+    expect(analyzeRest(dropWarmup(comTransit, 5))?.verdict).toBe('ok');
+  });
+
+  it('descartar amostras nao conserta um sensor de verdade ruim', () => {
+    const morto = [0, 0, 0, 0, 0, 0, 0, 0];
+    expect(analyzeRest(dropWarmup(morto, 5))?.verdict).toBe('fault');
   });
 });
 

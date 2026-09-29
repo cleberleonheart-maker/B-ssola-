@@ -37,6 +37,20 @@ export const detectAccelScale = (magnitudes: number[]): 'g' | 'ms2' => {
 export const toG = (magnitude: number, scale: 'g' | 'ms2'): number =>
   scale === 'ms2' ? magnitude / G_MS2 : magnitude;
 
+/**
+ * Amostras a descartar no começo da janela.
+ *
+ * O painel começa a coletar no instante em que o usuário o abre, então as
+ * primeiras amostras pegam o transitório do toque e o aparelho saindo da mão.
+ * 5 amostras a 200 ms dão 1 s de acomodação: o suficiente para o toque sumir,
+ * curto o bastante para não atrasar o teste.
+ */
+export const WARMUP = 5;
+
+/** Descarta as amostras de acomodação. */
+export const dropWarmup = (values: number[], warmup = WARMUP): number[] =>
+  values.length > warmup ? values.slice(warmup) : [];
+
 export type CheckStatus = 'pending' | 'running' | 'pass' | 'fail';
 
 export type CheckResult = {
@@ -53,9 +67,28 @@ export type RestAnalysis = {
   min: number;
   max: number;
   mean: number;
+  /** Mediana: resiste a pico isolado, ao contrário da média. */
+  median: number;
   /** true se toda a janela ficou dentro de [REST_MIN_G, REST_MAX_G]. */
   inRange: boolean;
+  /**
+   * `ok` reprovou por estar dentro da faixa, `moved` reprovou mas o nível de
+   * repouso está no lugar — o aparelho mexeu durante a janela — e `fault`
+   * reprovou com nível errado e pouca dispersão, que é defeito de verdade
+   * (sensor morto, escala errada, ganho torto).
+   */
+  verdict: RestVerdict;
 };
+
+export type RestVerdict = 'ok' | 'moved' | 'fault';
+
+/**
+ * Dispersão acima da qual a janela é considerada "movimento" mesmo com o nível
+ * fora da faixa. 0,5 g num intervalo de 5 s é grande demais para sensor parado:
+ * nenhum ganho torto mantém 0,5 g de dispersão. Serve só para separar "mexeram
+ * no aparelho" de "o sensor está errado".
+ */
+export const MOVED_SPREAD_G = 0.5;
 
 /**
  * Aceleração em repouso.
@@ -78,12 +111,35 @@ export const analyzeRest = (
   }
   const scale = detectAccelScale(valid);
   const gs = valid.map(m => toG(m, scale));
+  const lo = Math.min(...gs);
+  const hi = Math.max(...gs);
+  const mean = gs.reduce((s, v) => s + v, 0) / gs.length;
+  const mid = median(gs) ?? mean;
+  const inBand = (v: number) => v >= min && v <= max;
+  // A mediana decide o nível de repouso, não a média: um único pico de 1,4 g
+  // numa janela de 8 amostras puxa a média para 1,06 e faria um sensor
+  // perfeito ser acusado de defeito. A mediana ignora o outlier e responde o
+  // que a média não responde, que é "onde o aparelho estava parado".
+  const levelOk = inBand(mid);
   return {
     scale,
-    min: Math.min(...gs),
-    max: Math.max(...gs),
-    mean: gs.reduce((s, v) => s + v, 0) / gs.length,
-    inRange: Math.min(...gs) >= min && Math.max(...gs) <= max,
+    min: lo,
+    max: hi,
+    mean,
+    median: mid,
+    inRange: lo >= min && hi <= max,
+    verdict:
+      lo >= min && hi <= max
+        ? 'ok'
+        : levelOk
+          ? 'moved'
+          : // Nível errado e dispersão larga não convive: um aparelho parado
+            // não mantém um nível fora da faixa por 5 s. É movimento durante
+            // a janela, não sensor quebrado — e dizer "defeito" aqui mandaria
+            // o usuário trocar um sensor que está bom.
+            hi - lo > MOVED_SPREAD_G
+            ? 'moved'
+            : 'fault',
   };
 };
 
