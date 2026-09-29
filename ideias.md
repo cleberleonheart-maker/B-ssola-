@@ -359,3 +359,51 @@ foram encontrados de verdade, não ideias soltas.
       (heatmap) para mapear fontes numa área.
 - [ ] **49. ❄️ EMF: travar leitura** — congelar o valor na tela ao caminhar em direção
       à fonte (pico mantido).
+
+## Ideias novas (29/09/2026, 7ª leva — pós-auditoria)
+Saem da auditoria dos bugs corrigidos (commit 8dc0c59). Não repetem ideias já
+existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
+
+### Risco / processo
+- [ ] **61. 🐢 Acelerar o build local** — o plugin `io.invertase.gradle.build:1.5` do
+      notifee só resolve com rede (`--offline` falha) e o `clang++` do NDK roda sob
+      emulação `qemu-x86_64` (o que explica ~3,5 h para o `assembleDebug`). Separar
+      tarefas: compilar apenas JS/Java quando não mexer em C++ ou oferecer uma flag
+      para pular CMake (build incremental por camada). Reduz o custo de cada tentativa
+      sem esconder erros nativos.
+- [ ] **62. 🧪 Autoteste de campo** — modo "Diagnóstico > Autoteste" que valida
+      invariantes no próprio aparelho: parado, o norte não varia mais que 2° em 5 s;
+      em repouso, `|aceleração|` entre 0,98 g e 1,02 g; inclinando 90°, `verticalAngle`
+      muda. Apresenta **PASSOU/FALHOU** com números. Transforma o "não testado em
+      hardware" numa checagem que o usuário pode fazer na hora.
+- [ ] **63. 🔇 Relatório de bug com dados de sensores** — ao relatar um problema, o
+      app pode anexar um trecho anônimo (30–60 s) dos últimos logs de sensores (mag/accel,
+      GPS, heading). Dá reproduzibilidade sem vazar localização sensível (pode filtrar
+      coordenadas). Ajuda muito nos bugs que acabei de corrigir.
+
+### Produto
+- [ ] **64. 📟 Painel de diagnóstico dos sensores** — mostra valores brutos X/Y/Z do
+      acelerômetro e magnetômetro, o eixo dominante, magnitude, se está calibrado
+      (hard/soft iron efetivo) e um botão "Confirmar eixo". Fecha a ressalva deixada
+      no commit `8dc0c59`: em vez de assumir a convenção de eixos, o **aparelho** diz.
+- [ ] **65. 🧭 Auto-detecção da convenção do teodolito** — ao mirar um ponto fixo e
+      inclinar ~90°, se `verticalAngle` tender a 180° em vez de 0°, inverte
+      silenciosamente com aviso ("Convenção de inclinação corrigida") e permite
+      desfazer num toque. Barato, cobre o caso do usuário sem painel completo.
+- [ ] **66. 🎙️ Pré-visualizar o que a Kefera ouviu** — exibe a transcrição (com
+      confiança baixa) **antes** de executar: "Ouvi: *marcar waypoint*. Executar?
+      [Sim] [Corrigir]". Evita execuções erradas e facilita o ajuste do wake word.
+- [ ] **67. 🕵️ Segunda chance com confiança baixa** — reaproveita o fuzzy matcher:
+      quando a pontuação ficar abaixo do limiar, oferece a alternativa mais próxima
+      ("Você quis dizer *gravar trilha*?"). Reduz falhas silenciosas sem complicar
+      o fluxo.
+- [ ] **68. 📏 Unidades imperiais** — adicionar pés, milhas, pés-polegadas nas
+      configurações (juntamente com a troca entre graus/mils já existente). Mantém
+      coerência entre todos os painéis (distância, altura, vento).
+- [ ] **69. 🔇 Silenciar Kefera por N minutos** — botão "Silenciar por 5/15/30 min"
+      que desliga TTS/wake word temporariamente. Útil em acampamento, reuniões ou
+      locais onde falar incomoda.
+- [ ] **70. ♻️ Importar backup com pré-visualização** — além de exportar (#38),
+      importar um ZIP/JSON com **preview**: "Vai importar: 3 waypoints, 1 trilha,
+      declinação, calibrações. Substituir ou mesclar?". Evita sobrescrever dados
+      bons por engano.
