@@ -457,6 +457,9 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     wn_mils_desc: 'Mostra o azimute também em milésimos (6400) — padrão usado nas forças armadas.',
     wn_livebg_title: 'Rastreio ao vivo com a tela apagada',
     wn_livebg_desc: 'O rastreio agora pede permissao de segundo plano e mostra uma notificacao ativa, para continuar enviando sua posicao com a tela desligada.',
+    wn_selftest_title: '🧪 Autoteste dos sensores',
+    wn_selftest_desc:
+      'Novo modo que verifica no seu aparelho se o acelerometro, o magnetometro e a inclinacao estao funcionando, e mostra os numeros medidos.',
     wn_calverify_title: 'Conferência do norte',
     wn_calverify_desc: 'O app lembra de conferir o norte pelo Sol, para você perceber quando a bússola precisa ser calibrada de novo.',
     wn_livesrumo_title: 'Rumo no rastreio ao vivo',
@@ -1186,6 +1189,9 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     wn_mils_desc: 'Show headings also in mils (6400) — the standard used by the armed forces.',
     wn_livebg_title: 'Live tracking with the screen off',
     wn_livebg_desc: 'Live tracking now asks for background permission and shows an ongoing notification, so it keeps sending your location while the screen is off.',
+    wn_selftest_title: '🧪 Sensor self-test',
+    wn_selftest_desc:
+      'New mode that checks on your own phone whether the accelerometer, the magnetometer and the tilt reading actually work, and shows the measured numbers.',
     wn_calverify_title: 'North check',
     wn_calverify_desc: 'The app reminds you to check north against the Sun, so you can notice when the compass needs recalibrating.',
     wn_livesrumo_title: 'Heading in live tracking',
@@ -1914,6 +1920,9 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     wn_mils_desc: 'Muestra el azimut también en milésimas (6400), el estándar usado por las fuerzas armadas.',
     wn_livebg_title: 'Rastreo en vivo con la pantalla apagada',
     wn_livebg_desc: 'El rastreo en vivo ahora pide permiso en segundo plano y muestra una notificacion activa, para seguir enviando tu posicion con la pantalla apagada.',
+    wn_selftest_title: '🧪 Autotest de sensores',
+    wn_selftest_desc:
+      'Nuevo modo que comprueba en tu propio telefono si el acelerometro, el magnetometro y la inclinacion funcionan, y muestra los numeros medidos.',
     wn_calverify_title: 'Comprobación del norte',
     wn_calverify_desc: 'La app te recuerda comprobar el norte con el Sol, para que notes cuándo la brújula necesita recalibrarse.',
     wn_livesrumo_title: 'Rumo en el rastreo en vivo',
