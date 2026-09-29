@@ -21,6 +21,15 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'patches/**'
+      # Config do build que o filtro antigo deixava passar: mudar qualquer um
+      # destes sem disparar build produz APK desatualizado em silencio.
+      - 'index.js'
+      - 'tsconfig.json'
+      - 'babel.config.js'
+      - 'metro.config.js'
+      - 'android/settings.gradle'
+      - 'android/gradle/**'
+      - 'android/app/proguard-rules.pro'
 
 jobs:
   build:

@@ -295,10 +295,15 @@ foram encontrados de verdade, não ideias soltas.
 - [x] **58. 🧪 Teste do `live.html`** — já existia. `__tests__/liveViewer.test.js` tem 13
       casos cobrindo stale, expiração, erro de rede, polls sobrepostos e aba oculta. Este
       item foi anotado como pendência por engano e está encerrado.
-- [ ] **59. 🏗️ Build local do Android** — hoje o `assembleRelease` local não roda (o
-      `io.invertase.gradle.build:1.5` não resolve offline) e o CI é o único caminho, o
-      que torna todo ciclo de release lento e opaco. Se funcionar local, o debug de
-      build para de custar 6 min por tentativa.
+- [x] **59. 🏗️ Build local do Android** — encerrado sem implementação, de propósito.
+      O objetivo original era deixar o `assembleRelease` local funcional, mas o usuário
+      trabalha **num celular, sem máquina potente**, e o diagnóstico de 29/09 selou a
+      questão: o `assembleDebug` levou ~5 h, o `clang++` do NDK roda sob emulação
+      `qemu-x86_64` e o próprio aparelho reiniciou no meio do build, que não é
+      retomável (morrer no meio = trabalho perdido, e só o `.cxx/` já gravado
+      escapa). Descartar o build local e deixar o CI compilar é mais rápido, mais
+      barato e não consome a bateria de quem está no campo. **Regra: nunca buildar
+      localmente neste setup** — commitar e deixar o `build-apk.yml` rodar.
 - [x] **60. ☀️ Lembrar de conferir o norte pelo Sol** — feito na v7.23. A conferência
       exige apontar o aparelho para o Sol e segurar 12 leituras por 3 s, então não dá
       para rodá-la sozinha: o app só pode lembrar. Ele guarda quando foi a última
@@ -365,12 +370,13 @@ Saem da auditoria dos bugs corrigidos (commit 8dc0c59). Não repetem ideias já
 existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
 
 ### Risco / processo
-- [ ] **61. 🐢 Acelerar o build local** — o plugin `io.invertase.gradle.build:1.5` do
+- [x] **61. 🐢 Acelerar o build local** — encerrado junto com a 59, mesmo motivo: sem
+      máquina potente, não há o que acelerar. Fica o registro do diagnóstico, porque
+      ele explica a lentidão caso alguém tente de novo: o plugin
+      `io.invertase.gradle.build:1.5` do
       notifee só resolve com rede (`--offline` falha) e o `clang++` do NDK roda sob
-      emulação `qemu-x86_64` (o que explica ~3,5 h para o `assembleDebug`). Separar
-      tarefas: compilar apenas JS/Java quando não mexer em C++ ou oferecer uma flag
-      para pular CMake (build incremental por camada). Reduz o custo de cada tentativa
-      sem esconder erros nativos.
+      emulação `qemu-x86_64` (o que explica ~5 h para o `assembleDebug`). O cache do
+      CMake é válido — só o que muda o hash de configuração força recompilar tudo.
 - [ ] **62. 🧪 Autoteste de campo** — modo "Diagnóstico > Autoteste" que valida
       invariantes no próprio aparelho: parado, o norte não varia mais que 2° em 5 s;
       em repouso, `|aceleração|` entre 0,98 g e 1,02 g; inclinando 90°, `verticalAngle`
