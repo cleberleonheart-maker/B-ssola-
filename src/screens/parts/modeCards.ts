@@ -24,4 +24,5 @@ export const buildModeCards = (t: Translator): ModeCard[] => [
   { key: 'height', icon: '⌖', label: t('ui_mode_height').replace(/^\S+\s*/, ''), sub: t('ui_card_height') },
   { key: 'car', icon: '🚗', label: t('ui_mode_car').replace(/^\S+\s*/, ''), sub: t('ui_card_car') },
   { key: 'tri', icon: '📐', label: t('ui_mode_tri').replace(/^\S+\s*/, ''), sub: t('ui_card_tri') },
+  { key: 'selftest', icon: '🧪', label: t('ui_mode_selftest').replace(/^\S+\s*/, ''), sub: t('ui_card_selftest') },
 ];

@@ -17,7 +17,8 @@ export type DisplayMode =
   | 'height'
   | 'car'
   | 'tri'
-  | 'odometer';
+  | 'odometer'
+  | 'selftest';
 
 export type WindCal = { zero: number; strong: number };
 
@@ -81,6 +82,7 @@ export const loadDisplayMode = async (): Promise<DisplayMode> => {
       'car',
       'tri',
       'odometer',
+      'selftest',
     ];
     return modes.includes(raw as DisplayMode) ? (raw as DisplayMode) : 'compass';
   } catch {

@@ -11,6 +11,7 @@ import FieldNotesSheet from '../../components/FieldNotesSheet';
 import HeightView from '../../components/HeightView';
 import MetalDetectorView from '../../components/MetalDetectorView';
 import OdometerView from '../../components/OdometerView';
+import SensorSelfTestView from '../../components/SensorSelfTestView';
 import SunWatchView from '../../components/SunWatchView';
 import TargetNavBar from '../../components/TargetNavBar';
 import TheodoliteView from '../../components/TheodoliteView';
@@ -52,6 +53,7 @@ type Props = {
   location: LocationFix;
   hasFix: boolean;
   declination: Declination;
+  calibrationApplied: boolean;
   onAddWaypoint: (name: string) => void;
   onAddRemoteWaypoint: (wp: {
     name: string;
@@ -88,6 +90,7 @@ const ModeView = (props: Props) => {
     location,
     hasFix,
     declination,
+    calibrationApplied,
     onAddWaypoint,
     onAddRemoteWaypoint,
     statusPanels,
@@ -222,6 +225,12 @@ const ModeView = (props: Props) => {
         <View style={styles.trackArea}>
           <OdometerView />
         </View>
+      ) : displayMode === 'selftest' ? (
+        <SensorSelfTestView
+          active
+          heading={heading}
+          calibrationApplied={calibrationApplied}
+        />
       ) : (
         <View style={styles.arArea}>
           <AROverlay

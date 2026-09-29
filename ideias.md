@@ -377,11 +377,18 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       notifee só resolve com rede (`--offline` falha) e o `clang++` do NDK roda sob
       emulação `qemu-x86_64` (o que explica ~5 h para o `assembleDebug`). O cache do
       CMake é válido — só o que muda o hash de configuração força recompilar tudo.
-- [ ] **62. 🧪 Autoteste de campo** — modo "Diagnóstico > Autoteste" que valida
-      invariantes no próprio aparelho: parado, o norte não varia mais que 2° em 5 s;
-      em repouso, `|aceleração|` entre 0,98 g e 1,02 g; inclinando 90°, `verticalAngle`
-      muda. Apresenta **PASSOU/FALHOU** com números. Transforma o "não testado em
-      hardware" numa checagem que o usuário pode fazer na hora.
+- [x] **62. 🧪 Autoteste de campo** — feito. Novo modo 🧪 no launcher que valida no
+      próprio aparelho: (1) acelerômetro em repouso entre 0,98 g e 1,02 g, (2) norte
+      parado com variação ≤ 2° numa janela de 5 s, (3) resposta do `verticalAngle` à
+      inclinação. Mostra **✓/✕ com os números** e o que era esperado, não só um
+      veredito. Lógica pura em `src/services/sensorSelfTest.ts` (testável sem mock) +
+      painel `SensorSelfTestView`. Três decisões vindas do caso do sensor ruim:
+      (1) a escala do acelerômetro é **detectada** (Android entrega m/s², iOS entrega
+      g) e não assumida, senão o repouso reprovaria num aparelho correto; (2) o norte
+      parado é medido com quebra de 0/360, senão o teste reprovaria justamente onde a
+      bússola é mais estável; (3) sem calibração magnética o painel **avisa** em vez
+      de reprovar, porque aí a culpa é da calibração e não do sensor. 23 testes,
+      com 4 mutações confirmadas.
 - [ ] **63. 🔇 Relatório de bug com dados de sensores** — ao relatar um problema, o
       app pode anexar um trecho anônimo (30–60 s) dos últimos logs de sensores (mag/accel,
       GPS, heading). Dá reproduzibilidade sem vazar localização sensível (pode filtrar

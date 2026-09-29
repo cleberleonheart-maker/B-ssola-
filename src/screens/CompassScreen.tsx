@@ -1312,6 +1312,7 @@ const CompassScreen = () => {
           location={location}
           hasFix={hasFix}
           declination={declination}
+          calibrationApplied={calibrated}
           onAddWaypoint={addWaypoint}
           onAddRemoteWaypoint={addRemoteWaypoint}
           statusPanels={statusPanels}
