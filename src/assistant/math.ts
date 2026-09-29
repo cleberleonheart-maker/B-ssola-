@@ -1,5 +1,11 @@
 export const evalArithmetic = (expr: string): number | null => {
-  const tokens = (expr.match(/\d+(?:\.\d+)?|[+\-*/()]/g) || []).filter(Boolean);
+  // "x"/"X" só vale como multiplicação entre dígitos; qualquer outra letra
+  // invalida a expressão em vez de ser descartada em silêncio
+  const prepared = expr.replace(/(\d)\s*[xX]\s*(\d)/g, '$1 * $2');
+  if (!/^[\d+\-*/().\s]+$/.test(prepared)) {
+    return null;
+  }
+  const tokens = (prepared.match(/\d+(?:\.\d+)?|[+\-*/()]/g) || []).filter(Boolean);
   if (tokens.length === 0) {
     return null;
   }

@@ -24,6 +24,9 @@ import {
 
 const CAL_SAMPLES = 32;
 const CAL_INTERVAL = 160;
+const DETECT_INTERVAL = 100;
+// mesma taxa usada pela bússola em CompassScreen; restaurada ao desmontar
+const DEFAULT_SENSOR_INTERVAL = 200;
 const FILTER_ALPHA = 0.85;
 const NEEDLE_ALPHA = 0.92;
 const DETECT_THRESHOLD = 50;
@@ -73,6 +76,10 @@ const MetalDetectorView = ({ active }: Props) => {
     return () => {
       detectorSubRef.current?.unsubscribe();
       calSubRef.current?.unsubscribe();
+      // setUpdateIntervalForType é global por tipo e o observable é singleton:
+      // sem restaurar, a bússola passa a ler o magnetômetro na taxa da
+      // detecção até reiniciar o app
+      setUpdateIntervalForType(SensorTypes.magnetometer, DEFAULT_SENSOR_INTERVAL);
     };
   }, []);
 
@@ -122,7 +129,7 @@ const MetalDetectorView = ({ active }: Props) => {
           calSubRef.current?.unsubscribe();
           setProgress(1);
           setGuideState('ready');
-          setUpdateIntervalForType(SensorTypes.magnetometer, 100);
+          setUpdateIntervalForType(SensorTypes.magnetometer, DETECT_INTERVAL);
         }
       },
       error: () => {},

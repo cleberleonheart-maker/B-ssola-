@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native';
 import { useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
@@ -10,14 +10,40 @@ type Props = {
   targetDistance: number | null;
 };
 
-const G = 9.80665;
 const DIST_STEPS = [5, 1, 0.1];
 
-const verticalAngle = (accel: { x: number; y: number; z: number }): number => {
-  const raw = Math.asin(
-    Math.max(-1, Math.min(1, -accel.x / G)),
-  );
-  return (raw * 180) / Math.PI;
+// Elevação do aparelho em relação ao horizonte, em graus. Positivo = apontando
+// para cima, negativo = apontando para baixo.
+//
+// Deliberadamente NÃO divide por G: com atan2(lateral, normal) a norma se
+// cancela, então o resultado é idêntico se o sensor entregar m/s² (Android) ou
+// g (iOS, CMAccelerometerData.acceleration). Também fica correto com o
+// aparelho em movimento, não só em repouso.
+//
+// O eixo depende da orientação: em retrato, elevar o topo gira em torno de X
+// (usa Y); deitado, elevar gira em torno de Y (usa X). Ler um eixo fixo — o
+// bug original — devolvia sempre 0 em retrato, porque accel.x não varia quando
+// o aparelho é inclinado para cima nessa orientação.
+export const verticalAngle = (
+  accel: { x: number; y: number; z: number },
+  landscape: boolean,
+): number => {
+  const { x, y, z } = accel;
+  if (![x, y, z].every(Number.isFinite)) {
+    return 0;
+  }
+  const lateral = landscape ? x : y;
+  const mag = Math.sqrt(x * x + y * y + z * z);
+  if (!(mag > 0)) {
+    // vetor nulo (sensor ainda não calibrado): reporta 0 em vez de NaN
+    return 0;
+  }
+  // componente perpendicular ao eixo de elevação: resto da norma. O sinal é
+  // negativo em ambas as orientações: com o aparelho retido (z > 0), elevar o
+  // topo joga a componente lateral para valor negativo.
+  const rest = Math.sqrt(Math.max(0, mag * mag - lateral * lateral));
+  const raw = (Math.atan2(-lateral, rest) * 180) / Math.PI;
+  return Number.isFinite(raw) ? raw : 0;
 };
 
 const HeightView = ({ accel, targetDistance }: Props) => {
@@ -29,6 +55,22 @@ const HeightView = ({ accel, targetDistance }: Props) => {
   const [base, setBase] = useState<number | null>(null);
   const [distance, setDistance] = useState(10);
   const manualRef = useRef(false);
+  const [landscape, setLandscape] = useState(
+    (() => {
+      const { width, height } = Dimensions.get('window');
+      return width > height;
+    })(),
+  );
+
+  useEffect(() => {
+    const sub = Dimensions.addEventListener(
+      'change',
+      ({ window }: { window: { width: number; height: number } }) => {
+        setLandscape(window.width > window.height);
+      },
+    );
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     if (targetDistance != null && targetDistance > 0 && !manualRef.current) {
@@ -36,7 +78,7 @@ const HeightView = ({ accel, targetDistance }: Props) => {
     }
   }, [targetDistance]);
 
-  const live = verticalAngle(accel);
+  const live = verticalAngle(accel, landscape);
 
   const capture = (which: 'top' | 'base') => {
     if (which === 'top') setTop(live);
@@ -46,6 +88,13 @@ const HeightView = ({ accel, targetDistance }: Props) => {
   const clear = () => {
     setTop(null);
     setBase(null);
+  };
+
+  const useTargetDistance = () => {
+    if (targetDistance != null && targetDistance > 0) {
+      manualRef.current = false;
+      setDistance(targetDistance);
+    }
   };
 
   const usingTarget = targetDistance != null && targetDistance > 0;
@@ -143,7 +192,7 @@ const HeightView = ({ accel, targetDistance }: Props) => {
           </Pressable>
           {usingTarget && (
             <Pressable
-              onPress={() => setDistance(targetDistance!)}
+              onPress={useTargetDistance}
               style={[styles.targetChip, { borderColor: colors.accent + '66' }]}>
               <Text style={[styles.targetChipText, { color: colors.accent }]}>
                 {t('ht_use_target', {

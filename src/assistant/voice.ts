@@ -43,6 +43,43 @@ const ensureTts = async (): Promise<void> => {
   }
 };
 
+// rastreia se o TTS está falando, para que o microfone não reabra enquanto a
+// própria assistente fala (o TTS pode conter a palavra de ativação e
+// reacionar o ciclo de wake sozinho)
+let speaking = false;
+let watchdog: ReturnType<typeof setTimeout> | null = null;
+const idleWaiters: (() => void)[] = [];
+
+// fallback para quando nenhum evento tts-finish/error/cancel chega (perda de
+// audio focus, engine de TTS travado). Sem isso, `speaking` ficaria true para
+// sempre e a palavra de ativação nunca mais reabriria o microfone.
+const MAX_SPEECH_MS = 15000;
+const clearWatchdog = () => {
+  if (watchdog) {
+    clearTimeout(watchdog);
+    watchdog = null;
+  }
+};
+
+const markSpeaking = () => {
+  speaking = true;
+  clearWatchdog();
+  watchdog = setTimeout(markIdle, MAX_SPEECH_MS);
+};
+
+const markIdle = () => {
+  speaking = false;
+  clearWatchdog();
+  while (idleWaiters.length > 0) {
+    idleWaiters.pop()?.();
+  }
+};
+
+export const isSpeaking = (): boolean => speaking;
+
+export const whenSpeechIdle = (): Promise<void> =>
+  speaking ? new Promise<void>(resolve => idleWaiters.push(resolve)) : Promise.resolve();
+
 export const speak = async (text: string): Promise<void> => {
   if (!text) {
     return;
@@ -50,8 +87,13 @@ export const speak = async (text: string): Promise<void> => {
   try {
     await ensureTts();
     await Tts.stop();
+    markSpeaking();
+    Tts.addEventListener('tts-finish', markIdle);
+    Tts.addEventListener('tts-error', markIdle);
+    Tts.addEventListener('tts-cancel', markIdle);
     Tts.speak(text);
   } catch {
+    markIdle();
     // fala é opcional; silêncio não quebra o app
   }
 };
@@ -69,6 +111,7 @@ export const speakAndWait = async (
   } catch {
     // segue sem áudio
   }
+  markSpeaking();
   await new Promise<void>(resolve => {
     let done = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -83,6 +126,7 @@ export const speakAndWait = async (
       Tts.removeEventListener('tts-finish', finish);
       Tts.removeEventListener('tts-error', finish);
       Tts.removeEventListener('tts-cancel', finish);
+      markIdle();
       resolve();
     };
     timer = setTimeout(finish, timeoutMs);
@@ -100,6 +144,7 @@ export const speakAndWait = async (
 export const stopSpeaking = async (): Promise<void> => {
   try {
     await Tts.stop();
+    markIdle();
   } catch {
     // ignore
   }
@@ -201,12 +246,16 @@ export const destroyVoice = async (): Promise<void> => {
   }
 };
 
+const WAKE_VARIANTS =
+  /\b(keferas|kefera|quefera|kefera|kefega|keyfera)\b/g;
+
 export const isWakeWord = (normalizedText: string): boolean =>
-  normalizedText.includes('kefera') ||
-  normalizedText.includes('quefera') ||
-  normalizedText.includes('kefera') ||
-  normalizedText.includes('keferas') ||
-  normalizedText.includes('kefega');
+  WAKE_VARIANTS.test(normalizeWakeText(normalizedText));
+
+// remove a palavra de ativação do resto da frase, para que
+// "kefera, qual a minha latitude?" execute o comando em vez de só despertar
+export const stripWakeWord = (normalizedText: string): string =>
+  normalizeWakeText(normalizedText).replace(WAKE_VARIANTS, ' ').replace(/\s+/g, ' ').trim();
 
 export const normalizeWakeText = (text: string): string =>
   text

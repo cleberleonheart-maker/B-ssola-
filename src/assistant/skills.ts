@@ -687,6 +687,45 @@ const dateSkill: Skill = {
   run: (_ctx, _n, _tokens, _wildcards, t) => t('as_date', { date: nowDate(t) }),
 };
 
+const WORD_NUMBERS: Record<string, string> = {
+  um: '1',
+  uma: '1',
+  dois: '2',
+  duas: '2',
+  tres: '3',
+  quatro: '4',
+  cinco: '5',
+  seis: '6',
+  sete: '7',
+  oito: '8',
+  nove: '9',
+  dez: '10',
+  onze: '11',
+  doze: '12',
+  treze: '13',
+  quatorze: '14',
+  catorze: '14',
+  quinze: '15',
+  dezesseis: '16',
+  dezessete: '17',
+  dezoito: '18',
+  dezenove: '19',
+  vinte: '20',
+};
+
+export const spokenToExpr = (raw: string): string =>
+  raw
+    .replace(/ multiplicado por /g, ' * ')
+    .replace(/ dividido por /g, ' / ')
+    .replace(/ por /g, ' / ')
+    .replace(/ mais /g, ' + ')
+    .replace(/ menos /g, ' - ')
+    .replace(/ vezes /g, ' * ')
+    .replace(/(\d)\s*[xX]\s*(?=\d|$)/g, '$1 * ')
+    .replace(/\b([a-z]+)\b/g, (w: string) => WORD_NUMBERS[w] ?? w)
+    .replace(/\s+/g, ' ')
+    .trim();
+
 const mathSkill: Skill = {
   id: 'math',
   patterns: [
@@ -706,12 +745,7 @@ const mathSkill: Skill = {
     if (exprRaw == null || !exprRaw.trim()) {
       return null;
     }
-    const expr = exprRaw
-      .replace(/ mais /g, ' + ')
-      .replace(/ menos /g, ' - ')
-      .replace(/ vezes /g, ' * ')
-      .replace(/ dividido por /g, ' / ')
-      .replace(/ x /g, ' * ');
+    const expr = spokenToExpr(exprRaw);
     const result = evalArithmetic(expr);
     if (result == null) {
       return t('as_math_unknown');

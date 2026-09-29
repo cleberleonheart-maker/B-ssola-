@@ -260,18 +260,29 @@ export const lunarPosition = (date: Date, lat: number, lon: number) => {
   return horizonCoords(moonCoordinates(d), date, lat, lon);
 };
 
+// D é a elongação média da Lua: 0 = nova, 90 = quarto crescente, 180 = cheia,
+// 270 = quarto minguante. Os intervalos são centrados nos quartos reais.
 const MOON_PHASES = [
-  { from: 0, to: 45, name: 'Lua nova', icon: '🌑' },
-  { from: 45, to: 135, name: 'Crescente', icon: '🌒' },
-  { from: 135, to: 225, name: 'Lua cheia', icon: '🌕' },
-  { from: 225, to: 315, name: 'Minguante', icon: '🌘' },
-  { from: 315, to: 360, name: 'Lua nova', icon: '🌑' },
+  { from: 337.5, to: 360, name: 'Lua nova', icon: '🌑' },
+  { from: 0, to: 22.5, name: 'Lua nova', icon: '🌑' },
+  { from: 22.5, to: 67.5, name: 'Crescente', icon: '🌒' },
+  { from: 67.5, to: 112.5, name: 'Crescente', icon: '🌓' },
+  { from: 112.5, to: 157.5, name: 'Gibosa crescente', icon: '🌔' },
+  { from: 157.5, to: 202.5, name: 'Lua cheia', icon: '🌕' },
+  { from: 202.5, to: 247.5, name: 'Gibosa minguante', icon: '🌖' },
+  { from: 247.5, to: 292.5, name: 'Minguante', icon: '🌗' },
+  { from: 292.5, to: 337.5, name: 'Minguante', icon: '🌘' },
 ];
 
 export const moonPhase = (date: Date) => {
   const d = toDays(date);
   const D = wrap360(297.8501921 + 445267.1114034 * (d / 36525));
   const fraction = (1 - Math.cos(toRad(D))) / 2;
-  const phase = MOON_PHASES.find(p => D >= p.from && D < p.to) ?? MOON_PHASES[0];
+  const phase =
+    MOON_PHASES.find(p =>
+      p.from <= p.to
+        ? D >= p.from && D < p.to
+        : D >= p.from || D < p.to,
+    ) ?? MOON_PHASES[0];
   return { ...phase, elongation: D, fraction };
 };

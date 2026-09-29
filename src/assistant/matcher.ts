@@ -78,10 +78,10 @@ const matchEntries = (
   }
 
   if (entry.type === 'star') {
-    if (pos >= input.length) {
-      return { ok: false, wildcards };
-    }
-    for (let k = input.length; k > pos; k -= 1) {
+    // exige ao menos um token, exceto quando o curinga é o último item do
+    // padrão ("quantas trilhas *"), onde casar vazio é o comportamento válido
+    const minTokens = pos;
+    for (let k = input.length; k >= minTokens; k -= 1) {
       const r = matchEntries(entries, input, k, epos + 1, wildcards);
       if (r.ok) {
         return r;
@@ -115,6 +115,41 @@ const matchEntries = (
   return { ok: false, wildcards };
 };
 
+// ruído comum na fala ("por favor", "ei", "me diz") que não deve impedir um
+// padrão de casar; removido das pontas antes do casamento
+const FILLER = new Set([
+  'por',
+  'favor',
+  'ei',
+  'e',
+  'olha',
+  'ola',
+  'hey',
+  'me',
+  'diz',
+  'me diz',
+  'me fala',
+  'fala',
+  'pra',
+  'pro',
+  'please',
+  'ok',
+  'entao',
+  'agora',
+]);
+
+const stripFiller = (tokens: string[]): string[] => {
+  let start = 0;
+  let end = tokens.length;
+  while (start < end && FILLER.has(tokens[start])) {
+    start += 1;
+  }
+  while (end > start && FILLER.has(tokens[end - 1])) {
+    end -= 1;
+  }
+  return tokens.slice(start, end);
+};
+
 export const matches = (
   pattern: string,
   normalizedInput: string,
@@ -125,7 +160,15 @@ export const matches = (
   }
   const entries = parsePattern(pattern);
   const result = matchEntries(entries, inputTokens, 0, 0, []);
-  return { matched: result.ok, wildcards: result.wildcards };
+  if (result.ok) {
+    return { matched: true, wildcards: result.wildcards };
+  }
+  const stripped = stripFiller(inputTokens);
+  if (stripped.length === inputTokens.length) {
+    return { matched: false, wildcards: [] };
+  }
+  const retry = matchEntries(entries, stripped, 0, 0, []);
+  return { matched: retry.ok, wildcards: retry.wildcards };
 };
 
 export const phraseMatch = (

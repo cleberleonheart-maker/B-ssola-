@@ -3,6 +3,8 @@ import {
   saveMemory,
   pushHistory,
   createId,
+  cloneMemory,
+  DEFAULT_MEMORY,
   type MemoryState,
 } from './memory';
 import { runSkills } from './skills';
@@ -13,7 +15,7 @@ import { createTranslator, Lang, Translator } from '../i18n/strings';
 const pick = (list: string[]): string => list[Math.floor(Math.random() * list.length)];
 
 export class KeferaEngine {
-  private memory: MemoryState = { facts: {}, history: [] };
+  private memory: MemoryState = cloneMemory(DEFAULT_MEMORY);
   private ctx: AssistantContextData = buildEmptyContext();
   private ready = false;
   private lang: Lang = 'pt';
@@ -69,22 +71,28 @@ export class KeferaEngine {
 
     const tokens = toTokens(text);
     const normalized = tokens.join(' ');
-    this.userAnswer(text);
 
     if (!this.ready) {
+      this.userAnswer(text);
       return this.response(t('as_engine_not_ready'), 'error');
     }
+
+    // consultas de memória respondem sobre o histórico anterior: registrar a
+    // pergunta atual antes faria "qual foi a minha última pergunta?" devolver
+    // a si mesma
+    const memoryQuery = this.parseMemoryQuery(normalized, t);
+    if (memoryQuery) {
+      this.userAnswer(text);
+      return this.response(memoryQuery, 'memory');
+    }
+
+    this.userAnswer(text);
 
     const fact = this.parseFact(normalized, t);
     if (fact) {
       this.memory.facts[fact.key] = fact.value;
       this.persist();
       return this.response(fact.message, 'fact');
-    }
-
-    const memoryQuery = this.parseMemoryQuery(normalized, t);
-    if (memoryQuery) {
-      return this.response(memoryQuery, 'memory');
     }
 
     const skill = await runSkills(this.ctx, normalized, tokens, t);

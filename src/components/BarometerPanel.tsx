@@ -55,7 +55,15 @@ const BarometerPanel = ({
             )
             .slice(-PERSIST_MAX);
           const now = Date.now();
-          liveRef.current = entries.filter(e => now - e.ts < 30 * 60 * 1000);
+          const stored = entries
+            .filter(e => now - e.ts < 30 * 60 * 1000)
+            .slice(-LIVE_MAX);
+          // preserva as amostras já coletadas nesta sessão, que a leitura do
+          // AsyncStorage pode resolver depois do primeiro sample
+          liveRef.current = [...stored, ...liveRef.current]
+            .filter((e, i, merged) => merged.findIndex(x => x.ts === e.ts) === i)
+            .sort((a, b) => a.ts - b.ts)
+            .slice(-LIVE_MAX);
           setHistory(liveRef.current);
         } catch {
           // ignore bad data
@@ -89,7 +97,11 @@ const BarometerPanel = ({
     const spanHours = (h[h.length - 1].ts - h[0].ts) / 3600000;
     const mid = Math.floor(h.length / 2);
     const avg = (a: Entry[]) => a.reduce((s, e) => s + e.p, 0) / a.length;
-    const rate = spanHours > 0 ? (avg(h.slice(mid)) - avg(h.slice(0, mid))) / spanHours : 0;
+    // as duas meias janelas são adjacentes e separadas por spanHours/2, então
+    // dividir pela metade real mantém a taxa em hPa/h
+    const halfSpanHours = spanHours / 2;
+    const rate =
+      halfSpanHours > 0 ? (avg(h.slice(mid)) - avg(h.slice(0, mid))) / halfSpanHours : 0;
     if (rate > 0.7) return 'up' as const;
     if (rate < -0.7) return 'down' as const;
     return 'flat' as const;

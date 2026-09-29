@@ -17,7 +17,7 @@ import {
   attachVoice,
   isVoiceAvailable,
   isWakeWord,
-  normalizeWakeText,
+  stripWakeWord,
   speak,
   speakAndWait,
   startListening,
@@ -25,6 +25,7 @@ import {
   stopSpeaking,
   destroyVoice,
   setVoiceLanguage,
+  whenSpeechIdle,
 } from './voice';
 import {
   buildEmptyContext,
@@ -130,8 +131,9 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
 
       const wakeCmd = detectWakeCommand(clean);
       if (wakeCmd) {
-        const next =
-          wakeCmd === 'off' ? false : !wakeOnRef.current;
+        // 'on' é idempotente: pedir para ativar quando já está ativa não
+        // pode desligar a escuta
+        const next = wakeCmd === 'off' ? false : true;
         if (next !== wakeOnRef.current) {
           toggleWakeRef.current();
         }
@@ -232,6 +234,14 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       if (mode === 'command') {
         awaitingCommandRef.current = true;
       }
+      // abrir o microfone durante o TTS realimentaria a palavra de ativação
+      // (várias respostas contêm "Kefera") e reiniciaria o ciclo sozinha
+      if (mode === 'wake') {
+        await whenSpeechIdle();
+        if (!appActiveRef.current) {
+          return;
+        }
+      }
       sessionActiveRef.current = true;
       voiceModeRef.current = mode;
       setListening(true);
@@ -253,26 +263,48 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
     [clearWakeTimer, voiceSupported],
   );
 
-  const wakeDetected = useCallback(async () => {
+  const scheduleWakeCycle = useCallback(() => {
     clearWakeTimer();
-    awaitingCommandRef.current = true;
-    commandRetriesRef.current = 0;
-    try {
-      await stopListening();
-    } catch {
-      // ignore
-    }
-    sessionActiveRef.current = false;
-    voiceModeRef.current = 'none';
-    setListening(false);
-    const phrase = t('as_wake_here');
-    setOpen(true);
-    setMessages(prev => [...prev, createMessage('assistant', phrase, true)]);
-    await speakAndWait(phrase);
-    if (awaitingCommandRef.current && appActiveRef.current) {
-      beginSession('command');
-    }
-  }, [beginSession, clearWakeTimer, t]);
+    wakeTimerRef.current = setTimeout(() => {
+      beginSession('wake');
+    }, 450);
+  }, [beginSession, clearWakeTimer]);
+
+  const wakeDetected = useCallback(
+    async (inlineCommand?: string) => {
+      clearWakeTimer();
+      awaitingCommandRef.current = true;
+      commandRetriesRef.current = 0;
+      try {
+        await stopListening();
+      } catch {
+        // ignore
+      }
+      sessionActiveRef.current = false;
+      voiceModeRef.current = 'none';
+      setListening(false);
+      const phrase = t('as_wake_here');
+      setOpen(true);
+      setMessages(prev => [...prev, createMessage('assistant', phrase, true)]);
+      await speakAndWait(phrase);
+      if (!appActiveRef.current) {
+        return;
+      }
+      if (inlineCommand) {
+        // comando já veio na frase de ativação: não reabre o microfone
+        awaitingCommandRef.current = false;
+        await sendRef.current(inlineCommand);
+        if (wakeOnRef.current) {
+          scheduleWakeCycle();
+        }
+        return;
+      }
+      if (awaitingCommandRef.current) {
+        beginSession('command');
+      }
+    },
+    [beginSession, clearWakeTimer, scheduleWakeCycle, t],
+  );
 
   const handleTranscription = useCallback(
     (text: string) => {
@@ -281,10 +313,11 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       if (mode === 'wake') {
-        const norm = normalizeWakeText(text);
-        if (isWakeWord(norm)) {
-          wakeDetected();
+        if (!isWakeWord(text)) {
+          return;
         }
+        // "Kefera, qual a minha latitude?" desperta E executa o comando
+        wakeDetected(stripWakeWord(text) || undefined);
         return;
       }
       if (mode === 'command') {
@@ -300,14 +333,7 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
     [clearWakeTimer, wakeDetected],
   );
 
-  const scheduleWakeCycle = useCallback(() => {
-    clearWakeTimer();
-    wakeTimerRef.current = setTimeout(() => {
-      beginSession('wake');
-    }, 450);
-  }, [beginSession, clearWakeTimer]);
-
-const endCommandListening = useCallback(() => {
+  const endCommandListening = useCallback(() => {
     commandRetriesRef.current += 1;
     if (commandRetriesRef.current > MAX_COMMAND_RETRIES) {
       awaitingCommandRef.current = false;
@@ -324,7 +350,7 @@ const endCommandListening = useCallback(() => {
     }, 900);
   }, [beginSession, clearWakeTimer, scheduleWakeCycle]);
 
-const fallbackFromCommand = useCallback(() => {
+  const fallbackFromCommand = useCallback(() => {
     if (awaitingCommandRef.current) {
       endCommandListening();
       return;
@@ -338,49 +364,49 @@ const fallbackFromCommand = useCallback(() => {
     }
   }, [beginSession, clearWakeTimer, endCommandListening]);
 
-const handleVoiceEnd = useCallback(() => {
-  sessionActiveRef.current = false;
-  setListening(false);
-  if (awaitingCommandRef.current) {
-    endCommandListening();
-    return;
-  }
-  voiceModeRef.current = wakeOnRef.current ? 'wake' : 'none';
-  if (wakeOnRef.current && appActiveRef.current) {
-    scheduleWakeCycle();
-  }
-}, [endCommandListening, scheduleWakeCycle]);
+  const handleVoiceEnd = useCallback(() => {
+    sessionActiveRef.current = false;
+    setListening(false);
+    if (awaitingCommandRef.current) {
+      endCommandListening();
+      return;
+    }
+    voiceModeRef.current = wakeOnRef.current ? 'wake' : 'none';
+    if (wakeOnRef.current && appActiveRef.current) {
+      scheduleWakeCycle();
+    }
+  }, [endCommandListening, scheduleWakeCycle]);
 
-const handleVoiceError = useCallback(() => {
-  sessionActiveRef.current = false;
-  setListening(false);
-  fallbackFromCommand();
-}, [fallbackFromCommand]);
+  const handleVoiceError = useCallback(() => {
+    sessionActiveRef.current = false;
+    setListening(false);
+    fallbackFromCommand();
+  }, [fallbackFromCommand]);
 
   const toggleWake = useCallback(() => {
-    setWakeOnState(prev => {
-      const next = !prev;
-      wakeOnRef.current = next;
-      AsyncStorage.setItem(WAKE_PREF_KEY, next ? '1' : '0').catch(() => {});
-      if (next) {
-        if (sessionActiveRef.current) {
-          stopSession();
-        }
-        if (appActiveRef.current && voiceSupported) {
-          clearWakeTimer();
-          wakeTimerRef.current = setTimeout(() => {
-            beginSession('wake');
-          }, 300);
-        }
-      } else {
-        clearWakeTimer();
-        if (sessionActiveRef.current) {
-          stopSession();
-        }
-        setListening(false);
+    // efeitos fora do updater do setState: se o updater for re-invocado
+    // (render interrompido), os timers e sessões seriam criados duas vezes
+    const next = !wakeOnRef.current;
+    wakeOnRef.current = next;
+    setWakeOnState(next);
+    AsyncStorage.setItem(WAKE_PREF_KEY, next ? '1' : '0').catch(() => {});
+    if (next) {
+      if (sessionActiveRef.current) {
+        stopSession();
       }
-      return next;
-    });
+      if (appActiveRef.current && voiceSupported) {
+        clearWakeTimer();
+        wakeTimerRef.current = setTimeout(() => {
+          beginSession('wake');
+        }, 300);
+      }
+    } else {
+      clearWakeTimer();
+      if (sessionActiveRef.current) {
+        stopSession();
+      }
+      setListening(false);
+    }
   }, [beginSession, clearWakeTimer, stopSession, voiceSupported]);
 
   toggleWakeRef.current = toggleWake;
@@ -460,7 +486,10 @@ const handleVoiceError = useCallback(() => {
         wakeOnRef.current = next;
         setWakeOnState(next);
         if (next && appActiveRef.current) {
-          setTimeout(() => {
+          // guardado no ref para poder ser cancelado no cleanup, como todos
+          // os outros wake timers
+          clearWakeTimer();
+          wakeTimerRef.current = setTimeout(() => {
             beginSession('wake');
           }, 1500);
         }

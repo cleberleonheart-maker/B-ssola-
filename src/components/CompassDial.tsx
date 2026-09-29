@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, Text, StyleSheet, View } from 'react-native';
 import { useThemeColors } from '../theme/ThemeContext';
-import { DIRECTIONS } from '../utils/compass';
+import { DIRECTIONS, normalizeHeading } from '../utils/compass';
 
 type Props = {
   rotation: number;
@@ -114,7 +114,7 @@ const CompassDial = ({
           styles.dialGlow,
         ]}
         accessible
-        accessibilityLabel={`Bússola ${rotation.toFixed(0)} graus`}>
+        accessibilityLabel={`Bússola ${normalizeHeading(rotation).toFixed(0)} graus`}>
         <Animated.View
           style={[
             styles.plate,

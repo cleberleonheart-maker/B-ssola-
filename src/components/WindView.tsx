@@ -163,17 +163,14 @@ const WindView = ({ active }: Props) => {
     persistWindCal(DEFAULT_WIND_CAL);
   }, [persistWindCal]);
 
+  // sem faixa válida entre zero e forte (calibração invertida ou ausente) não
+  // há escala significantiva: reportar nulo em vez de saturar em 100%
+  const calValid = cal.strong - cal.zero >= 0.02;
   const ratio =
-    value === null
+    value === null || !calValid
       ? 0
-      : Math.max(
-          0,
-          Math.min(
-            1,
-            (value - cal.zero) / Math.max(cal.strong - cal.zero, 0.001),
-          ),
-        );
-  const index = value === null ? null : Math.round(ratio * 100);
+      : Math.max(0, Math.min(1, (value - cal.zero) / (cal.strong - cal.zero)));
+  const index = value === null ? null : calValid ? Math.round(ratio * 100) : null;
 
   const levelColor =
     index === null
@@ -185,7 +182,9 @@ const WindView = ({ active }: Props) => {
           : colors.success;
   const levelLabel =
     index === null
-      ? t('wind_no_signal')
+      ? value === null
+        ? t('wind_no_signal')
+        : t('wind_cal_needed')
       : index >= HIGH_THRESHOLD
         ? t('wind_high')
         : index >= LOW_THRESHOLD
@@ -318,6 +317,12 @@ const WindView = ({ active }: Props) => {
               </Text>
             </Pressable>
           </View>
+
+          {!calValid && (
+            <Text style={[styles.calButtonSub, { color: colors.warning }]}>
+              {t('wind_cal_invalid')}
+            </Text>
+          )}
 
           <View style={styles.actionsRow}>
             <Pressable

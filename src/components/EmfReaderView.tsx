@@ -15,8 +15,9 @@ import { useRepetitiveBeep, soundAvailable } from '../services/sound';
 const SAMPLE_INTERVAL = 200;
 const FILTER_ALPHA = 0.82;
 const SCALE_MAX = 200;
-const LOW_THRESHOLD = 40;
-const HIGH_THRESHOLD = 90;
+// limiares de severidade como fração do desvio do ambiente (ratio 0..1)
+const LOW_THRESHOLD = 0.45;
+const HIGH_THRESHOLD = 0.75;
 const HISTORY_MAX = 90;
 
 const MONO = Platform.select({ ios: 'Menlo', default: 'monospace' });
@@ -40,6 +41,7 @@ const EmfReaderView = ({ active, hasFix, onAdd }: Props) => {
   const [ambient, setAmbient] = useState<number | null>(null);
 
   const filteredRef = useRef(0);
+  const hasSampleRef = useRef(false);
   const subRef = useRef<ReturnType<typeof magnetometer.subscribe> | null>(null);
   const minRef = useRef<number | null>(null);
   const maxRef = useRef<number | null>(null);
@@ -53,6 +55,8 @@ const EmfReaderView = ({ active, hasFix, onAdd }: Props) => {
     }
     setError(false);
     filteredRef.current = 0;
+    hasSampleRef.current = false;
+    setValue(0);
     setUpdateIntervalForType(SensorTypes.magnetometer, SAMPLE_INTERVAL);
     subRef.current = magnetometer.subscribe({
       next: ({ x, y, z }: { x: number; y: number; z: number }) => {
@@ -62,6 +66,7 @@ const EmfReaderView = ({ active, hasFix, onAdd }: Props) => {
             ? raw
             : filteredRef.current * FILTER_ALPHA + raw * (1 - FILTER_ALPHA);
         filteredRef.current = ema;
+        hasSampleRef.current = true;
         const rounded = Math.round(ema * 10) / 10;
         setValue(rounded);
         historyRef.current = [...historyRef.current.slice(-(HISTORY_MAX - 1)), rounded];
@@ -92,6 +97,11 @@ const EmfReaderView = ({ active, hasFix, onAdd }: Props) => {
   }, []);
 
   const captureAmbient = useCallback(() => {
+    // sem amostra real, filteredRef ainda é 0 e gravar isso travaria a escala
+    // em 100%; espera a primeira leitura do magnetômetro
+    if (!hasSampleRef.current) {
+      return;
+    }
     setAmbient(Math.round(filteredRef.current * 10) / 10);
   }, []);
 
@@ -107,16 +117,19 @@ const EmfReaderView = ({ active, hasFix, onAdd }: Props) => {
     ambient === null
       ? Math.max(0, Math.min(1, value / SCALE_MAX))
       : Math.max(0, Math.min(1, delta / span));
+  // nível baseado no desvio do ambiente (mesma medida da barra, do bipe e da
+  // vibração): comparar o valor absoluto com 40/90 µT marca "alto" o tempo
+  // inteiro em regiões de campo magnético alto e nunca reage a anomalias reais
   const levelColor =
-    value >= HIGH_THRESHOLD
+    ratio >= HIGH_THRESHOLD
       ? colors.danger
-      : value >= LOW_THRESHOLD
+      : ratio >= LOW_THRESHOLD
         ? colors.warning
         : colors.success;
   const levelLabel =
-    value >= HIGH_THRESHOLD
+    ratio >= HIGH_THRESHOLD
       ? t('emf_high')
-      : value >= LOW_THRESHOLD
+      : ratio >= LOW_THRESHOLD
         ? t('emf_medium')
         : t('emf_low');
 

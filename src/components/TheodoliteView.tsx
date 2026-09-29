@@ -4,11 +4,13 @@ import {
   Text,
   Pressable,
   StyleSheet,
+  Dimensions,
 } from 'react-native';
 import { useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import { normalizeHeading, cardinalOf } from '../utils/compass';
+import { verticalAngle } from './HeightView';
 
 type Props = {
   heading: number;
@@ -17,12 +19,17 @@ type Props = {
 };
 
 const RETICLE_R = 110;
-const G = 9.80665;
 
 const TheodoliteView = ({ heading, declination, accel }: Props) => {
   const colors = useThemeColors();
   const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
+
+  const landscape = useMemo(() => {
+    const { width, height } = Dimensions.get('window');
+    return width > height;
+  }, []);
+  const vrRaw = verticalAngle(accel, landscape);
 
   const [mode, setMode] = useState<'simple' | 'advanced'>('simple');
   const [held, setHeld] = useState<{ hr: number; vr: number } | null>(null);
@@ -38,7 +45,6 @@ const TheodoliteView = ({ heading, declination, accel }: Props) => {
     : normalizeHeading(heading + declination.degrees);
   const hr = useTrue ? trueHeading : magHeading;
 
-  const vrRaw = Math.asin(Math.max(-1, Math.min(1, -accel.x / G))) * (180 / Math.PI);
   const vr = Math.round(vrRaw * 10) / 10;
 
   const displayHr = held ? held.hr : hr;
@@ -61,13 +67,15 @@ const TheodoliteView = ({ heading, declination, accel }: Props) => {
   }, [hr, vr]);
 
   const mark = useCallback(() => {
+    // grava o valor exibido: com HOLD ativo as marcas devem refletir o que o
+    // usuário está vendo na tela, não o ângulo vivo
     if (markA && !markB) {
-      setMarkB({ hr, vr });
+      setMarkB({ hr: displayHr, vr: displayVr });
     } else {
-      setMarkA({ hr, vr });
+      setMarkA({ hr: displayHr, vr: displayVr });
       setMarkB(null);
     }
-  }, [hr, vr, markA, markB]);
+  }, [displayHr, displayVr, markA, markB]);
 
   const clearMarks = useCallback(() => {
     setMarkA(null);
@@ -154,7 +162,7 @@ const TheodoliteView = ({ heading, declination, accel }: Props) => {
               {displayHr.toFixed(1)}°
             </Text>
             <Text style={[styles.subLabel, { color: colors.textMuted }]}>
-              {cardinal.short} · {useTrue ? t('ui_geo_north') : t('ui_mag_north')} {hr.toFixed(1)}°
+              {cardinal.short} · {useTrue ? t('ui_geo_north') : t('ui_mag_north')} {displayHr.toFixed(1)}°
             </Text>
           </View>
           <View style={[styles.vSep, { backgroundColor: colors.border }]} />

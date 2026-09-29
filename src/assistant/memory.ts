@@ -26,6 +26,13 @@ export const DEFAULT_MEMORY: MemoryState = {
 export const createId = (): string =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
 
+// cópia profunda: facts e history são mutados in-place por pushHistory e pelo
+// engine, então uma cópia rasa faria(DEFAULT_MEMORY) vazar estado entre sessões
+export const cloneMemory = (m: MemoryState): MemoryState => ({
+  facts: { ...m.facts },
+  history: m.history.map(h => ({ ...h })),
+});
+
 export const pushHistory = (
   memory: MemoryState,
   role: 'user' | 'assistant',
@@ -117,7 +124,7 @@ const readLocal = async (): Promise<MemoryState> => {
   try {
     const raw = await migrateKey(LEGACY_STORAGE_KEY, STORAGE_KEY);
     if (!raw) {
-      return { ...DEFAULT_MEMORY };
+      return cloneMemory(DEFAULT_MEMORY);
     }
     const parsed = JSON.parse(raw) as Partial<MemoryState>;
     return {
@@ -128,7 +135,7 @@ const readLocal = async (): Promise<MemoryState> => {
       history: Array.isArray(parsed.history) ? parsed.history : [],
     };
   } catch {
-    return { ...DEFAULT_MEMORY };
+    return cloneMemory(DEFAULT_MEMORY);
   }
 };
 
