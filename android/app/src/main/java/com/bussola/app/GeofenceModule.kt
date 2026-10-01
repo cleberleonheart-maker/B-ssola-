@@ -22,8 +22,10 @@ import java.util.concurrent.ConcurrentHashMap
 class GeofenceReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
     val id = intent.getStringExtra(GeofenceBridge.EXTRA_ID) ?: return
-    val name = intent.getStringExtra(GeofenceBridge.EXTRA_NAME) ?: "waypoint"
-    val title = intent.getStringExtra(GeofenceBridge.EXTRA_TITLE) ?: "Bússola"
+    val name =
+      intent.getStringExtra(GeofenceBridge.EXTRA_NAME)
+        ?: context.getString(R.string.geofence_generic_waypoint)
+    val title = intent.getStringExtra(GeofenceBridge.EXTRA_TITLE)
     GeofenceBridge.notifyArrival(context, id, title, name)
   }
 }
@@ -38,17 +40,22 @@ object GeofenceBridge {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       val channel = NotificationChannel(
         CHANNEL_ID,
-        "Geofence",
+        context.getString(R.string.geofence_channel_name),
         NotificationManager.IMPORTANCE_HIGH,
       ).apply {
-        description = "Avisos ao entrar em áreas de waypoints"
+        description = context.getString(R.string.geofence_channel_desc)
       }
       (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
         .createNotificationChannel(channel)
     }
   }
 
-  fun notifyArrival(context: Context, id: String, title: String, name: String) {
+  /**
+   * `title` chega do JavaScript e por isso já vem no idioma escolhido no app
+   * (via `addGeofence`). O corpo é montado aqui e por isso vai em `strings.xml`:
+   * escrevê-lo em Kotlin fixava o aviso em português mesmo com o app em inglês.
+   */
+  fun notifyArrival(context: Context, id: String, title: String?, name: String) {
     ensureChannel(context)
     val open = PendingIntent.getActivity(
       context,
@@ -57,9 +64,9 @@ object GeofenceBridge {
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
     val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-      .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-      .setContentTitle(title)
-      .setContentText("Você chegou perto de $name")
+      .setSmallIcon(android.R.drawable.ic_stat_alert)
+      .setContentTitle(title ?: context.getString(R.string.geofence_arrived_title))
+      .setContentText(context.getString(R.string.geofence_arrived_text, name))
       .setContentIntent(open)
       .setAutoCancel(true)
       .build()
@@ -141,8 +148,7 @@ class GeofenceModule(private val reactContext: ReactApplicationContext) :
       val intent = Intent(reactContext, GeofenceReceiver::class.java)
         .setAction("com.bussola.app.GEOFENCE")
         .putExtra(GeofenceBridge.EXTRA_ID, id)
-        .putExtra(GeofenceBridge.EXTRA_NAME, activeFlags[id] ?: "waypoint")
-        .putExtra(GeofenceBridge.EXTRA_TITLE, "Bússola")
+        .putExtra(GeofenceBridge.EXTRA_NAME, activeFlags[id] ?: "")
       val pi = PendingIntent.getBroadcast(
         reactContext,
         id.hashCode(),

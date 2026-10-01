@@ -115,7 +115,22 @@ export const buildBackup = async (): Promise<string> => {
   return JSON.stringify(envelope, null, 2);
 };
 
-export type BackupResult = { ok: true } | { ok: false; error: string };
+/**
+ * `invalid` = não é um backup do Bússola (JSON quebrado, `app` errado, `data`
+ * ausente). `unsupported_version` = é um backup, mas de outra geração do
+ * formato. `write_failed` = o arquivo era válido mas uma gravação falhou no
+ * meio (ver `detail`).
+ *
+ * Os três são diferentes na cara do usuário: o primeiro diz "não consegui ler",
+ * o segundo diz "esse arquivo vem de uma versão do app que você não tem" e o
+ * terceiro diz "não consegui gravar". Colapsar os dois primeiros fazia um
+ * backup do futuro ser aplicado como se fosse do presente — o
+ * `!parsed.fileVersion` antigo aceitava 99.
+ */
+export type BackupError = 'invalid' | 'unsupported_version' | 'write_failed';
+export type BackupResult =
+  | { ok: true }
+  | { ok: false; error: BackupError; detail?: string };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -127,8 +142,14 @@ export const applyBackup = async (raw: string): Promise<BackupResult> => {
   } catch {
     return { ok: false, error: 'invalid' };
   }
-  if (!isRecord(parsed) || parsed.app !== 'bussola' || !parsed.fileVersion) {
+  if (!isRecord(parsed) || parsed.app !== 'bussola') {
     return { ok: false, error: 'invalid' };
+  }
+  if (
+    parsed.fileVersion !== BACKUP_FILE_VERSION ||
+    !Number.isInteger(parsed.fileVersion)
+  ) {
+    return { ok: false, error: 'unsupported_version' };
   }
   if (!isRecord(parsed.data)) {
     return { ok: false, error: 'invalid' };
@@ -189,7 +210,8 @@ export const applyBackup = async (raw: string): Promise<BackupResult> => {
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : 'unknown',
+      error: 'write_failed',
+      detail: error instanceof Error ? error.message : 'unknown',
     };
   }
 };

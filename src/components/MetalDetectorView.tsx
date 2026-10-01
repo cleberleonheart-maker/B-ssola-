@@ -18,6 +18,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import { useRepetitiveBeep, soundAvailable } from '../services/sound';
 import {
+  clearMetalCalibration,
   loadMetalCalibration,
   saveMetalCalibration,
 } from '../services/metalCalibrationService';
@@ -147,6 +148,29 @@ const MetalDetectorView = ({ active }: Props) => {
     needleSmoothedRef.current = 0;
     prevDetectedRef.current = false;
     setGuideState('running');
+  }, []);
+
+  /**
+   * Apaga a linha de base e volta ao guia.
+   *
+   * "Re-calibrar" refaz a medição, o que exige 32 amostras com o aparelho
+   * parado e longe de metal. Isso não resolve o caso em que a calibração ficou
+   * boa mas o ambiente mudou (dentro do carro, mesa com objeto de metal, casa
+   * nova): aí o que se quer é esquecer a referência antiga, não medir outra. Sem
+   * isto a única saída era reinstalar o app — `clearMetalCalibration` existia
+   * desde o começo, sem chamador.
+   */
+  const resetBaseline = useCallback(() => {
+    detectorSubRef.current?.unsubscribe();
+    detectorSubRef.current = null;
+    baselineRef.current = 0;
+    setBaseline(0);
+    setDetected(false);
+    setµT(0);
+    setDeviation(0);
+    clearMetalCalibration()
+      .then(() => setGuideState('guide'))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -283,6 +307,13 @@ const MetalDetectorView = ({ active }: Props) => {
                   {t('md_cal_start_detection')}
                 </Text>
               </Pressable>
+              <Pressable
+                onPress={resetBaseline}
+                style={[styles.ghostButton, { borderColor: colors.border }]}>
+                <Text style={[styles.ghostButtonText, { color: colors.textMuted }]}>
+                  {t('md_reset_baseline')}
+                </Text>
+              </Pressable>
             </>
           )}
         </View>
@@ -334,6 +365,13 @@ const MetalDetectorView = ({ active }: Props) => {
             style={[styles.recalButton, { borderColor: colors.border }]}>
             <Text style={[styles.recalText, { color: colors.text }]}>
               {t('md_recal')}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={resetBaseline}
+            style={[styles.recalButton, { borderColor: colors.border }]}>
+            <Text style={[styles.recalText, { color: colors.textMuted }]}>
+              {t('md_reset_baseline')}
             </Text>
           </Pressable>
         </View>
@@ -519,6 +557,17 @@ const createStyles = (_colors: {
     recalText: {
       fontSize: 13,
       fontWeight: '800',
+    },
+    ghostButton: {
+      marginTop: spacing.md,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+      borderRadius: radius.full,
+      borderWidth: 1,
+    },
+    ghostButtonText: {
+      fontSize: 13,
+      fontWeight: '700',
     },
   });
 

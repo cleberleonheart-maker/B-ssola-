@@ -16,6 +16,7 @@ import type { LocationMode } from '../services/locationService';
 import type { AppMode } from '../services/preferencesService';
 import type { Declination } from '../utils/declination';
 import { loadLockPin } from '../services/preferencesService';
+import { BACKUP_FILE_VERSION } from '../services/backupService';
 import { APP_VERSION, APP_VERSION_CODE } from '../version.generated';
 import { checkForUpdate, type AvailableUpdate } from '../services/versionService';
 import { loadSoundPref, saveSoundPref } from '../services/sound';
@@ -254,14 +255,21 @@ const SettingsModal = ({
       setImportVisible(false);
       setImportText('');
       Alert.alert(t('set_backup_import'), t('backup_restored'));
-    } else {
+      return;
+    }
+    if (errorKey.startsWith('write_failed:')) {
       Alert.alert(
         t('set_backup_import'),
-        errorKey === 'invalid'
-          ? t('backup_invalid')
-          : t('backup_error', { error: errorKey }),
+        t('backup_error', { error: errorKey.slice('write_failed:'.length) }),
       );
+      return;
     }
+    Alert.alert(
+      t('set_backup_import'),
+      errorKey === 'unsupported_version'
+        ? t('backup_unsupported_version', { version: BACKUP_FILE_VERSION })
+        : t('backup_invalid'),
+    );
   };
 
   const startPinFlow = (flow: Exclude<PinFlow, null>) => {

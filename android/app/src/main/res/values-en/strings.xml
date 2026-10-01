@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">Bussola</string>
+
+    <string name="geofence_channel_name">Waypoint arrival</string>
+    <string name="geofence_channel_desc">Notifies you when you get close to a saved waypoint</string>
+    <string name="geofence_arrived_title">You have arrived</string>
+    <string name="geofence_arrived_text">You got close to %1$s</string>
+    <string name="geofence_generic_waypoint">waypoint</string>
+
+    <string name="live_channel_name">Live tracking</string>
+    <string name="live_channel_desc">Keeps location sharing running with the screen off</string>
+    <string name="live_active_title">Live tracking active</string>
+    <string name="live_active_text">Sharing your location</string>
+    <string name="live_active_text_remaining">Sharing your location for about %1$d more min</string>
+    <string name="live_stop_action">Stop</string>
+
+    <string name="alerts_channel_name">Civil alerts</string>
+    <string name="alerts_channel_desc">Storm and risk warnings for your area</string>
+    <string name="alerts_fallback_text">Weather alert for your area.</string>
+</resources>

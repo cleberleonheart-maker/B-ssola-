@@ -23,16 +23,42 @@ class ApkDownloaderModule(
 
   override fun getName(): String = "ApkDownloader"
 
+  /** Downloads vivos, por id. `cancel` desliga a flag e fecha a conexão. */
+  private val cancelled = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+  private val connections = java.util.concurrent.ConcurrentHashMap<String, HttpURLConnection>()
+
   private fun emit(event: String, payload: com.facebook.react.bridge.WritableMap) {
     reactContext.emitDeviceEvent(event, payload)
   }
 
+  private fun isCancelled(id: String): Boolean = cancelled[id] == true
+
+  /**
+   * Interrompe um download e apaga o arquivo parcial.
+   *
+   * Sem apagar, o `.apk` truncado fica em Downloads e o próximo "instalar"
+   * pode pegá-lo. Não emitimos evento: quem cancelou (o JS) já está com a
+   * promise rejeitada e um `Done` tarde reabriria a tela de instalação.
+   */
+  @ReactMethod
+  fun cancel(id: String, promise: Promise) {
+    cancelled[id] = true
+    try {
+      connections[id]?.disconnect()
+    } catch (_: Exception) {
+    }
+    connections.remove(id)
+    promise.resolve(true)
+  }
+
   @ReactMethod
   fun download(url: String, fileName: String, id: String, promise: Promise) {
+    cancelled.remove(id)
     Thread {
       var output: java.io.OutputStream? = null
       var connection: HttpURLConnection? = null
       var insertedUri: android.net.Uri? = null
+      var settled = false
       try {
         val safeName = if (fileName.endsWith(".apk")) fileName else "$fileName.apk"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -60,6 +86,7 @@ class ApkDownloaderModule(
           readTimeout = 30000
           instanceFollowRedirects = true
         }
+        connections[id] = connection
         connection.connect()
         val code = connection.responseCode
         if (code !in 200..299) {
@@ -71,6 +98,9 @@ class ApkDownloaderModule(
         var received = 0L
         var lastEmit = 0L
         while (true) {
+          if (isCancelled(id)) {
+            throw IllegalStateException("download_cancelled")
+          }
           val read = input.read(buffer)
           if (read <= 0) break
           output.write(buffer, 0, read)
@@ -89,7 +119,16 @@ class ApkDownloaderModule(
         output.flush()
         output.close()
         output = null
+        connections.remove(id)
         connection.disconnect()
+
+        // Chega aqui depois do `output.close()`, então apagar o arquivo é seguro.
+        if (isCancelled(id)) {
+          deletePartial(insertedUri, safeName)
+          settled = true
+          promise.resolve(false)
+          return@Thread
+        }
 
         val done = Arguments.createMap().apply {
           putString("id", id)
@@ -98,6 +137,7 @@ class ApkDownloaderModule(
           putString("uri", insertedUri?.toString() ?: "")
         }
         emit("ApkDownloaderDone", done)
+        settled = true
         promise.resolve(true)
       } catch (error: Exception) {
         try {
@@ -105,17 +145,52 @@ class ApkDownloaderModule(
         } catch (_: Exception) {
         }
         try {
+          connections.remove(id)
           connection?.disconnect()
         } catch (_: Exception) {
+        }
+        val cancelledDownload = isCancelled(id) ||
+          (error.message ?: "") == "download_cancelled"
+        deletePartial(insertedUri, safeName)
+        cancelled.remove(id)
+        if (cancelledDownload) {
+          // Cancelado: quem pediu o cancelamento já trata do estado da tela.
+          // Emitir `Error` aqui reabriria um erro que o usuário acabou de
+          // resolver fechando o modal.
+          if (!settled) {
+            settled = true
+            promise.resolve(false)
+          }
+          return@Thread
         }
         val fail = Arguments.createMap().apply {
           putString("id", id)
           putString("message", error.message ?: error.toString())
         }
         emit("ApkDownloaderError", fail)
-        promise.reject("download_failed", error.message ?: "Falha ao baixar", error)
+        if (!settled) {
+          settled = true
+          promise.reject("download_failed", error.message ?: "Falha ao baixar", error)
+        }
       }
     }.start()
+  }
+
+  /** Apaga o arquivo meio baixado, seja do MediaStore ou do diretório interno. */
+  private fun deletePartial(insertedUri: android.net.Uri?, fileName: String) {
+    if (insertedUri != null) {
+      try {
+        reactContext.contentResolver.delete(insertedUri, null, null)
+      } catch (_: Exception) {
+      }
+      return
+    }
+    try {
+      val dir = reactContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        ?: reactContext.filesDir
+      File(dir, fileName).delete()
+    } catch (_: Exception) {
+    }
   }
 
   @ReactMethod

@@ -27,6 +27,7 @@ import {
   type RecordedTrack,
 } from '../services/trackService';
 import { ensureCloudUser, pushTracks } from '../services/cloud';
+import { flushOdometer } from '../services/odometerService';
 
 const MIN_SEGMENT_M = 3;
 const MIN_GAP_MS = 1000;
@@ -99,6 +100,11 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
     }
     const pts = pointsRef.current;
     setRecording(false);
+    // Fim de gravação é um ponto de repouso conhecido: o odômetro pode ter até
+    // 1,5 s de distância ainda só no debounce do serviço, e uma trilha recém
+    // salva é exatamente quando se olha o odômetro. Sem isto, o total da tela
+    // podia não bater com a distância da trilha que a pessoa acabou de gravar.
+    flushOdometer().catch(() => {});
     if (pts.length < 2) {
       return;
     }
@@ -115,8 +121,9 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
     saveTrack(track).then(setSaved);
     pointsRef.current = [];
     lastPtRef.current = null;
-    setPoints([]);
+    setRecording(false);
     setElapsed(0);
+    flushOdometer().catch(() => {});
   }, []);
 
   const discard = useCallback(() => {

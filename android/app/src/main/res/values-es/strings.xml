@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">Bussola</string>
+
+    <string name="geofence_channel_name">Llegada a puntos</string>
+    <string name="geofence_channel_desc">Avisa cuando te acercas a un punto guardado</string>
+    <string name="geofence_arrived_title">Has llegado</string>
+    <string name="geofence_arrived_text">Te acercaste a %1$s</string>
+    <string name="geofence_generic_waypoint">punto</string>
+
+    <string name="live_channel_name">Rastreo en vivo</string>
+    <string name="live_channel_desc">Mantiene el rastreo activo con la pantalla apagada</string>
+    <string name="live_active_title">Rastreo en vivo activo</string>
+    <string name="live_active_text">Compartilhando tu ubicación</string>
+    <string name="live_active_text_remaining">Compartilhando tu ubicación unos %1$d min más</string>
+    <string name="live_stop_action">Detener</string>
+
+    <string name="alerts_channel_name">Alertas civiles</string>
+    <string name="alerts_channel_desc">Avisos de tormenta y riesgo en tu región</string>
+    <string name="alerts_fallback_text">Alerta meteorológica en tu región.</string>
+</resources>

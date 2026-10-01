@@ -29,6 +29,30 @@ import { cardinalOf, formatAzimuth } from '../../utils/compass';
 import { createStyles } from './styles';
 import type { ActiveTarget } from './StatusPanels';
 
+/**
+ * Nome de cada modo, para o ErrorBoundary dizer qual travou. São as chaves de
+ * `ui_mode_*`; os emojis fazem parte do texto traduzido, então aparecem no
+ * título do erro como no resto do app.
+ */
+const MODE_LABEL_KEY: Record<DisplayMode, string> = {
+  compass: 'ui_mode_compass',
+  level: 'ui_mode_level',
+  ar: 'ui_mode_ar',
+  camera: 'ui_mode_camera',
+  metal: 'ui_mode_metal',
+  emf: 'ui_mode_emf',
+  theodolite: 'ui_mode_theodolite',
+  sun: 'ui_mode_sun',
+  wind: 'ui_mode_wind',
+  height: 'ui_mode_height',
+  car: 'ui_mode_car',
+  tri: 'ui_mode_tri',
+  track: 'ui_card_track',
+  notes: 'ui_card_notes',
+  odometer: 'ui_card_odometer',
+  selftest: 'ui_card_selftest',
+};
+
 export type DialMarker = { name: string; bearing: number; distance: number };
 
 type Props = {
@@ -97,7 +121,7 @@ const ModeView = (props: Props) => {
   } = props;
 
   return (
-    <>
+    <ErrorBoundary modeLabel={t(MODE_LABEL_KEY[displayMode])}>
       {displayMode === 'compass' ? (
         <View style={styles.dialArea} onLayout={onDialAreaLayout}>
           <CompassDial
@@ -140,18 +164,16 @@ const ModeView = (props: Props) => {
         </View>
       ) : displayMode === 'camera' ? (
         <View style={styles.arArea}>
-          <ErrorBoundary>
-            <CameraARView
-              heading={heading}
-              sun={sun}
-              moon={moon}
-              moonIcon={moonIcon ?? '🌙'}
-              target={target}
-              virtual={virtual}
-              mils={useMils}
-              active
-            />
-          </ErrorBoundary>
+          <CameraARView
+            heading={heading}
+            sun={sun}
+            moon={moon}
+            moonIcon={moonIcon ?? '🌙'}
+            target={target}
+            virtual={virtual}
+            mils={useMils}
+            active
+          />
         </View>
       ) : displayMode === 'metal' ? (
         <View style={styles.arArea}>
@@ -249,7 +271,7 @@ const ModeView = (props: Props) => {
       )}
 
       {statusPanels}
-    </>
+    </ErrorBoundary>
   );
 };
 

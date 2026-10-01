@@ -41,9 +41,9 @@ object LiveTracking {
     val channel =
       NotificationChannel(
         CHANNEL_ID,
-        "Rastreio ao vivo",
+        context.getString(R.string.live_channel_name),
         NotificationManager.IMPORTANCE_LOW,
-      ).apply { description = "Mantem o compartilhamento de local ativo com a tela apagada" }
+      ).apply { description = context.getString(R.string.live_channel_desc) }
     (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
       .createNotificationChannel(channel)
   }
@@ -74,17 +74,21 @@ object LiveTracking {
     val minutes = if (expiresAt > 0) ((expiresAt - System.currentTimeMillis()) / 60000L)
       .coerceAtLeast(0L) else 0L
 
+    // "Compartilhando sua local" — o texto antigo, sem o "ção", ficava
+    // truncado e parecia erro de digitação na notificação que fica na tela por
+    // meia hora. Os textos vêm de strings.xml para sair no idioma do aparelho.
+    val text =
+      if (minutes > 0) context.getString(R.string.live_active_text_remaining, minutes.toInt())
+      else context.getString(R.string.live_active_text)
+
     return NotificationCompat.Builder(context, CHANNEL_ID)
-      .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-      .setContentTitle("Rastreio ao vivo ativo")
-      .setContentText(
-        if (minutes > 0) "Compartilhando sua local por mais ~$minutes min"
-        else "Compartilhando sua local",
-      )
+      .setSmallIcon(android.R.drawable.ic_stat_live)
+      .setContentTitle(context.getString(R.string.live_active_title))
+      .setContentText(text)
       .setOngoing(true)
       .setPriority(NotificationCompat.PRIORITY_LOW)
       .setContentIntent(open)
-      .addAction(0, "Parar", stop)
+      .addAction(0, context.getString(R.string.live_stop_action), stop)
       .build()
   }
 }

@@ -7,6 +7,7 @@ import {
   ScrollView,
   useWindowDimensions,
   Alert,
+  AppState,
   Share,
   Vibration,
   type LayoutChangeEvent,
@@ -84,6 +85,7 @@ import {
 import { buildBackup, applyBackup } from '../services/backupService';
 import {
   addDistance,
+  flushOdometer,
   getTotals,
   type DayTotal,
 } from '../services/odometerService';
@@ -374,7 +376,9 @@ const CompassScreen = () => {
     async (json: string): Promise<string | null> => {
       const result = await applyBackup(json);
       if (!result.ok) {
-        return result.error === 'invalid' ? 'invalid' : result.error;
+        return result.error === 'write_failed'
+          ? `write_failed:${result.detail ?? ''}`
+          : result.error;
       }
       await Promise.all([
         loadAppMode().then(setAppModeState),
@@ -580,6 +584,26 @@ const CompassScreen = () => {
     return () => stopWatchRef.current?.();
   }, [locationMode, applyWatching]);
 
+  /**
+   * A gravação do odômetro é debounced em 1,5 s dentro do serviço. Se o app for
+   * morto nessa janela — `home` e o Android matar o processo, memória baixa, o
+   * usuário forçar-parando — o último trecho de distância some sem aviso, e é
+   * justamente o que a pessoa media. `flushOdometer` existia para isso e não
+   * tinha chamador. Gravar ao sair do foreground não atrapalha nada: o
+   * LiveTracking tem caminho próprio e continua com a sessão aberta.
+   */
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'background' || state === 'inactive') {
+        flushOdometer().catch(() => {});
+      }
+    });
+    return () => {
+      sub.remove();
+      flushOdometer().catch(() => {});
+    };
+  }, []);
+
   useEffect(() => {
     const lat = location.latitude;
     const lon = location.longitude;
@@ -616,7 +640,7 @@ const CompassScreen = () => {
             const key = `${alert.severity}|${alert.event}|${alert.expires ?? 'x'}`;
             if (!notifiedAlertsRef.current.has(key)) {
               notifiedAlertsRef.current.add(key);
-              showAlertNotification(alert);
+              showAlertNotification(alert, t);
             }
           });
       });
@@ -630,7 +654,7 @@ const CompassScreen = () => {
       active = false;
       clearInterval(id);
     };
-  }, [location.latitude, location.longitude]);
+  }, [location.latitude, location.longitude, t]);
 
   useEffect(() => {
     const lat = location.latitude;

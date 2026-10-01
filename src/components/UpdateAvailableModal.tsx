@@ -13,6 +13,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import { APP_VERSION } from '../version.generated';
 import {
+  cancelApkDownload,
   downloadApk,
   installApk,
   isApkDownloaderAvailable,
@@ -28,7 +29,13 @@ type Props = {
   onClose: () => void;
 };
 
-type Status = 'idle' | 'downloading' | 'installing' | 'permission' | 'error';
+type Status =
+  | 'idle'
+  | 'downloading'
+  | 'installing'
+  | 'permission'
+  | 'error'
+  | 'insecure';
 
 const UpdateAvailableModal = ({
   visible,
@@ -45,7 +52,6 @@ const UpdateAvailableModal = ({
   const [percent, setPercent] = useState(0);
   const apkUri = useRef<string | null>(null);
   const running = useRef(false);
-  const startedAuto = useRef(false);
 
   const launchInstall = useCallback(
     (uri: string) => {
@@ -65,16 +71,26 @@ const UpdateAvailableModal = ({
     [onClose],
   );
 
+  const [errorKind, setErrorKind] = useState<'generic' | 'timeout'>('generic');
+
   const openUpdate = useCallback(() => {
     if (running.current) {
       return;
     }
-    if (!isApkDownloaderAvailable() || !isDirectApkUrl(updateUrl)) {
+    if (!isApkDownloaderAvailable()) {
       Linking.openURL(updateUrl).catch(() => {});
+      return;
+    }
+    if (!isDirectApkUrl(updateUrl)) {
+      // URL rejeitada: ou não termina em .apk, ou não é HTTPS. Um link em
+      // texto claro não vai para o navegador em silêncio — isso exporia o
+      // download; o usuário escolhe abrir.
+      setStatus('insecure');
       return;
     }
     running.current = true;
     setStatus('downloading');
+    setErrorKind('generic');
     setPercent(0);
     const fallbackName = `bussola-${versionName.replace(/[^\w.-]+/g, '')}.apk`;
     downloadApk(updateUrl, fallbackName, progress => {
@@ -94,29 +110,42 @@ const UpdateAvailableModal = ({
           running.current = false;
         }
       })
-      .catch(() => {
+      .catch(error => {
+        if (error?.message === 'download_timeout') {
+          setErrorKind('timeout');
+        }
         setStatus('error');
         running.current = false;
       });
   }, [updateUrl, versionName, launchInstall]);
 
+  const cancelDownload = useCallback(() => {
+    if (!running.current) {
+      return;
+    }
+    cancelApkDownload();
+    running.current = false;
+    setStatus('idle');
+    setPercent(0);
+  }, []);
+
+  /**
+   * Sem disparo automático. O modal abre sozinho ao detectar uma versão nova,
+   * e o download começava 700 ms depois — antes de qualquer pessoa conseguir
+   * ler "tem atualização", num aparelho que pode estar em dados móveis. Baixar
+   * dezenas de MB é decisão do usuário, não efeito colateral de abrir o app.
+   */
   useEffect(() => {
     if (!visible) {
-      startedAuto.current = false;
       return;
     }
-    if (startedAuto.current) {
-      return;
-    }
-    if (!isApkDownloaderAvailable() || !isDirectApkUrl(updateUrl)) {
-      return;
-    }
-    startedAuto.current = true;
-    const timer = setTimeout(() => {
-      openUpdate();
-    }, 700);
-    return () => clearTimeout(timer);
-  }, [visible, updateUrl, openUpdate]);
+    return () => {
+      if (running.current) {
+        cancelApkDownload();
+        running.current = false;
+      }
+    };
+  }, [visible]);
 
   const progressWidth: `${number}%` = `${percent}%`;
 
@@ -176,33 +205,52 @@ const UpdateAvailableModal = ({
                 styles.statusText,
                 { color: colors.danger ?? colors.primary },
               ]}>
-              {t('upd_error')}
+              {errorKind === 'timeout' ? t('upd_error_timeout') : t('upd_error')}
             </Text>
           ) : null}
 
-          <Pressable
-            onPress={() => {
-              if (status === 'permission' && apkUri.current) {
-                launchInstall(apkUri.current);
-                return;
-              }
-              openUpdate();
-            }}
-            disabled={status === 'downloading' || status === 'installing'}
-            style={[
-              styles.button,
-              { backgroundColor: colors.primary },
-              (status === 'downloading' || status === 'installing') &&
-                styles.buttonDisabled,
-            ]}>
-            {status === 'downloading' || status === 'installing' ? (
-              <ActivityIndicator color={colors.background} />
-            ) : (
-              <Text style={[styles.buttonText, { color: colors.background }]}>
-                {status === 'error' ? t('upd_retry') : t('upd_install')}
+          {status === 'insecure' ? (
+            <Text
+              style={[
+                styles.statusText,
+                { color: colors.danger ?? colors.primary },
+              ]}>
+              {t('upd_error_http')}
+            </Text>
+          ) : null}
+
+          {status === 'downloading' ? (
+            <Pressable onPress={cancelDownload} style={styles.laterButton}>
+              <Text style={[styles.laterText, { color: colors.textMuted }]}>
+                {t('upd_cancel')}
               </Text>
-            )}
-          </Pressable>
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={() => {
+                if (status === 'permission' && apkUri.current) {
+                  launchInstall(apkUri.current);
+                  return;
+                }
+                openUpdate();
+              }}
+              disabled={status === 'installing'}
+              style={[
+                styles.button,
+                { backgroundColor: colors.primary },
+                status === 'installing' && styles.buttonDisabled,
+              ]}>
+              {status === 'installing' ? (
+                <ActivityIndicator color={colors.background} />
+              ) : (
+                <Text style={[styles.buttonText, { color: colors.background }]}>
+                  {status === 'error' || status === 'insecure'
+                    ? t('upd_retry')
+                    : t('upd_install')}
+                </Text>
+              )}
+            </Pressable>
+          )}
 
           {dismissable && (
             <Pressable onPress={onClose} style={styles.laterButton}>

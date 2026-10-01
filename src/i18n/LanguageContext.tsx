@@ -13,7 +13,7 @@ import { migrateKey } from '../utils/storage';
 const LANG_KEY = '@bussola/kefera/lang';
 const LEGACY_LANG_KEY = '@bussola/virgin/lang';
 
-interface LanguageContextData {
+export interface LanguageContextData {
   lang: Lang;
   setLang: (lang: Lang) => void;
   t: Translator;

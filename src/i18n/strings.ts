@@ -90,6 +90,9 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     ui_card_car: 'Voltar até o carro marcado',
     ui_mode_tri: '📐 Triângulo',
     ui_card_tri: 'Alvo por 2 miras cruzadas',
+    err_mode: 'Erro no modo {mode}',
+    err_retry: 'Tentar de novo',
+    err_copied: 'Detalhes copiados',
     ui_back_home: 'Painel',
     wind_title: 'Índice de vento',
     wind_low: 'Calmo',
@@ -292,6 +295,8 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     backup_invalid: 'Não foi possível ler esse backup.',
     backup_error: 'Erro ao restaurar: {error}',
     backup_notes_hint: 'Observação: as fotos da caderneta não são exportadas (somente texto e coordenadas).',
+    backup_unsupported_version:
+      'Este backup vem de uma versão do app que não reconhece este formato (formato {version}). Atualize o app e tente de novo.',
     set_sound_sensors_sub: 'Bipes de proximidade: detector de metais, nível e EMF',
     set_sound_off: 'Desligados',
 
@@ -491,8 +496,13 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     upd_allow_install: 'Permita "instalar apps desta fonte" e toque em Instalar.',
     upd_retry: 'Tentar de novo',
     upd_error: 'Não foi possível baixar agora.',
+    upd_error_http: 'O link da atualização não é seguro (não é HTTPS). Atualize à mão pelo navegador.',
+    upd_error_timeout: 'O download demorou demais e foi cancelado.',
+    upd_cancel: 'Cancelar',
     upd_later: 'Agora não',
 
+    al_notif_channel: 'Alertas civis',
+    al_notif_fallback: 'Alerta meteorológico na sua região.',
     al_title: 'Alerta civil',
     al_subtitle: 'Ciclones, chuva forte e terremotos na sua região.',
     al_loading: 'Buscando alertas…',
@@ -516,6 +526,7 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     md_clear: 'Limpo',
     md_auto: 'Auto-ajuste',
     md_recal: 'Re-calibrar',
+    md_reset_baseline: 'Esquecer esta linha de base',
 
     emf_title: 'Leitor de campo eletromagnético',
     emf_hint: 'Aponte o aparelho para medir o campo magnético ao redor. Valores em µT.',
@@ -827,6 +838,9 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     ui_card_car: 'Walk back to your parked car',
     ui_mode_tri: '📐 Triangle',
     ui_card_tri: 'Target from two crossed bearings',
+    err_mode: 'Error in {mode} mode',
+    err_retry: 'Try again',
+    err_copied: 'Details copied',
     ui_back_home: 'Panel',
     wind_title: 'Wind index',
     wind_low: 'Calm',
@@ -1029,6 +1043,8 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     backup_invalid: 'Could not read that backup.',
     backup_error: 'Restore error: {error}',
     backup_notes_hint: 'Note: fieldbook photos are not exported (only text and coordinates).',
+    backup_unsupported_version:
+      'This backup comes from an app version that uses a format this build does not read (format {version}). Update the app and try again.',
     set_sound_sensors_sub: 'Proximity beeps: metal detector, level and EMF',
     set_sound_off: 'Off',
 
@@ -1228,8 +1244,13 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     upd_allow_install: 'Allow "install unknown apps" for this app, then tap Install.',
     upd_retry: 'Try again',
     upd_error: 'Could not download right now.',
+    upd_error_http: 'The update link is not secure (not HTTPS). Update by hand in the browser.',
+    upd_error_timeout: 'The download took too long and was cancelled.',
+    upd_cancel: 'Cancel',
     upd_later: 'Not now',
 
+    al_notif_channel: 'Civil alerts',
+    al_notif_fallback: 'Weather alert for your area.',
     al_title: 'Civil alert',
     al_subtitle: 'Cyclones, heavy rain and earthquakes in your region.',
     al_loading: 'Searching for alerts…',
@@ -1253,6 +1274,7 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     md_clear: 'Clear',
     md_auto: 'Auto-tune',
     md_recal: 'Recalibrate',
+    md_reset_baseline: 'Forget this baseline',
 
     emf_title: 'Electromagnetic field reader',
     emf_hint: 'Point the device to measure the magnetic field around it. Values in µT.',
@@ -1563,6 +1585,9 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     ui_card_car: 'Volver hasta el coche marcado',
     ui_mode_tri: '📐 Triángulo',
     ui_card_tri: 'Blanco con 2 miras cruzadas',
+    err_mode: 'Error en el modo {mode}',
+    err_retry: 'Intentar de nuevo',
+    err_copied: 'Detalles copiados',
     ui_back_home: 'Panel',
     wind_title: 'Índice de viento',
     wind_low: 'Calma',
@@ -1765,6 +1790,8 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     backup_invalid: 'No pudimos leer ese respaldo.',
     backup_error: 'Error al restaurar: {error}',
     backup_notes_hint: 'Nota: las fotos de la libreta no se exportan (solo el texto y las coordenadas).',
+    backup_unsupported_version:
+      'Este respaldo viene de una versión de la app cuyo formato esta compilación no lee (formato {version}). Actualiza la app e inténtalo de nuevo.',
     set_sound_sensors_sub: 'Bips de proximidad: detector de metales, nivel y EMF',
     set_sound_off: 'Apagados',
 
@@ -1964,8 +1991,13 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     upd_allow_install: 'Permite "instalar apps de esta fuente" y toca Instalar.',
     upd_retry: 'Intentar de nuevo',
     upd_error: 'No se pudo descargar ahora.',
+    upd_error_http: 'El enlace de la actualización no es seguro (no es HTTPS). Actualiza a mano en el navegador.',
+    upd_error_timeout: 'La descarga tardó demasiado y se canceló.',
+    upd_cancel: 'Cancelar',
     upd_later: 'Ahora no',
 
+    al_notif_channel: 'Alertas civiles',
+    al_notif_fallback: 'Alerta meteorológica en tu región.',
     al_title: 'Alerta civil',
     al_subtitle: 'Ciclones, lluvias fuertes y terremotos en tu región.',
     al_loading: 'Buscando alertas…',
@@ -1989,6 +2021,7 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     md_clear: 'Despejado',
     md_auto: 'Auto-ajuste',
     md_recal: 'Recalibrar',
+    md_reset_baseline: 'Olvidar esta línea base',
 
     emf_title: 'Lector de campo electromagnético',
     emf_hint: 'Apunta el dispositivo para medir el campo magnético a su alrededor. Valores en µT.',

@@ -1,3 +1,24 @@
 <resources>
     <string name="app_name">Bussola</string>
+
+    <!-- Canal e aviso de chegada em waypoints (GeofenceBridge). -->
+    <string name="geofence_channel_name">Chegada a pontos</string>
+    <string name="geofence_channel_desc">Avisa quando você chega perto de um ponto salvo</string>
+    <string name="geofence_arrived_title">Você chegou</string>
+    <string name="geofence_arrived_text">Chegou perto de %1$s</string>
+    <string name="geofence_generic_waypoint">ponto</string>
+
+    <!-- Canal e aviso do rastreio ao vivo (LiveTracking). -->
+    <string name="live_channel_name">Rastreio ao vivo</string>
+    <string name="live_channel_desc">Mantém o compartilhamento de localização ativo com a tela apagada</string>
+    <string name="live_active_title">Rastreio ao vivo ativo</string>
+    <string name="live_active_text">Compartilhando sua localização</string>
+    <string name="live_active_text_remaining">Compartilhando sua localização por mais ~%1$d min</string>
+    <string name="live_stop_action">Parar</string>
+
+    <!-- Canal dos alertas meteorológicos (notifications.ts monta no JS; aqui
+         fica só o fallback que o módulo nativo usa). -->
+    <string name="alerts_channel_name">Alertas civis</string>
+    <string name="alerts_channel_desc">Avisos de tempestade e risco da sua região</string>
+    <string name="alerts_fallback_text">Alerta meteorológico na sua região.</string>
 </resources>
