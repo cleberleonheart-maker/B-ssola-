@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { normalizeHeading } from '../utils/compass';
 import {
   isCloudEnabled,
   ensureCloudUser,
@@ -78,9 +79,32 @@ export const getActiveLiveSession = async (): Promise<LiveSession | null> => {
   }
 };
 
+/**
+ * O *bearing* do GPS so existe quando ha deslocamento; parado, o Android devolve
+ * `null`. O rumo da bussola e sempre disponivel, entao serve de reserva — sem ele
+ * o viewer fica sem rumo justamente na emergencia com o aparelho no bolso.
+ *
+ * Preferimos o GPS quando existe por ser a referencia da plataforma. O rumo da
+ * bussola ja vem com a declinacao aplicada (ver `CompassScreen.handleHeading`),
+ * entao esta no mesmo referencial do resto do app e nao converte de novo.
+ */
+export const resolveLiveHeading = (
+  gpsHeading: number | null | undefined,
+  magneticHeading: number | null | undefined,
+): number | null => {
+  if (gpsHeading != null && Number.isFinite(gpsHeading)) {
+    return gpsHeading;
+  }
+  if (magneticHeading != null && Number.isFinite(magneticHeading)) {
+    return normalizeHeading(magneticHeading);
+  }
+  return null;
+};
+
 export const pushLiveFix = async (
   s: LiveSession,
   fix: LocationFix,
+  magneticHeading: number | null = null,
 ): Promise<boolean> => {
   if (!isCloudEnabled()) return false;
   // A identidade vem sempre daqui, e nao da sessao: o stopLiveShare tambem usa
@@ -94,7 +118,7 @@ export const pushLiveFix = async (
     fix.latitude,
     fix.longitude,
     fix.accuracy ?? null,
-    fix.heading,
+    resolveLiveHeading(fix.heading, magneticHeading),
     s.expiresAt,
   );
 };

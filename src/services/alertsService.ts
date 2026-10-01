@@ -143,12 +143,8 @@ export const fetchNearbyQuakes = async (
         if (mag < minMagnitude) return null;
         let distanceKm: number | null = null;
         if (coords && coords.length >= 2) {
-          distanceKm = haversine(
-            latitude,
-            longitude,
-            coords[1],
-            coords[0],
-          );
+          distanceKm =
+            haversine(latitude, longitude, coords[1], coords[0]) / 1000;
         }
         return {
           mag,

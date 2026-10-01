@@ -89,16 +89,17 @@
 - ✅ **2. Retorno pela trilha** — ✅ feito em v7.4.
 - [ ] **3. POIs na trilha** — marcar pontos de interesse durante a gravação (foto + nota)
       que aparecem desenhados sobre o trajeto.
-- [ ] **4. Waypoint por voz** — "Kefera, marca este ponto como *casa*" cria waypoint sem
-      tirar a mão do aparelho.
-- [ ] **5. Odômetro histórico** — distância acumulada por dia/semana, salva por usuário.
+- [x] **4. Waypoint por voz** — ✅ feito na v7.17: "marca este ponto como X" salva a
+      posição atual sem tirar as mãos do caminho.
+- [x] **5. Odômetro histórico** — ✅ feito na v7.17 (hoje/semana/últimos 7 dias).
 - [ ] **6. Beacon de emergência** — a cada X min envia posição por SMS para contato
       configurado (funciona sem dados móveis, só SMS).
 - [ ] **7. Detecção de queda** — acelerômetro detecta impacto + imobilidade e oferece
       envio automático do SOS.
 - [ ] **8. Contexto no SOS** — incluir rede/carrier e % de bateria no alerta.
 - [ ] **9. Kefera troca modos** — ✅ feito em v7.5: "Kefera, abre o detector de metais" / "modo sol".
-- [ ] **10. Kefera conta o histórico** — "quanto andei hoje?", "qual a trilha mais longa?".
+- [x] **10. Kefera conta o histórico** — ✅ feito na v7.17 (hoje, ontem, semana, trilha
+      mais longa).
 - [ ] **11. Alarme de chegada por voz** — Kefera lembra ao chegar perto de ponto.
 - [ ] **12. Elevação no AR** — além do azimute, indicar se o alvo está acima/abaixo do
       horizonte (usando `accel` no `CameraARView`).
@@ -139,8 +140,7 @@
 ## Ideias novas (23/09/2026, 2ª leva)
 - [ ] **23. "Volte antes do escuro"** — com a trilha gravando, estimar o ritmo e avisar a
       hora-limite de retorno antes do pôr do sol (junta trilha + relógio de sol).
-- [ ] **24. Rastreio ao vivo por link** — gerar link (WhatsApp/família) com a posição em
-      tempo real por X minutos, expira sozinho.
+- [x] **24. Rastreio ao vivo por link** — ✅ feito na v7.19 (30 min, expira sozinho).
 - [ ] **25. Foto com rumo** — na caderneta, guardar junto da foto a direção da bússola
       apontada no momento.
 - [ ] **26. Metrônomo de passo** — bipes de cadência (~120/min) para caminhada no ritmo.
@@ -285,6 +285,26 @@ foram encontrados de verdade, não ideias soltas.
       que funciona. 9 testes em `__tests__/liveTracking.test.ts`.
       **Falta: testar com a tela apagada no aparelho antes de fechar como concluída.**
       Não aumentar o stale do viewer — isso só mascara o sumiço.
+      *Status: código pronto (155), ainda não verificado em campo. Protocolo: instalar o
+      APK do CI, iniciar o rastreio, travar a tela, deixar 2–3 min e ver se a etiqueta
+      fica `● AO VIVO` estável; repetir em segundo plano e com a economia de energia do
+      sistema ligada. Não dá para buildar localmente (#59/#61).*
+
+- [ ] **55b. 💀 Processo morto ≠ timer estrangulado** — a #55 fecha o caso do
+      *throttling*: com o processo promovido, o `setInterval` do `EmergencyModal` volta
+      a puxar. O serviço é `START_STICKY`, então o Android recria o processo se ele
+      morrer — **mas quem faz o push continua sendo o JavaScript**, e o `setInterval`
+      só nasce de novo quando o modal do SOS monta e chama `getActiveLiveSession()`.
+      Ou seja: se o app for morto de vez (não estrangulado), o rastreio continua no
+      `live_shares` com a última posição e o viewer marca `● SEM SINAL` de forma
+      permanente, sem nenhum aviso de que a sessão ainda consta como ativa.
+      **Diferente da #55 e mais grave:** lá o sumiço é temporário, aqui é definitiva
+      enquanto ninguém reabrir o modal. O conserto é mover o push para dentro do
+      `LiveTrackingService` (o serviço passa a ter a própria posição e a fazer o upsert),
+      o que exige location no serviço e não só `startForeground`. Levanta também a
+      questão de expiração: quem apaga a linha quando o prazo passa se o JS não
+      volta? Teste de campo no mesmo roteiro da #55, com o app forçado a morrer
+      (adb kill do processo).
 - [ ] **56. 💥 Relatório de crash** — hoje um erro em produção é invisível; o usuário
       simplesmente vê o app fechar. Sentry daria o stack real.
 - [x] **57. 🧪 Testes dos componentes extraídos** — feito. 12 testes para as primitivas de
@@ -344,8 +364,10 @@ foram encontrados de verdade, não ideias soltas.
       o app em segundo plano (afeta GPS e câmera contínuos).
 - [x] **40. 🧭 Melhoria: rumo inverso sempre visível** — mostrar o rumo de volta em tempo
       real (não só no retorno de trilha), útil em navegação de retorno simples.
-- [ ] **41. 🛠️ Gesture de pinch na Visão** — o vision-camera v5 não expõe pinch; fazer
-      zoom por gesto com react-native-gesture-handler (além do botão ×1–×6).
+- [ ] **41. 🛠️ Gesture de pinch na Visão** — a v7.11 anunciou "pinch (gesto) + botão de
+      zoom", mas só o botão ×1–×6 existe: não há `pinch`/`gesture` em
+      `CameraARView`. O texto da v7.11 está errado; falta de fato o gesto via
+      react-native-gesture-handler (que hoje nem é dependência do projeto).
 - [ ] **42. 🎨 Tema "sol forte"** — tema de alto contraste para leitura outdoor sob sol
       direto (além do Noturno e Neon).
 - [ ] **43. ⚡ Performance: memoizar marcos** — evitar recálculo de distância/rumo de

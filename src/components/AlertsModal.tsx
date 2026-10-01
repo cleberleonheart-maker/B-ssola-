@@ -33,13 +33,13 @@ const AlertsModal = ({ visible, latitude, longitude, onClose }: Props) => {
   const [error, setError] = useState(false);
 
   const load = async () => {
+    setError(false);
     if (latitude === 0 && longitude === 0) {
       setAlerts({ weather: [], quakes: [] });
       setLoading(false);
       return;
     }
     setLoading(true);
-    setError(false);
     try {
       const result = await fetchCivilAlerts(latitude, longitude);
       setAlerts(result);

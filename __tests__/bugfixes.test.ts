@@ -7,6 +7,8 @@ import { cloneMemory, DEFAULT_MEMORY, pushHistory } from '../src/assistant/memor
 import { moonPhase } from '../src/utils/astro';
 import { normalizeHeading } from '../src/utils/compass';
 import { verticalAngle } from '../src/components/HeightView';
+import { simplifyPath } from '../src/services/trackService';
+import { resolveLiveHeading } from '../src/services/liveShareService';
 
 type Vec = { x: number; y: number; z: number };
 
@@ -186,5 +188,127 @@ describe('bug 18: heading wrap used for accessibility', () => {
   it('normalizeHeading folds accumulated rotation into 0-360', () => {
     expect(normalizeHeading(723)).toBeCloseTo(3, 5);
     expect(normalizeHeading(-10)).toBeCloseTo(350, 5);
+  });
+});
+
+describe('bug 19: simplifyPath collapsed every track to 2 points', () => {
+  const line = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      lat: -23.55 + (i / (n - 1)) * 0.01,
+      lon: -46.63 + (i / (n - 1)) * 0.01,
+      alt: 100,
+      ts: 1700000000000 + i * 1000,
+    }));
+
+  it('keeps the endpoints of a straight track', () => {
+    const out = simplifyPath(line(400), 0.00002);
+    expect(out.length).toBe(2);
+    expect(out[0].lat).toBeCloseTo(-23.55, 9);
+    expect(out[out.length - 1].lat).toBeCloseTo(-23.54, 6);
+  });
+
+  it('preserves a real corner instead of cutting across it', () => {
+    const pts = [
+      { lat: 0, lon: 0, alt: null, ts: 1 },
+      { lat: 0, lon: 0.001, alt: null, ts: 2 },
+      { lat: 0.001, lon: 0.001, alt: null, ts: 3 },
+    ];
+    const out = simplifyPath(pts, 0.00001);
+    expect(out.length).toBe(3);
+    expect(out[1].lat).toBeCloseTo(0, 9);
+  });
+
+  it('returns real TrackPoint objects, not wrappers', () => {
+    const out = simplifyPath(line(50), 0.00002);
+    for (const p of out) {
+      expect(typeof p.lat).toBe('number');
+      expect(typeof p.lon).toBe('number');
+    }
+  });
+
+  it('never drops below the two endpoints', () => {
+    const out = simplifyPath(line(200), 0.00002);
+    expect(out.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('treats the tolerance as a distance, not a squared distance', () => {
+    const pts = [
+      { lat: 0, lon: 0, alt: null, ts: 1 },
+      { lat: 0.00005, lon: 0.0005, alt: null, ts: 2 },
+      { lat: 0, lon: 0.001, alt: null, ts: 3 },
+    ];
+    expect(simplifyPath(pts, 1e-5).length).toBe(3);
+    expect(simplifyPath(pts, 1e-3).length).toBe(2);
+  });
+
+  it('keeps detail that a squared tolerance used to throw away', () => {
+    const pts = Array.from({ length: 101 }, (_, i) => ({
+      lat: 0,
+      lon: i * 0.0001,
+      alt: null,
+      ts: 1,
+      jitter: Math.sin(i / 4) * 0.0004,
+    })).map(p => ({ ...p, lat: p.lat + p.jitter }));
+    const out = simplifyPath(pts, 0.00002);
+    expect(out.length).toBeGreaterThan(2);
+  });
+
+  it('aguenta trilha longa sem estourar a pilha', () => {
+    const pts = Array.from({ length: 20000 }, (_, i) => ({
+      lat: -23.55 + Math.sin(i / 9) * 0.0006,
+      lon: -46.63 + i * 0.00002,
+      alt: null,
+      ts: 1700000000000 + i * 4000,
+    }));
+    const out = simplifyPath(pts, 0.00002);
+    expect(out.length).toBeGreaterThan(2);
+    expect(out.length).toBeLessThan(pts.length);
+    expect(out[0]).toBe(pts[0]);
+    expect(out[out.length - 1]).toBe(pts[pts.length - 1]);
+  });
+
+  it('preserva a ordem dos pontos', () => {
+    const pts = Array.from({ length: 500 }, (_, i) => ({
+      lat: 0 + Math.sin(i / 5) * 0.001,
+      lon: i * 0.0001,
+      alt: null,
+      ts: 1,
+    }));
+    const out = simplifyPath(pts, 0.00002);
+    for (let i = 1; i < out.length; i += 1) {
+      expect(out[i].lon).toBeGreaterThan(out[i - 1].lon);
+    }
+  });
+});
+
+describe('bug 20: o viewer ficava sem rumo quando o GPS nao devolve bearing', () => {
+  const h = (g: number | null | undefined, m: number | null | undefined) =>
+    resolveLiveHeading(g, m);
+
+  it('usa o bearing do GPS quando existe', () => {
+    expect(h(42, 187)).toBe(42);
+    expect(h(0, 187)).toBe(0);
+  });
+
+  it('usa o rumo magnetico quando o GPS devolveu null', () => {
+    expect(h(null, 187)).toBe(187);
+    expect(h(undefined, 350)).toBe(350);
+  });
+
+  it('mantem null quando nao ha nenhum dos dois', () => {
+    expect(h(null, null)).toBeNull();
+    expect(h(undefined, undefined)).toBeNull();
+    expect(h(null, NaN)).toBeNull();
+    expect(h(null, Infinity)).toBeNull();
+  });
+
+  it('normaliza o rumo magnetico para 0-360', () => {
+    expect(h(null, 370)).toBeCloseTo(10, 5);
+    expect(h(null, -10)).toBeCloseTo(350, 5);
+    expect(h(null, 725)).toBeCloseTo(5, 5);
+  });
+
+  it('ignora um bearing do GPS invalido e cai na reserva', () => {
+    expect(h(NaN, 187)).toBe(187);
   });
 });

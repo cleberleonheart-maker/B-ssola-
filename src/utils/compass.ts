@@ -16,6 +16,25 @@ export const wrap180 = (deg: number) => {
 export const MILS_PER_DEG = 6400 / 360;
 
 /**
+ * Média de azimutes. Azimute é circular: 350° e 10° ficam a 20° um do outro,
+ * não a 180°, então a média aritmética vira exatamente o oposto do esperado.
+ */
+export const circularMeanHeading = (values: number[]): number => {
+  let sin = 0;
+  let cos = 0;
+  let count = 0;
+  for (const value of values) {
+    if (!Number.isFinite(value)) continue;
+    const rad = (value * Math.PI) / 180;
+    sin += Math.sin(rad);
+    cos += Math.cos(rad);
+    count += 1;
+  }
+  if (count === 0 || (sin === 0 && cos === 0)) return 0;
+  return normalizeHeading((Math.atan2(sin, cos) * 180) / Math.PI);
+};
+
+/**
  * Formata um azimute em graus (000°–360°) ou milésimos militares
  * ("mils", 6400 no círculo completo).
  */

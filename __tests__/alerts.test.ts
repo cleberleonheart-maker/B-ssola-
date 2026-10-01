@@ -1,4 +1,5 @@
 import {
+  fetchNearbyQuakes,
   inmetRings,
   pointInRing,
   parseInmetSeverity,
@@ -64,5 +65,45 @@ describe('parseInmetSeverity', () => {
 
   it('desconhecido -> green', () => {
     expect(parseInmetSeverity('qualquer coisa')).toBe('green');
+  });
+});
+describe('fetchNearbyQuakes', () => {
+  const originalFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const stub = (features: unknown) => {
+    globalThis.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ features }),
+    }) as unknown as typeof fetch;
+  };
+
+  const featureAt = (lon: number, lat: number, mag: number) => ({
+    properties: { mag, place: 'teste', time: 1700000000000 },
+    geometry: { coordinates: [lon, lat, 10] },
+  });
+
+  it('reporta a distancia em km, e nao em metros', async () => {
+    stub([featureAt(-46.63, -23.0, 5)]);
+    const quakes = await fetchNearbyQuakes(-23.55, -46.63);
+    expect(quakes).toHaveLength(1);
+    expect(quakes[0].distanceKm).not.toBeNull();
+    expect(quakes[0].distanceKm as number).toBeGreaterThan(50);
+    expect(quakes[0].distanceKm as number).toBeLessThan(70);
+  });
+
+  it('mantem um terremoto a 50 km, que o filtro em metros descartava', async () => {
+    stub([featureAt(-46.63, -23.0, 5)]);
+    const quakes = await fetchNearbyQuakes(-23.55, -46.63);
+    expect(quakes[0].distanceKm as number).toBeLessThan(1000);
+    expect(quakes).toHaveLength(1);
+  });
+
+  it('descarta um sismo distante alem do raio pedido', async () => {
+    stub([featureAt(-46.63, 10.0, 5)]);
+    expect(await fetchNearbyQuakes(-23.55, -46.63, 1000)).toHaveLength(0);
   });
 });

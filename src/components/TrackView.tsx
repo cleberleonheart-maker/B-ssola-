@@ -73,6 +73,9 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
     if (!location || (location.latitude === 0 && location.longitude === 0)) {
       return;
     }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
     const first: TrackPoint = {
       lat: location.latitude,
       lon: location.longitude,

@@ -130,6 +130,86 @@ describe('sessão de live', () => {
     expect(pushLivePosition.mock.calls[0][5]).toBeNull();
   });
 
+  it('usa o rumo da bussola quando o GPS nao devolve bearing (ideia 54)', async () => {
+    const { service, pushLivePosition } = loadService(1000);
+    const s = await service.startLiveShare(30);
+    await service.pushLiveFix(
+      s!,
+      {
+        latitude: -15.8,
+        longitude: -47.9,
+        accuracy: null,
+        altitude: null,
+        speed: null,
+        provider: null,
+        updatedAt: null,
+        heading: null,
+      },
+      187,
+    );
+    expect(pushLivePosition.mock.calls[0][5]).toBe(187);
+  });
+
+  it('prefere o bearing do GPS quando ele existe', async () => {
+    const { service, pushLivePosition } = loadService(1000);
+    const s = await service.startLiveShare(30);
+    await service.pushLiveFix(
+      s!,
+      {
+        latitude: -15.8,
+        longitude: -47.9,
+        accuracy: null,
+        altitude: null,
+        speed: null,
+        provider: null,
+        updatedAt: null,
+        heading: 42,
+      },
+      187,
+    );
+    expect(pushLivePosition.mock.calls[0][5]).toBe(42);
+  });
+
+  it('normaliza o rumo da bussola antes de enviar', async () => {
+    const { service, pushLivePosition } = loadService(1000);
+    const s = await service.startLiveShare(30);
+    await service.pushLiveFix(
+      s!,
+      {
+        latitude: -15.8,
+        longitude: -47.9,
+        accuracy: null,
+        altitude: null,
+        speed: null,
+        provider: null,
+        updatedAt: null,
+        heading: null,
+      },
+      370,
+    );
+    expect(pushLivePosition.mock.calls[0][5]).toBeCloseTo(10, 5);
+  });
+
+  it('descarta rumo magnetico invalido em vez de mandar NaN', async () => {
+    const { service, pushLivePosition } = loadService(1000);
+    const s = await service.startLiveShare(30);
+    await service.pushLiveFix(
+      s!,
+      {
+        latitude: -15.8,
+        longitude: -47.9,
+        accuracy: null,
+        altitude: null,
+        speed: null,
+        provider: null,
+        updatedAt: null,
+        heading: null,
+      },
+      NaN,
+    );
+    expect(pushLivePosition.mock.calls[0][5]).toBeNull();
+  });
+
   it('usa o mesmo userId no push e na remoção da linha', async () => {
     const { service, pushLivePosition, deleteLiveShareRow } = loadService(1000);
     const s = await service.startLiveShare(30);

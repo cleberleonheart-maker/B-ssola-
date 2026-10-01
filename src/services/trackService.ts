@@ -130,35 +130,37 @@ export const simplifyPath = (
     return (p.lon - projLon) ** 2 + (p.lat - projLat) ** 2;
   };
 
-  const rdp = (
-    pts: TrackPoint[],
-    eps: number,
-  ): TrackPoint[] => {
-    if (pts.length < 3) return pts;
+  const keep = new Set<number>([0, points.length - 1]);
+  const eps = tolerance * tolerance;
+  const stack: number[] = [0, points.length - 1];
+
+  while (stack.length > 0) {
+    const last = stack.pop() as number;
+    const first = stack.pop() as number;
+    if (last - first < 2) {
+      continue;
+    }
     let dmax = 0;
-    let index = 0;
-    for (let i = 1; i < pts.length - 1; i++) {
-      const d = segDist(pts[i], pts[0], pts[pts.length - 1]);
+    let index = -1;
+    for (let i = first + 1; i < last; i += 1) {
+      const d = segDist(points[i], points[first], points[last]);
       if (d > dmax) {
         dmax = d;
         index = i;
       }
     }
-    if (dmax > eps) {
-      const left = rdp(pts.slice(0, index + 1), eps);
-      const right = rdp(pts.slice(index), eps);
-      return left.slice(0, -1).concat(right);
+    if (index < 0 || dmax <= eps) {
+      continue;
     }
-    return [pts[0], pts[pts.length - 1]];
-  };
+    keep.add(index);
+    stack.push(first, index, index, last);
+  }
 
-  type P = { p: TrackPoint; i: number };
-  const indexed: P[] = points.map((p, i) => ({ p, i }));
-  const result = rdp(indexed as unknown as TrackPoint[], tolerance) as unknown as P[];
-  return result
-    .slice()
-    .sort((a, b) => a.i - b.i)
-    .map(it => it.p);
+  const out: TrackPoint[] = [];
+  for (let i = 0; i < points.length; i += 1) {
+    if (keep.has(i)) out.push(points[i]);
+  }
+  return out;
 };
 
 export const formatDuration = (ms: number): string => {

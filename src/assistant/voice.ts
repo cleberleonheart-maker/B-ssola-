@@ -75,6 +75,21 @@ const markIdle = () => {
   }
 };
 
+let idleListenersBound = false;
+
+// Os listeners do Tts são globais: registrá-los a cada `speak` acumulava três
+// subscrições permanentes por fala. `markIdle` é idempotente, então basta
+// ligá-los uma vez.
+const bindIdleListeners = () => {
+  if (idleListenersBound) {
+    return;
+  }
+  idleListenersBound = true;
+  Tts.addEventListener('tts-finish', markIdle);
+  Tts.addEventListener('tts-error', markIdle);
+  Tts.addEventListener('tts-cancel', markIdle);
+};
+
 export const isSpeaking = (): boolean => speaking;
 
 export const whenSpeechIdle = (): Promise<void> =>
@@ -88,9 +103,7 @@ export const speak = async (text: string): Promise<void> => {
     await ensureTts();
     await Tts.stop();
     markSpeaking();
-    Tts.addEventListener('tts-finish', markIdle);
-    Tts.addEventListener('tts-error', markIdle);
-    Tts.addEventListener('tts-cancel', markIdle);
+    bindIdleListeners();
     Tts.speak(text);
   } catch {
     markIdle();

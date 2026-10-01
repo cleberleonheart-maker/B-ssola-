@@ -132,7 +132,13 @@ const MetalDetectorView = ({ active }: Props) => {
           setUpdateIntervalForType(SensorTypes.magnetometer, DETECT_INTERVAL);
         }
       },
-      error: () => {},
+      error: () => {
+        calSubRef.current?.unsubscribe();
+        calSubRef.current = null;
+        setProgress(0);
+        setGuideState('guide');
+        setUpdateIntervalForType(SensorTypes.magnetometer, DETECT_INTERVAL);
+      },
     });
   }, []);
 
@@ -175,7 +181,10 @@ const MetalDetectorView = ({ active }: Props) => {
         setµT(Math.round(ema * 10) / 10);
         setDeviation(Math.round(needleSmoothedRef.current * 10) / 10);
       },
-      error: () => {},
+      error: () => {
+        detectorSubRef.current?.unsubscribe();
+        setGuideState('guide');
+      },
     });
 
     return () => {

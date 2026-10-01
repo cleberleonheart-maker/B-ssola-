@@ -43,10 +43,15 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
 
   const hasFix = location.latitude !== 0 && location.longitude !== 0;
   const locationRef = useRef(location);
+  const headingRef = useRef(heading);
 
   useEffect(() => {
     locationRef.current = location;
   }, [location]);
+
+  useEffect(() => {
+    headingRef.current = heading;
+  }, [heading]);
 
   const shareText = useMemo(() => {
     if (!hasFix) return '🆘';
@@ -139,7 +144,7 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
           return;
         }
         setTick(v => v + 1);
-        void pushLiveFix(s, locationRef.current);
+        void pushLiveFix(s, locationRef.current, headingRef.current);
       }, 10000);
     },
     [clearTicker, endSession],
@@ -167,7 +172,7 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
         return;
       }
       const url = liveLink(s);
-      const sent = await pushLiveFix(s, locationRef.current);
+      const sent = await pushLiveFix(s, locationRef.current, headingRef.current);
       if (!sent) {
         await stopLiveShare(s.token);
         Alert.alert(t('live_title'), t('live_error'));

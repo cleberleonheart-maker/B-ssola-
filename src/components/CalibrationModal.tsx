@@ -27,7 +27,7 @@ import {
   solarOk,
 } from '../services/calibrationService';
 import { solarPosition } from '../utils/astro';
-import { normalizeHeading } from '../utils/compass';
+import { normalizeHeading, circularMeanHeading } from '../utils/compass';
 
 const CAL_INTERVAL = 100;
 const MIN_SAMPLES = 100;
@@ -65,6 +65,7 @@ const CalibrationModal = ({
   const [count, setCount] = useState(0);
   const [coverage, setCoverage] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
 
   const headingRef = useRef(heading);
   useEffect(() => {
@@ -112,7 +113,7 @@ const CalibrationModal = ({
       setMeasureProgress(i);
       if (i >= MEASURE_N) {
         if (measureIvRef.current) clearInterval(measureIvRef.current);
-        const avg = normalizeHeading(acc.reduce((s, v) => s + v, 0) / acc.length);
+        const avg = circularMeanHeading(acc);
         const p = solarPosition(new Date(), latitude, longitude);
         const expected = normalizeHeading(
           p.azimuth - (declinationEnabled ? 0 : declinationDegrees),
@@ -172,11 +173,17 @@ const CalibrationModal = ({
 
   const concluir = useCallback(async () => {
     setSaving(true);
+    setSaveError(false);
     const cal = computeCalibration(collectorRef.current);
-    await saveCalibration(cal);
-    onSave(cal);
-    setSaving(false);
-    onClose();
+    try {
+      await saveCalibration(cal);
+      onSave(cal);
+      onClose();
+    } catch {
+      setSaveError(true);
+    } finally {
+      setSaving(false);
+    }
   }, [onSave, onClose]);
 
   const reset = useCallback(async () => {
@@ -309,6 +316,11 @@ const CalibrationModal = ({
                 {t('cal_reset_btn')}
               </Text>
             </Pressable>
+            {saveError ? (
+              <Text style={[styles.saveErrorText, { color: colors.warning }]}>
+                {t('cal_save_fail')}
+              </Text>
+            ) : null}
             <Pressable
               disabled={!canFinish || saving}
               onPress={concluir}
@@ -391,6 +403,11 @@ const styles = StyleSheet.create({
   progressFill: {
     height: '100%',
     borderRadius: 3,
+  },
+  saveErrorText: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
   },
   actions: {
     flexDirection: 'row',
