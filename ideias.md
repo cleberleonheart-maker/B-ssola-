@@ -97,7 +97,7 @@
 - [ ] **7. Detecção de queda** — acelerômetro detecta impacto + imobilidade e oferece
       envio automático do SOS.
 - [ ] **8. Contexto no SOS** — incluir rede/carrier e % de bateria no alerta.
-- [ ] **9. Kefera troca modos** — ✅ feito em v7.5: "Kefera, abre o detector de metais" / "modo sol".
+- [x] **9. Kefera troca modos** — ✅ feito em v7.5: "Kefera, abre o detector de metais" / "modo sol".
 - [x] **10. Kefera conta o histórico** — ✅ feito na v7.17 (hoje, ontem, semana, trilha
       mais longa).
 - [ ] **11. Alarme de chegada por voz** — Kefera lembra ao chegar perto de ponto.
@@ -272,9 +272,13 @@ foram encontrados de verdade, não ideias soltas.
       atual. Quem salta do cod 80 para o 153 vê uma linha e não sabe o que houve no
       meio. Acumular as entradas entre a última versão vista (guardada no
       AsyncStorage) e a atual.
-- [ ] **54. 🧭 Rumo magnético como reserva** — o `heading` do GPS só vem quando há
-      deslocamento. O `EmergencyModal` já recebe o rumo magnético da bússola; usar como
-      fallback quando o GPS não tem *bearing* deixa o viewer com rumo quase sempre.
+- [x] **54. 🧭 Rumo magnético como reserva** — ✅ feito junto da auditoria pós-v7.26
+      (bug nº 4 do commit `362b41b`). `resolveLiveHeading()` em `liveShareService.ts`
+      prefere o bearing do GPS e cai na bússola magnética quando ele vem `null` — que é
+      o caso do SOS com o aparelho parado no bolso, que é justamente onde o viewer
+      ficava sem rumo. Normaliza para 0-360 e trata NaN/Infinity como ausente. O
+      `EmergencyModal` passa o rumo num ref para o interval de 10 s. 4 testes em
+      `bugfixes.test.ts` + 4 em `liveSession.test.ts`.
 - [ ] **55. ⏱️ Tirar o "SEM SINAL" piscando** — app empurra a cada 10 s e o viewer
       considera stale acima de 25 s. **Causa raiz confirmada: não era folga do viewer.**
       Com o app em background o Android estrangula o `setInterval` e o `LocationManager`
@@ -459,3 +463,45 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       importar um ZIP/JSON com **preview**: "Vai importar: 3 waypoints, 1 trilha,
       declinação, calibrações. Substituir ou mesclar?". Evita sobrescrever dados
       bons por engano.
+
+### Fechado no commit `2d8b204` (7 bugs P0/P1)
+- [x] **71. 📦 Backup aceito sem `fileVersion` válido** — `applyBackup` exigia só
+      `!parsed.fileVersion`, então um `0` ou uma string passavam. Passou a exigir
+      inteiro igual a `BACKUP_FILE_VERSION` (1) e a distinguir `invalid`,
+      `unsupported_version` e `write_failed`; o alerta passa a dizer a versão.
+- [x] **77. 📏 Odómetro perdia leituras ao fechar o app** — a escrita é adiada por
+      debounce e nada forçava o flush. Agora roda no `background`/`inactive` do
+      `AppState`, no cleanup e ao parar ou descartar uma gravação.
+- [x] **⬇️ Atualizador baixava o APK sozinho** — 700 ms depois de aparecer ele
+      começava a usar internet sem o utilizador pedir. Passou a exigir toque, a
+      aceitar só `https:` e a ter timeout de 5 min com cancelar e remoção do
+      ficheiro parcial (idem no `ApkDownloaderModule.kt`).
+- [x] **🌐 Paridade i18n testada por contagem** — `new Set(counts).size === 1`
+      passa com uma chave a faltar em `en` e outra a sobrar em `es`, e como o
+      tradutor cai no português sem aviso o bug é invisível na tela. O teste passa
+      a comparar conjuntos de chaves e a varrer os `t()` usados no código.
+- [x] **🛡️ Um crash no modo matava a tela toda** — o `ErrorBoundary` não existia
+      fora da câmera e não tinha tradução nem "Tentar de novo". Agora envolve os
+      17 modos em `ModeView` e diz que modo falhou.
+- [x] **🧲 Sem forma de esquecer a linha de base do detector** — "Re-calibrar" refaz
+      as 32 amostras, o que não ajuda quando o problema é o ambiente (dentro do
+      carro, mesa com metal). `clearMetalCalibration()` existia sem chamador; ganhou
+      botão próprio.
+- [x] **📢 "Compartilhando sua local"** — typo numa notificação que fica meia hora
+      na tela. Corrigido, e os textos de notificação foram para `strings.xml` com
+      `values-en` e `values-es` novos, para saírem no idioma do aparelho.
+
+### Dívidas abertas do mesmo commit
+- [ ] **71b. 🔐 Verificar SHA-256 do APK antes de instalar** — a descarga passa a ser
+      `https`, o que resolve servidor falso mas não o binário trocado no caminho.
+      Falta `expectedHash` do release + `crypto` no nativo, e um ecrã de
+      "verificando" para não parecer que a instalação falhou.
+- [ ] **78b. 🧪 Testes do cancelamento e do timeout** — `cancelApkDownload()` chama
+      `native.cancel` e o `ApkDownloaderModule` resolve `false`, mas o
+      `downloadApk` só trata `.catch`: se o nativo resolver `false`, a Promise JS
+      fica pendente. Falta tratar `resolve(false)` e testar com temporizador falso.
+- [ ] **81b. 🔨 Compilar o Kotlin** — `ApkDownloaderModule.kt`, `GeofenceModule.kt`
+      e `LiveTrackingModule.kt` só passaram pelo `tsc`, que não valida Java/Kotlin.
+      Falta um `./gradlew assembleDebug` para apanhar o que sobrou.
+- [ ] **82b. 🧪 Testes de `applyBackup`** — a validação do `fileVersion` não tem
+      teste; vale cobrir versão ausente, `0`, string e versão futura.
