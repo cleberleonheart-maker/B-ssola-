@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import CompassScreen from './src/screens/CompassScreen';
 import { ThemeProvider, useThemeColors, useTheme } from './src/theme/ThemeContext';
 import { LanguageProvider } from './src/i18n/LanguageContext';
@@ -12,6 +11,10 @@ import UpdateAvailableModal from './src/components/UpdateAvailableModal';
 import LocationGate from './src/components/LocationGate';
 import LockScreen from './src/components/LockScreen';
 import { loadLockPin } from './src/services/preferencesService';
+import {
+  loadChangelogSeen,
+  markChangelogSeen,
+} from './src/services/changelogSeen';
 import { APP_VERSION_CODE } from './src/version.generated';
 import {
   checkForUpdate,
@@ -19,12 +22,11 @@ import {
   type AvailableUpdate,
 } from './src/services/versionService';
 
-const VERSION_SEEN_KEY = '@bussola/versionSeen';
-
 function Root() {
   const colors = useThemeColors();
   const { theme } = useTheme();
   const [showUpdate, setShowUpdate] = useState(false);
+  const [changelogFrom, setChangelogFrom] = useState<number | null>(null);
   const [availableUpdate, setAvailableUpdate] = useState<AvailableUpdate | null>(
     null,
   );
@@ -51,21 +53,20 @@ function Root() {
   );
 
   useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(VERSION_SEEN_KEY);
-        if (raw === null || parseInt(raw, 10) !== APP_VERSION_CODE) {
-          setShowUpdate(true);
-        }
-      } catch {
-        // ignore storage errors
+    loadChangelogSeen().then(from => {
+      if (from !== APP_VERSION_CODE) {
+        setChangelogFrom(from);
+        setShowUpdate(true);
       }
-      try {
-        await AsyncStorage.setItem(VERSION_SEEN_KEY, String(APP_VERSION_CODE));
-      } catch {
-        // ignore storage errors
-      }
-    })();
+    });
+  }, []);
+
+  // Marcar no fechar, e não no abrir: se o processo morre com o modal na tela,
+  // o intervalo de versões continua guardado e aparece de novo.
+  const closeWhatsNew = useCallback(() => {
+    setShowUpdate(false);
+    setChangelogFrom(null);
+    markChangelogSeen(APP_VERSION_CODE);
   }, []);
 
   useEffect(() => {
@@ -93,7 +94,8 @@ function Root() {
         {lock.unlocked ? <CompassScreen /> : null}
         <WhatsNewModal
           visible={showUpdate}
-          onClose={() => setShowUpdate(false)}
+          lastSeen={changelogFrom}
+          onClose={closeWhatsNew}
         />
         <UpdateAvailableModal
           visible={availableUpdate !== null}

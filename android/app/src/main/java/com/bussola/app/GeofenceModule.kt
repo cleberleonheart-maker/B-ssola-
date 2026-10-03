@@ -64,7 +64,7 @@ object GeofenceBridge {
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
     val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-      .setSmallIcon(android.R.drawable.ic_stat_alert)
+      .setSmallIcon(R.drawable.ic_stat_alert)
       .setContentTitle(title ?: context.getString(R.string.geofence_arrived_title))
       .setContentText(context.getString(R.string.geofence_arrived_text, name))
       .setContentIntent(open)

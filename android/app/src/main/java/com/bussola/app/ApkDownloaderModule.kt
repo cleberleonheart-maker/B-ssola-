@@ -26,6 +26,7 @@ class ApkDownloaderModule(
   /** Downloads vivos, por id. `cancel` desliga a flag e fecha a conexão. */
   private val cancelled = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
   private val connections = java.util.concurrent.ConcurrentHashMap<String, HttpURLConnection>()
+  private val partials = java.util.concurrent.ConcurrentHashMap<String, android.net.Uri>()
 
   private fun emit(event: String, payload: com.facebook.react.bridge.WritableMap) {
     reactContext.emitDeviceEvent(event, payload)
@@ -39,6 +40,10 @@ class ApkDownloaderModule(
    * Sem apagar, o `.apk` truncado fica em Downloads e o próximo "instalar"
    * pode pegá-lo. Não emitimos evento: quem cancelou (o JS) já está com a
    * promise rejeitada e um `Done` tarde reabriria a tela de instalação.
+   *
+   * O `Thread` do download também apaga ao notar a flag, mas ele só acorda no
+   * próximo `read()`. Apagar aqui é o que garante que o ficheiro desapareça já,
+   * mesmo que a thread travada demore a acordar.
    */
   @ReactMethod
   fun cancel(id: String, promise: Promise) {
@@ -48,6 +53,7 @@ class ApkDownloaderModule(
     } catch (_: Exception) {
     }
     connections.remove(id)
+    partials.remove(id)?.let { uri -> deleteUri(uri) }
     promise.resolve(true)
   }
 
@@ -59,8 +65,11 @@ class ApkDownloaderModule(
       var connection: HttpURLConnection? = null
       var insertedUri: android.net.Uri? = null
       var settled = false
+      // Fora do `try`: o `catch` precisa dele para apagar o ficheiro parcial,
+      // e foi declarado dentro do `try` — o `compileDebugKotlin` acusava
+      // "unresolved reference" e nada do módulo compilava.
+      val safeName = if (fileName.endsWith(".apk")) fileName else "$fileName.apk"
       try {
-        val safeName = if (fileName.endsWith(".apk")) fileName else "$fileName.apk"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
           val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, safeName)
@@ -79,6 +88,7 @@ class ApkDownloaderModule(
           if (!fallbackDir.exists()) fallbackDir.mkdirs()
           val file = File(fallbackDir, safeName)
           output = file.outputStream()
+          partials[id] = android.net.Uri.fromFile(file)
         }
 
         connection = (URL(url).openConnection() as HttpURLConnection).apply {
@@ -120,6 +130,7 @@ class ApkDownloaderModule(
         output.close()
         output = null
         connections.remove(id)
+        partials.remove(id)
         connection.disconnect()
 
         // Chega aqui depois do `output.close()`, então apagar o arquivo é seguro.
@@ -151,6 +162,7 @@ class ApkDownloaderModule(
         }
         val cancelledDownload = isCancelled(id) ||
           (error.message ?: "") == "download_cancelled"
+        partials.remove(id)
         deletePartial(insertedUri, safeName)
         cancelled.remove(id)
         if (cancelledDownload) {
@@ -179,16 +191,21 @@ class ApkDownloaderModule(
   /** Apaga o arquivo meio baixado, seja do MediaStore ou do diretório interno. */
   private fun deletePartial(insertedUri: android.net.Uri?, fileName: String) {
     if (insertedUri != null) {
-      try {
-        reactContext.contentResolver.delete(insertedUri, null, null)
-      } catch (_: Exception) {
-      }
+      deleteUri(insertedUri)
       return
     }
     try {
       val dir = reactContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
         ?: reactContext.filesDir
       File(dir, fileName).delete()
+    } catch (_: Exception) {
+    }
+  }
+
+  /** Apaga uma linha do MediaStore, se ela existir. */
+  private fun deleteUri(uri: android.net.Uri) {
+    try {
+      reactContext.contentResolver.delete(uri, null, null)
     } catch (_: Exception) {
     }
   }

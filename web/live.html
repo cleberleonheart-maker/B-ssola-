@@ -125,6 +125,36 @@
       ? '🛑 O rastreio foi encerrado pela pessoa. A posição abaixo é a última recebida.'
       : '🛑 O rastreio foi encerrado.');
   }
+  function post(rpc, body) {
+    var ctl = ('AbortController' in window) ? new AbortController() : null;
+    var guard = setTimeout(function () { if (ctl) ctl.abort(); }, 8000);
+    return fetch(API + '/rest/v1/rpc/' + rpc, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: KEY, Authorization: 'Bearer ' + KEY },
+      body: JSON.stringify(body),
+      signal: ctl ? ctl.signal : undefined,
+    })
+      .then(function (r) {
+        clearTimeout(guard);
+        if (!r.ok) throw new Error('http ' + r.status);
+        return r.status === 204 ? [] : r.json();
+      })
+      .catch(function (e) { clearTimeout(guard); throw e; });
+  }
+  // A posição sumiu por dois motivos que o viewer precisa distinguir: a pessoa
+  // parou (a linha foi apagada) ou o prazo venceu (a linha continua lá, e só a
+  // RPC de posição a esconde). Sem perguntar, todo sumiço virava "🛑 encerrado
+  // pela pessoa" — inclusive o caso em que ninguém encostou no botão.
+  function resolveEnd() {
+    post('get_live_status', { p_token: tkn })
+      .then(function (rows) {
+        var s = rows && rows.length ? rows[0] : null;
+        if (s && s.expired) { expired(); return; }
+        if (s) { schedule(POLL_MS); return; }
+        ended();
+      })
+      .catch(function () { ended(); });
+  }
   function render(p) {
     everHad = true;
     expiresAt = p.expires_at ? new Date(p.expires_at).getTime() : 0;
@@ -151,24 +181,12 @@
   function poll() {
     if (done || busy) return;
     busy = true;
-    var ctl = ('AbortController' in window) ? new AbortController() : null;
-    var guard = setTimeout(function () { if (ctl) ctl.abort(); }, 8000);
-    fetch(API + '/rest/v1/rpc/get_live_position', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: KEY, Authorization: 'Bearer ' + KEY },
-      body: JSON.stringify({ p_token: tkn }),
-      signal: ctl ? ctl.signal : undefined,
-    })
-      .then(function (r) {
-        clearTimeout(guard);
-        if (!r.ok) throw new Error('http ' + r.status);
-        return r.status === 204 ? [] : r.json();
-      })
+    post('get_live_position', { p_token: tkn })
       .then(function (rows) {
         errors = 0;
         showRetry(false);
         if (!rows || !rows.length) {
-          if (everHad) { ended(); return; }
+          if (everHad) { resolveEnd(); return; }
           if (Date.now() - startedAt > MAX_WAIT_MS) { expired(); return; }
           setTag(null);
           showCoords(false);
@@ -180,7 +198,6 @@
         schedule(POLL_MS);
       })
       .catch(function () {
-        clearTimeout(guard);
         errors += 1;
         showRetry(true);
         if (everHad) {

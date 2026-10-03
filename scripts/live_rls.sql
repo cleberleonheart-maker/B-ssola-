@@ -9,8 +9,8 @@
 --  3. A pagina chama get_live_position(token) com a anon key. A funcao
 --     e SECURITY DEFINER e SEMPRE valida: token existe + nao expirou +
 --     retorna apenas lat/lng/heading/accuracy/... Nunca expoe user_id.
---  4. Ao expirar, a funcao devolve vazio -> pagina mostra "expirado".
---     O link morre sozinho.
+--  4. Ao expirar, a funcao devolve vazio -> pagina consulta get_live_status
+--     (que nao devolve coordenada) para dizer "expirou" em vez de "encerrado".
 -- Idempotente. Rode no Supabase > SQL Editor > New query.
 -- ============================================================
 
@@ -94,6 +94,38 @@ $$;
 -- A justica do link eh o token: se expirou ou token errado, devolve vazio.
 -- Concede EXECUTE a anon (pagina web usa anon key + RLS da funcao).
 grant execute on function public.get_live_position(text) to anon, authenticated;
+
+-- ============================================================
+-- Só o estado da sessao, sem coordenada.
+--
+-- A posicao some da resposta por dois motivos que o viewer precisa
+-- distinguir: a pessoa encerrou (a linha foi apagada) ou o prazo venceu
+-- (a linha continua la, e a RPC acima esconde por `expires_at > now()`).
+-- Sem esta funcao o viewer dizia "🛑 encerrado pela pessoa" para um prazo
+-- so cumprido -- o sumico ficava sem explicacao nenhuma.
+--
+-- Devolve carimbos de tempo e nada mais: quem tem o link expirado continua
+-- sem acesso a posicao. A linha expirada fica na tabela de proposito (e o
+-- indice de `expires_at` existe para uma limpeza eventual), porque e ela que
+-- permite essa resposta.
+-- ============================================================
+create or replace function public.get_live_status(p_token text)
+returns table (
+  expires_at timestamptz,
+  updated_at timestamptz,
+  expired boolean
+)
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  select s.expires_at, s.updated_at, s.expires_at <= now()
+  from public.live_shares s
+  where s.token = p_token
+  limit 1;
+$$;
+
+grant execute on function public.get_live_status(text) to anon, authenticated;
 
 -- ============================================================
 -- OPCIONAL — bucket publico "live" para hospedar web/live.html.

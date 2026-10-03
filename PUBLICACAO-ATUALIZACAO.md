@@ -75,10 +75,15 @@ Referência atual (o registro da v125 abaixo é histórico e ficou desatualizado
 
 ## Fluxo automático (recomendado)
 1. Edite `android/app/version.properties` (`versionCode` e `versionName`).
-2. Atualize o changelog em `src/components/WhatsNewModal.tsx` (entrada para o novo
+2. Atualize o changelog em `src/services/changelog.ts` (entrada para o novo
    `versionCode`) e as chaves `wn_*` em `src/i18n/strings.ts` nos 3 idiomas.
-3. `npm run lint && npm run typecheck && npm test` — o CI repete os três como gate.
-4. `git push` na `main`: o workflow builda, assina, publica na tag `bussola-apk`
+3. `./gradlew compileDebugKotlin` a partir de `android/` — o `tsc` não valida
+   Kotlin e já deixou passar APIs removidas do SDK.
+4. `npm run lint && npm run typecheck && npm test` — o CI repete os três como gate.
+5. Se o commit mexer em `scripts/live_rls.sql`, cole o ficheiro no SQL Editor do
+   Supabase: o `publicar-supabase.sh` só mexe em `app_version` e nenhuma das duas
+   RPCs novas chega à nuvem sozinha.
+6. `git push` na `main`: o workflow builda, assina, publica na tag `bussola-apk`
    e grava `app_version` no Supabase.
 
 ## Fluxo local

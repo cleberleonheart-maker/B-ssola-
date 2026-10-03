@@ -9,6 +9,22 @@ export const isCloudEnabled = (): boolean =>
   SUPABASE_ANON_KEY !== 'COLE_A_CHAVE_ANON' &&
   SUPABASE_URL.startsWith('https://');
 
+export type CloudEndpoint = {
+  url: string;
+  anonKey: string;
+};
+
+/**
+ * URL e anon key para quem fala com o Supabase fora do `supabase-js` — hoje
+ * só o `LiveTrackingService`, que faz o push da posição em Kotlin.
+ *
+ * Continua vindo daqui, e não de uma cópia no Kotlin: a RLS de `live_shares`
+ * compara `user_id` com `auth.uid()`, e dois lugares com credenciais diferentes
+ * é exatamente o tipo de armadilha que a v7.22 removendo `LiveSession.userId`.
+ */
+export const cloudEndpoint = (): CloudEndpoint | null =>
+  isCloudEnabled() ? { url: SUPABASE_URL, anonKey: SUPABASE_ANON_KEY } : null;
+
 let client: SupabaseClient | null = null;
 if (isCloudEnabled()) {
   try {
@@ -102,6 +118,25 @@ export const ensureCloudUser = async (): Promise<string | null> => {
     ensurePromise = null;
   }).catch(() => {});
   return ensurePromise;
+};
+
+/**
+ * Token de acesso da sessão (JWT) do usuário da nuvem.
+ *
+ * O `LiveTrackingService` precisa dele para escrever em `live_shares`: a RLS
+ * só aceita `user_id = auth.uid()`, e o `uid()` vem do token, não de um
+ * parâmetro. Sem ele o push nativo voltaria 401 e o rastreio morreria em
+ * silêncio — daí `null` ser tratado como "não dá para subir o serviço".
+ */
+export const getCloudAccessToken = async (): Promise<string | null> => {
+  if (!client) return null;
+  try {
+    const { data } = await withTimeout(client.auth.getSession());
+    const token = data?.session?.access_token;
+    return typeof token === 'string' && token.length > 0 ? token : null;
+  } catch {
+    return null;
+  }
 };
 
 export const fetchCloudMemory = async (

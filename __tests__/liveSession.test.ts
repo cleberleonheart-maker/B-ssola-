@@ -1,4 +1,7 @@
-const loadService = (now: number) => {
+const loadService = (
+  now: number,
+  opts?: { userId?: string | null; cloudEnabled?: boolean },
+) => {
   const store = new Map<string, string>();
   const AsyncStorage = {
     getItem: jest.fn(async (key: string) => store.get(key) ?? null),
@@ -23,10 +26,11 @@ const loadService = (now: number) => {
       _expiresAt: number,
     ) => true,
   );
+  const userId = opts?.userId === undefined ? 'user-1' : opts.userId;
   jest.doMock('@react-native-async-storage/async-storage', () => ({ __esModule: true, default: AsyncStorage }));
   jest.doMock('../src/services/cloud', () => ({
-    isCloudEnabled: jest.fn(() => true),
-    ensureCloudUser: jest.fn(async () => 'user-1'),
+    isCloudEnabled: jest.fn(() => opts?.cloudEnabled !== false),
+    ensureCloudUser: jest.fn(async () => userId),
     pushLivePosition,
     deleteLiveShareRow,
   }));
@@ -227,5 +231,27 @@ describe('sessão de live', () => {
     const pushedUser = pushLivePosition.mock.calls[0][1];
     const deletedUser = deleteLiveShareRow.mock.calls[0][1];
     expect(pushedUser).toBe(deletedUser);
+  });
+
+  // O `LiveTrackingService` grava a posicao em Kotlin e precisa do mesmo id que
+  // o `pushLiveFix` usaria: com um id diferente, a RLS reprovaria o upsert do
+  // servico e o `stopLiveShare` apagaria outra linha.
+  it('entrega ao serviço o token e o userId da sessão', async () => {
+    const { service } = loadService(1000);
+    const s = await service.startLiveShare(30);
+    await expect(service.livePushCredentials(s!)).resolves.toEqual({
+      token: s!.token,
+      userId: 'user-1',
+    });
+  });
+
+  it('nao entrega credencial sem nuvem ou sem usuário', async () => {
+    const semNuvem = loadService(1000, { cloudEnabled: false });
+    const s1 = await semNuvem.service.startLiveShare(30);
+    expect(s1).toBeNull();
+
+    const semUsuario = loadService(1000, { userId: null });
+    const s2 = await semUsuario.service.startLiveShare(30);
+    expect(await semUsuario.service.livePushCredentials(s2!)).toBeNull();
   });
 });

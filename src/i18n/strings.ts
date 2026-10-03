@@ -369,6 +369,9 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     ui_dir_w: 'O',
 
     wn_title: 'Novidades da versão {version}',
+    wn_title_since: 'Novidades desde a versão {code}',
+    wn_subtitle_since: 'O que mudou enquanto o app esteve desatualizado:',
+    wn_build_label: 'Build {code}',
     wn_subtitle: 'Conheça o que foi adicionado no Bússola:',
     wn_cam_title: 'Visão corrigida',
     wn_cam_desc: 'Tela preta da câmera corrigida com reinício automático e visão de segurança.',
@@ -466,6 +469,15 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     wn_livebg_desc: 'O rastreio agora pede permissao de segundo plano e mostra uma notificacao ativa, para continuar enviando sua posicao com a tela desligada.',
     wn_selftestfix_title: '🧪 Autoteste: "mexeu" não é defeito',
     wn_selftestfix_desc: 'O autoteste agora descarta o movimento do toque e separa o aparelho que mexeu do sensor quebrado, com mensagem própria para cada caso.',
+
+    wn_livenative_title: 'Rastreio ao vivo sobrevive ao app fechado',
+    wn_livenative_desc: 'A posição passa a ser enviada pelo serviço do próprio Android, e não mais pelo app. Se o sistema encerrar o Bússola para economizar memória, o rastreio continua e o link não fica parado.',
+    wn_liveexpired_title: 'Fim de rastreio explicado',
+    wn_liveexpired_desc: 'Quem assiste pelo link agora distingue o prazo cumprido de você ter encerrado, em vez de dizer que foi cancelado nos dois casos.',
+    wn_whatsnew_title: 'Novidades de tudo o que ficou para trás',
+    wn_whatsnew_desc: 'A lista de novidades soma as versões que você perdeu enquanto não atualizou, em vez de mostrar só a mais recente.',
+    wn_apkcancel_title: 'Cancelar a atualização não trava mais',
+    wn_apkcancel_desc: 'Cancelar o download do APK volta a tela na hora e o ficheiro meio baixado é apagado, em vez de a tela ficar à espera que o download termine.',
     wn_selftest_title: '🧪 Autoteste dos sensores',
     wn_selftest_desc:
       'Novo modo que verifica no seu aparelho se o acelerometro, o magnetometro e a inclinacao estao funcionando, e mostra os numeros medidos.',
@@ -1117,6 +1129,9 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     ui_dir_w: 'W',
 
     wn_title: 'What is new in version {version}',
+    wn_title_since: 'What changed since build {code}',
+    wn_subtitle_since: 'What changed while the app was out of date:',
+    wn_build_label: 'Build {code}',
     wn_subtitle: 'Check out what was added to Compass:',
     wn_cam_title: 'Fixed camera view',
     wn_cam_desc: 'Black camera screen fixed with automatic restart and safe fallback.',
@@ -1214,6 +1229,15 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     wn_livebg_desc: 'Live tracking now asks for background permission and shows an ongoing notification, so it keeps sending your location while the screen is off.',
     wn_selftestfix_title: '🧪 Self-test: "moved" is not a fault',
     wn_selftestfix_desc: 'The self-test now discards the movement from your tap and tells a phone that moved apart from a broken sensor, with its own message for each case.',
+
+    wn_livenative_title: 'Live tracking survives the app being closed',
+    wn_livenative_desc: 'Your position is now sent by the Android service itself instead of by the app. If the system shuts Bussola down to save memory, tracking carries on and the link never freezes.',
+    wn_liveexpired_title: 'The end of tracking is explained',
+    wn_liveexpired_desc: 'Whoever is following the link now tells the time limit apart from you stopping it, instead of saying it was cancelled either way.',
+    wn_whatsnew_title: 'What is new covers everything you missed',
+    wn_whatsnew_desc: "The what's new list now adds up the versions you missed while not updating, instead of showing only the most recent one.",
+    wn_apkcancel_title: 'Cancelling the update no longer freezes',
+    wn_apkcancel_desc: 'Cancelling the APK download brings the screen back straight away and deletes the half-downloaded file, instead of leaving the screen waiting for the download to end.',
     wn_selftest_title: '🧪 Sensor self-test',
     wn_selftest_desc:
       'New mode that checks on your own phone whether the accelerometer, the magnetometer and the tilt reading actually work, and shows the measured numbers.',
@@ -1864,6 +1888,9 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     ui_dir_w: 'O',
 
     wn_title: 'Novedades de la versión {version}',
+    wn_title_since: 'Novedades desde la versión {code}',
+    wn_subtitle_since: 'Qué cambió mientras la app estuvo desactualizada:',
+    wn_build_label: 'Build {code}',
     wn_subtitle: 'Conoce lo que se añadió a Brújula:',
     wn_cam_title: 'Visión corregida',
     wn_cam_desc: 'Pantalla negra de la cámara corregida con reinicio automático y vista segura.',
@@ -1961,6 +1988,15 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     wn_livebg_desc: 'El rastreo en vivo ahora pide permiso en segundo plano y muestra una notificacion activa, para seguir enviando tu posicion con la pantalla apagada.',
     wn_selftestfix_title: '🧪 Autotest: "se movió" no es un fallo',
     wn_selftestfix_desc: 'El autotest ahora descarta el movimiento del toque y distingue un teléfono que se movió de un sensor roto, con su propio mensaje para cada caso.',
+
+    wn_livenative_title: 'El rastreo en vivo sobrevive a la app cerrada',
+    wn_livenative_desc: 'La posición la envía ahora el propio servicio de Android, y no la app. Si el sistema cierra Bussola para ahorrar memoria, el rastreo sigue y el enlace no se queda quieto.',
+    wn_liveexpired_title: 'El fin del rastreo se explica',
+    wn_liveexpired_desc: 'Quien mira por el enlace ahora distingue el plazo cumplido de que lo detuvieras tú, en vez de decir que se canceló en los dos casos.',
+    wn_whatsnew_title: 'Las novedades cubren todo lo que te perdiste',
+    wn_whatsnew_desc: 'La lista de novedades ahora suma las versiones que perdiste mientras no actualizabas, en vez de mostrar solo la más reciente.',
+    wn_apkcancel_title: 'Cancelar la actualización ya no se congela',
+    wn_apkcancel_desc: 'Cancelar la descarga del APK devuelve la pantalla al instante y borra el archivo a medio descargar, en vez de dejar la pantalla esperando a que termine.',
     wn_selftest_title: '🧪 Autotest de sensores',
     wn_selftest_desc:
       'Nuevo modo que comprueba en tu propio telefono si el acelerometro, el magnetometro y la inclinacion funcionan, y muestra los numeros medidos.',

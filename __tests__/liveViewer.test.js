@@ -147,6 +147,50 @@ describe('viewer do rastreio ao vivo', () => {
     expect(app.nodes.coords.textContent).toMatch(/S 23°/);
   });
 
+  // Sem a RPC de status o viewer tratava prazo cumprido como "a pessoa
+  // encerrou": dois motivos para a posição sumir, um mensaje só.
+  it('diz que expirou quando o prazo venceu e ninguem encerrou', async () => {
+    let positionCalls = 0;
+    const app = boot('#tkn=abc', (url) => {
+      if (String(url).indexOf('get_live_status') >= 0) {
+        return reply([{
+          expires_at: new Date(Date.now() - 1000).toISOString(),
+          updated_at: new Date(Date.now() - 60000).toISOString(),
+          expired: true,
+        }]);
+      }
+      positionCalls += 1;
+      return reply(positionCalls === 1 ? [fix()] : []);
+    });
+    await wait(30);
+    app.again();
+    await wait(30);
+    expect(app.nodes.note.textContent).toMatch(/expirou/i);
+    expect(app.nodes.note.textContent).not.toMatch(/encerrado/i);
+  });
+
+  it('segue tentando quando a linha continua viva e sem posicao', async () => {
+    let positionCalls = 0;
+    const app = boot('#tkn=abc', (url) => {
+      if (String(url).indexOf('get_live_status') >= 0) {
+        return reply([{
+          expires_at: new Date(Date.now() + 600000).toISOString(),
+          updated_at: new Date().toISOString(),
+          expired: false,
+        }]);
+      }
+      positionCalls += 1;
+      return reply(positionCalls === 1 ? [fix()] : []);
+    });
+    await wait(30);
+    app.again();
+    await wait(30);
+    expect(app.nodes.note.textContent).not.toMatch(/encerrado|expirou/i);
+    app.again();
+    await wait(30);
+    expect(positionCalls).toBe(3);
+  });
+
   it('trata erro de rede com estado offline e botão de atualizar', async () => {
     const { nodes } = boot('#tkn=abc', () => Promise.reject(new Error('offline')));
     await wait(30);

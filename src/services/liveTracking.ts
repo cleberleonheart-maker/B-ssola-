@@ -1,4 +1,5 @@
 import { NativeModules, PermissionsAndroid, Platform } from 'react-native';
+import { cloudEndpoint, getCloudAccessToken } from './cloud';
 
 type StartResult = {
   started: boolean;
@@ -6,53 +7,105 @@ type StartResult = {
 };
 
 type LiveTrackingNative = {
-  start: (expiresAt: number) => Promise<StartResult>;
+  start: (config: NativeTrackingConfig) => Promise<StartResult>;
   stop: () => Promise<boolean>;
   hasBackgroundLocation: () => Promise<boolean>;
 };
 
-// Resolvido na chamada, e nao no carregamento do modulo: registrar o
-// pacote nativo pode acontecer depois do bundle comecar, e a captura
-// anticipada prenderia um `undefined` para sempre.
-const getNative = (): LiveTrackingNative | undefined =>
-  NativeModules.LiveTracking as LiveTrackingNative | undefined;
+/** Espelha o que o `LiveTrackingService` le do Intent. */
+type NativeTrackingConfig = {
+  token: string;
+  userId: string;
+  accessToken: string;
+  url: string;
+  anonKey: string;
+  expiresAt: number;
+};
+
+export type LiveTrackingRequest = {
+  /** Token da sessao (`lnv...`): a chave da linha em `live_shares`. */
+  token: string;
+  /** Mesmo id que o `pushLiveFix` usaria — a RLS exige `user_id = auth.uid()`. */
+  userId: string;
+  expiresAt: number;
+};
+
+/** Quem esta gravando a posicao na tabela. */
+export type LiveTrackingOwner = 'service' | 'js';
 
 export type LiveTrackingResult = {
-  /** O foreground service subiu, ou seja, o timer do JS deve sobreviver. */
+  /** O servico subiu e ele proprio faz o push. */
   foreground: boolean;
   /** A permissão de localização em background está concedida. */
   backgroundLocation: boolean;
+  /**
+   * `'service'` quando o nativo assume o push. `'js'` no iOS, sem permissao ou
+   * sem credencial: ai o `setInterval` do modal continua sendo quem envia, e so
+   * funciona com o app aberto — que e o que o aviso de permissao ja diz.
+   */
+  owner: LiveTrackingOwner;
 };
 
-const unavailable: LiveTrackingResult = {
+// Resolvido na chamada, e nao no carregamento do modulo: registrar o
+// pacote nativo pode acontecer depois do bundle comecar, e a captura
+// antecipada prenderia um `undefined` para sempre.
+const getNative = (): LiveTrackingNative | undefined =>
+  NativeModules.LiveTracking as LiveTrackingNative | undefined;
+
+const jsFallback = (backgroundLocation: boolean): LiveTrackingResult => ({
   foreground: false,
-  backgroundLocation: false,
-};
+  backgroundLocation,
+  owner: 'js',
+});
 
 /**
- * Mantém o rastreio ao vivo funcionando com a tela apagada.
+ * Sobe o foreground service, que passa a ser dono da posição.
  *
- * O push é um `setInterval` de JavaScript. Sem foreground service o Android
- * estrangula esse timer e o `LocationManager` para de entregar fix assim que
- * o app sai de foreground — que é justamente o caso de uso, com o aparelho no
- * bolso. O serviço nativo só promove o processo; o push continua no JS.
+ * Antes o servico so mantinha o processo vivo e quem fazia o push era o
+ * `setInterval` do JavaScript. Isso resolve o estrangulamento de timer com o
+ * app em background, mas nao o processo morto: START_STICKY traz o processo de
+ * volta e o `setInterval` so nasce de novo quando o modal do SOS monta — ate
+ * la, a linha em `live_shares` ficava parada e quem assistia via "SEM SINAL"
+ * sem nenhuma pista de que a sessao seguia ativa.
+ *
+ * Com o push no servico a posicao nao depende mais do JS existir. O primeiro
+ * fix continua sendo enviado pelo JS antes disto: e o que aborta a sessao se o
+ * upsert falhar (v7.20), e o servico assume a partir do segundo.
  */
 export const startLiveTracking = async (
-  expiresAt: number,
+  req: LiveTrackingRequest,
 ): Promise<LiveTrackingResult> => {
   const native = getNative();
-  if (Platform.OS !== 'android' || !native) return unavailable;
+  if (Platform.OS !== 'android' || !native) return jsFallback(false);
 
-  let backgroundLocation = await native.hasBackgroundLocation().catch(() => false);
+  // Sem endpoint ou sem JWT o push nativo volta 401 e o rastreio morre em
+  // silencio: melhor o JS assumir, que pelo menos da para avisar o usuario.
+  const endpoint = cloudEndpoint();
+  const accessToken = await getCloudAccessToken().catch(() => null);
+  if (!endpoint || !accessToken) return jsFallback(false);
+
+  let backgroundLocation = await native
+    .hasBackgroundLocation()
+    .catch(() => false);
   if (!backgroundLocation) {
     backgroundLocation = await requestBackgroundLocation();
   }
-  if (!backgroundLocation) return { foreground: false, backgroundLocation: false };
+  if (!backgroundLocation) return jsFallback(false);
 
-  const res = await native.start(expiresAt).catch(() => null);
+  const config: NativeTrackingConfig = {
+    token: req.token,
+    userId: req.userId,
+    accessToken,
+    url: endpoint.url,
+    anonKey: endpoint.anonKey,
+    expiresAt: req.expiresAt,
+  };
+
+  const res = await native.start(config).catch(() => null);
   return {
     foreground: res?.started === true,
     backgroundLocation: res?.backgroundLocation !== false,
+    owner: res?.started === true ? 'service' : 'js',
   };
 };
 

@@ -123,6 +123,22 @@ export const pushLiveFix = async (
   );
 };
 
+/**
+ * O que o `LiveTrackingService` precisa para assumir o push: o token da linha e
+ * o `user_id` que a RLS vai comparar com o `auth.uid()` do JWT.
+ *
+ * Sai daqui, e nao do modal, para o id continuar vindo de uma fonte so — o
+ * `pushLiveFix` e o `stopLiveShare` usam o mesmo `ensureCloudUser()`, e foi
+ * justamente um id guardado na sessao que deixou a linha orfa na v7.22.
+ */
+export const livePushCredentials = async (
+  s: LiveSession,
+): Promise<{ token: string; userId: string } | null> => {
+  if (!isCloudEnabled()) return null;
+  const userId = await ensureCloudUser();
+  return userId ? { token: s.token, userId } : null;
+};
+
 export const shareLiveLink = async (s: LiveSession): Promise<void> => {
   const url = liveLink(s);
   try {

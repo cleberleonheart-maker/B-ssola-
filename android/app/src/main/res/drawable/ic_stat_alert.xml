@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Ícone da notificação de geofence.
+
+  `android.R.drawable.ic_stat_alert` não existe no SDK público: `android.R.drawable`
+  tem 174 campos e nenhum deles é `ic_stat_*` (são recursos `@hide`). O
+  `compileDebugKotlin` acusava "unresolved reference" e nada do módulo compilava.
+  O nome do ficheiro fica igual ao que o código usava, para o diff ser legível.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,2L1,21h22L12,2zM13,18h-2v-2h2v2zM13,14h-2v-4h2v4z" />
+</vector>

@@ -55,7 +55,22 @@ const fileNameFromUrl = (url: string, fallback: string): string => {
  */
 const DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000;
 
-let activeDownloadId: string | null = null;
+/**
+ * O nativo sinaliza cancelamento resolvendo `false`, não rejeitando. Só tratar
+ * `.catch` deixava a promise pendurada: o modal voltava a "inativo" mas o
+ * `await` ficava preso até o timeout de 5 min. Guardamos também quem rejeita,
+ * para o cancelamento feito pelo próprio app resolver por aqui em vez de
+ * esperar o nativo.
+ */
+type ActiveDownload = {
+  id: string;
+  reject: (error: Error) => void;
+};
+
+let active: ActiveDownload | null = null;
+
+/** Motivo do cancelamento: o utilizador, ou o timeout de 5 min. */
+export type ApkCancelReason = 'download_cancelled' | 'download_timeout';
 
 export const downloadApk = (
   url: string,
@@ -67,7 +82,6 @@ export const downloadApk = (
   }
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const name = fileNameFromUrl(url, fileName.endsWith('.apk') ? fileName : `${fileName}.apk`);
-  activeDownloadId = id;
 
   return new Promise<ApkDownloadResult>((resolve, reject) => {
     let settled = false;
@@ -79,8 +93,8 @@ export const downloadApk = (
         timer = null;
       }
       subs.forEach(sub => sub.remove());
-      if (activeDownloadId === id) {
-        activeDownloadId = null;
+      if (active?.id === id) {
+        active = null;
       }
     };
     const settle = (fn: () => void) => {
@@ -105,28 +119,48 @@ export const downloadApk = (
       }),
     ];
 
+    active = { id, reject: error => settle(() => reject(error)) };
+
     timer = setTimeout(() => {
-      cancelApkDownload();
-      settle(() => reject(new Error('download_timeout')));
+      // O motivo importa: o modal distingue "esgotou o tempo" de "o utilizador
+      // cancelou", e só o primeiro mostra o aviso de tentar de novo.
+      cancelApkDownload('download_timeout');
     }, DOWNLOAD_TIMEOUT_MS);
 
-    native.download(url, name, id).catch(error => {
-      settle(() => reject(error));
-    });
+    native.download(url, name, id).then(
+      finished => {
+        // `false` = o nativo foi interrompido. Sem isto a promise ficava
+        // pendurada quando o cancelamento vinha do timeout ou de outro caller.
+        if (!finished) {
+          settle(() => reject(new Error('download_cancelled')));
+        }
+      },
+      error => {
+        settle(() => reject(error));
+      },
+    );
   });
 };
 
 /**
  * Cancela o download em curso. Apaga também o arquivo parcial: sem isso o
- * `.apk` truncado fica na pasta Downloads, e o próximo "instalar" podría
+ * `.apk` truncado fica na pasta Downloads, e o próximo "instalar" poderia
  * pegá-lo. O nativo ignora o evento `Done`/`Error` que chegar depois.
+ *
+ * Rejeita a promise por aqui, e não à espera do `resolve(false)` do nativo, para
+ * a tela responder na hora.
  */
-export const cancelApkDownload = (): void => {
-  const id = activeDownloadId;
-  if (!id || !native?.cancel) {
+export const cancelApkDownload = (
+  reason: ApkCancelReason = 'download_cancelled',
+): void => {
+  const current = active;
+  if (!current) {
     return;
   }
-  native.cancel(id).catch(() => {});
+  if (native?.cancel) {
+    native.cancel(current.id).catch(() => {});
+  }
+  current.reject(new Error(reason));
 };
 
 export const installApk = (uri: string): Promise<boolean> => {

@@ -111,6 +111,12 @@ const UpdateAvailableModal = ({
         }
       })
       .catch(error => {
+        // `download_cancelled` é o nosso próprio cancelamento ou o timeout:
+        // a tela já voltou a "inativo", e marcar "erro" aqui mostraria um
+        // aviso que o usuário acabou de provocar de propósito.
+        if (error?.message === 'download_cancelled') {
+          return;
+        }
         if (error?.message === 'download_timeout') {
           setErrorKind('timeout');
         }

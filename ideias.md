@@ -491,17 +491,61 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       na tela. Corrigido, e os textos de notificação foram para `strings.xml` com
       `values-en` e `values-es` novos, para saírem no idioma do aparelho.
 
+### Fechadas do mesmo commit (v7.27)
+- [x] **83. 📡 Push do rastreio ao vivo morria com o processo morto** — o
+      foreground service só mantinha o processo vivo e quem enviava a posição era
+      o `setInterval` do JS. Com `START_STICKY` o processo voltava, mas o timer
+      só nasce de novo quando o modal do SOS monta, e até lá a linha ficava
+      parada. Agora o serviço faz o push (`LiveTrackingSession.kt`), com
+      `START_REDELIVER_INTENT` e sem Intent completo o serviço não sobe em vez
+      de derrubar 401 a cada 10 s em silêncio. O JS só manda o primeiro fix e
+      passa a contar a contagem decrescente — `ownerRef` evita dois autores a
+      oscilar o `updated_at`.
+- [x] **84. 🔐 Push nativo sem JWT e sem o par url/anon key** — a RLS de
+      `live_shares` compara `user_id` com `auth.uid()`, que vem do token, não de
+      um parâmetro. `getCloudAccessToken()` e `cloudEndpoint()` dão o par ao
+      nativo a partir da mesma fonte do `supabase-js`, e sem credencial o
+      rastreio cai para o JS, que pelo menos avisa.
+- [x] **85. 📝 "Novidades" mostrava só a última versão** — quem ficava desatualizado
+      nunca via o que tinha perdido, e o build visto era gravado ao *abrir* o
+      app: matar o processo com o modal na tela perdia o intervalo para sempre.
+      Agora `changelogBetween()` acumula o intervalo e grava-se ao fechar.
+- [x] **86. ⏰ Fim de rastreio sem explicação** — a posição some por dois motivos e
+      o viewer dizia "🛑 encerrado pela pessoa" nos dois, inclusive no prazo só
+      cumprido. Nova RPC `get_live_status` (devolve carimbos, nunca coordenada)
+      e `resolveEnd()` no `web/live.html`.
+- [x] **78b. 🧪 Testes do cancelamento e do timeout** — fechado junto com o bug:
+      o `downloadApk` agora rejeita por aqui quando o nativo resolve `false`, e o
+      `UpdateAvailableModal` distingue `download_cancelled` de
+      `download_timeout` para não mostrar um erro que o próprio utilizador
+      provocou. Coberto por `__tests__/apkUpdate.test.ts`.
+- [x] **81b. 🔨 Compilar o Kotlin** — fechado. `./gradlew compileDebugKotlin`
+      acusou três coisas que o `tsc` nunca veria: `android.R.drawable.ic_stat_live`
+      e `ic_stat_alert` nunca estiveram no SDK público (`android.R.drawable` tem
+      174 campos e nenhum é `ic_stat_*`; são recursos `@hide`), e este código
+      vinha deles — agora são `R.drawable.*` com dois vetores próprios; `val
+      safeName` estava declarado dentro do `try` e usado no `catch`; e o
+      `GeomagneticField` desta leva, que também é `@hide`, saiu — o
+      `resolveLiveHeading` passou a seguir a mesma ordem de preferência do JS, senão
+      a agulha saltava no instante em que o serviço assumia.
+- [x] **82b. 🧪 Testes de `applyBackup`** — fechado: `__tests__/backupService.test.ts`
+      cobre versão ausente, `0`, string, versão futura e a gravação.
+
 ### Dívidas abertas do mesmo commit
 - [ ] **71b. 🔐 Verificar SHA-256 do APK antes de instalar** — a descarga passa a ser
       `https`, o que resolve servidor falso mas não o binário trocado no caminho.
       Falta `expectedHash` do release + `crypto` no nativo, e um ecrã de
       "verificando" para não parecer que a instalação falhou.
-- [ ] **78b. 🧪 Testes do cancelamento e do timeout** — `cancelApkDownload()` chama
-      `native.cancel` e o `ApkDownloaderModule` resolve `false`, mas o
-      `downloadApk` só trata `.catch`: se o nativo resolver `false`, a Promise JS
-      fica pendente. Falta tratar `resolve(false)` e testar com temporizador falso.
-- [ ] **81b. 🔨 Compilar o Kotlin** — `ApkDownloaderModule.kt`, `GeofenceModule.kt`
-      e `LiveTrackingModule.kt` só passaram pelo `tsc`, que não valida Java/Kotlin.
-      Falta um `./gradlew assembleDebug` para apanhar o que sobrou.
-- [ ] **82b. 🧪 Testes de `applyBackup`** — a validação do `fileVersion` não tem
-      teste; vale cobrir versão ausente, `0`, string e versão futura.
+- [ ] **87. 🧨 `get_live_status` só funciona depois de aplicada no Supabase** —
+      aplicada no SQL Editor a 2026-10-03. O que fica é o processo: o
+      `publicar-supabase.sh` só mexe em `app_version` e nenhuma das RPCs chega à
+      nuvem sozinha, e o `publicar.sh` local idem. Vale um `./scripts/publicar-rls.sh`
+      com a service_role, ou um passo no `publicar.sh`, antes que a próxima RPC
+      volta a ficar só no repositório.
+- [ ] **88. 🧪 Testes do serviço nativo** — o `compileDebugKotlin` garante que
+      compila, não que `pushLivePosition` faz o upsert certo nem que o
+      `START_REDELIVER_INTENT` traz o Intent de volta. Nenhum dos dois é testável
+      em JVM sem extrair o parsing e o payload, que já são funções fora da classe.
+- [ ] **89. 🧭 Dois rumos para a mesma linha** — `resolveLiveHeading` do JS e o do
+      Kotlin concordam por construção agora, mas nada impede que o próximo que
+      mexer num mexa só num. Vale um teste de paridade sobre os dois.

@@ -14,6 +14,7 @@ import {
   startLiveShare,
   stopLiveShare,
   pushLiveFix,
+  livePushCredentials,
   liveLink,
   liveCountdown,
   getActiveLiveSession,
@@ -22,6 +23,8 @@ import {
 import {
   startLiveTracking,
   stopLiveTracking,
+  hasBackgroundLocation,
+  type LiveTrackingOwner,
 } from '../services/liveTracking';
 import { useTheme } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -114,6 +117,12 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
   const [, setTick] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionRef = useRef<LiveSession | null>(null);
+  /**
+   * Quem esta gravando a posicao. Com o servico no ar, ele e o dono e este
+   * `setInterval` vira so a contagem regressiva: dois autores na mesma linha
+   * fariam o `updated_at` oscilar e o viewer a piscar entre eles.
+   */
+  const ownerRef = useRef<LiveTrackingOwner>('js');
 
   const clearTicker = useCallback(() => {
     if (timerRef.current) {
@@ -134,9 +143,10 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
   );
 
   const startTicker = useCallback(
-    (s: LiveSession) => {
+    (s: LiveSession, owner: LiveTrackingOwner) => {
       clearTicker();
       sessionRef.current = s;
+      ownerRef.current = owner;
       setLiveSession(s);
       timerRef.current = setInterval(() => {
         if (Date.now() > s.expiresAt) {
@@ -144,23 +154,55 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
           return;
         }
         setTick(v => v + 1);
-        void pushLiveFix(s, locationRef.current, headingRef.current);
+        if (ownerRef.current === 'js') {
+          void pushLiveFix(s, locationRef.current, headingRef.current);
+        }
       }, 10000);
     },
     [clearTicker, endSession],
+  );
+
+  /**
+   * Sobe o servico que assume o push e devolve quem ficou com a posicao.
+   *
+   * `prompt` e `false` na retomada: reabrir o app e abrir o modal do SOS nao
+   * pode arrancar um dialogo de permissao na cara de quem so esta olhando a
+   * tela. Sem permissao o dono volta a ser o JS e o rastreio segue valendo com
+   * o app aberto, que e o que o aviso abaixo diz.
+   */
+  const ensureService = useCallback(
+    async (
+      s: LiveSession,
+      prompt: boolean,
+    ): Promise<LiveTrackingOwner> => {
+      if (!prompt && !(await hasBackgroundLocation())) return 'js';
+      const credentials = await livePushCredentials(s);
+      if (!credentials) return 'js';
+      const tracking = await startLiveTracking({
+        ...credentials,
+        expiresAt: s.expiresAt,
+      });
+      if (tracking.owner === 'service' && !tracking.backgroundLocation) {
+        Alert.alert(t('live_title'), t('live_bg_denied'));
+      }
+      return tracking.owner;
+    },
+    [t],
   );
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       const active = await getActiveLiveSession();
-      if (mounted && active) startTicker(active);
+      if (!mounted || !active) return;
+      const owner = await ensureService(active, false);
+      if (mounted) startTicker(active, owner);
     })();
     return () => {
       mounted = false;
       clearTicker();
     };
-  }, [clearTicker, startTicker]);
+  }, [clearTicker, ensureService, startTicker]);
 
   const startLive = async () => {
     if (!hasFix || liveBusy || sessionRef.current) return;
@@ -172,17 +214,16 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
         return;
       }
       const url = liveLink(s);
+      // O primeiro fix continua sendo do JS: e o que aborta a sessao se o
+      // upsert falhar, em vez de mandar um link que ninguem vai ver.
       const sent = await pushLiveFix(s, locationRef.current, headingRef.current);
       if (!sent) {
         await stopLiveShare(s.token);
         Alert.alert(t('live_title'), t('live_error'));
         return;
       }
-      startTicker(s);
-      const tracking = await startLiveTracking(s.expiresAt);
-      if (!tracking.backgroundLocation) {
-        Alert.alert(t('live_title'), t('live_bg_denied'));
-      }
+      const owner = await ensureService(s, true);
+      startTicker(s, owner);
       try {
         await Share.share({ message: t('live_shared') + ' ' + url });
       } catch {}

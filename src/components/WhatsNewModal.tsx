@@ -11,120 +11,26 @@ import { useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import { APP_VERSION, APP_VERSION_CODE } from '../version.generated';
-import type { Translator } from '../i18n/strings';
-
-type Entry = { icon: string; title: string; desc: string };
-
-const CHANGELOG: Record<number, (t: Translator) => Entry[]> = {
-  157: t => [
-    { icon: '🧪', title: t('wn_selftestfix_title'), desc: t('wn_selftestfix_desc') },
-  ],
-  156: t => [
-    { icon: '🧪', title: t('wn_selftest_title'), desc: t('wn_selftest_desc') },
-  ],
-  155: t => [
-    { icon: '📡', title: t('wn_livebg_title'), desc: t('wn_livebg_desc') },
-  ],
-  154: t => [
-    { icon: '☀️', title: t('wn_calverify_title'), desc: t('wn_calverify_desc') },
-  ],
-  153: t => [
-    { icon: '🧭', title: t('wn_livesrumo_title'), desc: t('wn_livesrumo_desc') },
-  ],
-  152: t => [
-    { icon: '🛡️', title: t('wn_updatefix_title'), desc: t('wn_updatefix_desc') },
-    { icon: '🧹', title: t('wn_tidy_title'), desc: t('wn_tidy_desc') },
-  ],
-  151: t => [
-    { icon: '📡', title: t('wn_live_title'), desc: t('wn_live_desc') },
-    { icon: '🛑', title: t('wn_livestop_title'), desc: t('wn_livestop_desc') },
-    { icon: '🗺️', title: t('wn_liveview_title'), desc: t('wn_liveview_desc') },
-  ],
-  150: t => [
-    { icon: '📡', title: t('wn_live_title'), desc: t('wn_live_desc') },
-  ],
-  149: t => [
-    { icon: '🔄', title: t('wn_updcheck_title'), desc: t('wn_updcheck_desc') },
-    { icon: '🧭', title: t('wn_dialcompact_title'), desc: t('wn_dialcompact_desc') },
-  ],
-  148: t => [
-    { icon: '🗣', title: t('wn_voz_title'), desc: t('wn_voz_desc') },
-    { icon: '📏', title: t('wn_odo_title'), desc: t('wn_odo_desc') },
-    { icon: '🤖', title: t('wn_hist_title'), desc: t('wn_hist_desc') },
-    { icon: '🔐', title: t('wn_pin_title'), desc: t('wn_pin_desc') },
-    { icon: '💾', title: t('wn_backup_title'), desc: t('wn_backup_desc') },
-    { icon: '🎯', title: t('wn_mils_title'), desc: t('wn_mils_desc') },
-  ],
-  147: t => [
-    { icon: '📡', title: t('wn_emf_title'), desc: t('wn_emf_desc') },
-  ],
-  146: t => [
-    { icon: '📐', title: t('wn_tri_title'), desc: t('wn_tri_desc') },
-  ],
-  145: t => [
-    { icon: '☀️', title: t('wn_sun_title'), desc: t('wn_sun_desc') },
-  ],
-  144: t => [
-    { icon: '⚡', title: t('wn_short_title'), desc: t('wn_short_desc') },
-  ],
-  143: t => [
-    { icon: '↩️', title: t('wn_return_title'), desc: t('wn_return_desc') },
-  ],
-  142: t => [
-    { icon: '🧭', title: t('wn_steady_title'), desc: t('wn_steady_desc') },
-    { icon: '📷', title: t('wn_campro_title'), desc: t('wn_campro_desc') },
-    { icon: '🗺️', title: t('wn_gpx_title'), desc: t('wn_gpx_desc') },
-  ],
-  141: t => [
-    { icon: '⌖', title: t('wn_height_title'), desc: t('wn_height_desc') },
-    { icon: '🚗', title: t('wn_car_title'), desc: t('wn_car_desc') },
-  ],
-  140: t => [
-    { icon: '🧭', title: t('wn_arflat_title'), desc: t('wn_arflat_desc') },
-    { icon: '🔋', title: t('wn_bat_title'), desc: t('wn_bat_desc') },
-    { icon: '🎥', title: t('wn_fov_title'), desc: t('wn_fov_desc') },
-  ],
-  139: t => [
-    { icon: '📷', title: t('wn_cam2_title'), desc: t('wn_cam2_desc') },
-  ],
-  138: t => [
-    { icon: '📷', title: t('wn_cam2_title'), desc: t('wn_cam2_desc') },
-  ],
-  137: t => [
-    { icon: '📷', title: t('wn_cam2_title'), desc: t('wn_cam2_desc') },
-  ],
-  136: t => [
-    { icon: '📷', title: t('wn_cam2_title'), desc: t('wn_cam2_desc') },
-  ],
-  135: t => [
-    { icon: '📷', title: t('wn_cam_title'), desc: t('wn_cam_desc') },
-    { icon: '↩️', title: t('wn_back_title'), desc: t('wn_back_desc') },
-    { icon: '🚨', title: t('wn_inmet_title'), desc: t('wn_inmet_desc') },
-    { icon: '🔔', title: t('wn_notify_title'), desc: t('wn_notify_desc') },
-  ],
-};
-
-const changelogFor = (code: number, t: Translator): Entry[] => {
-  const build = CHANGELOG[code];
-  if (build) {
-    return build(t);
-  }
-  const nearest = Object.keys(CHANGELOG)
-    .map(Number)
-    .filter(known => known < code)
-    .sort((a, b) => b - a)[0];
-  return nearest ? CHANGELOG[nearest](t) : [];
-};
+import { changelogBetween } from '../services/changelog';
 
 type Props = {
   visible: boolean;
   onClose: () => void;
+  /**
+   * Build em que as novidades foram vistas pela última vez. `null` (primeira
+   * abertura, ou o botão "novidades" das Configurações) mostra só a versão
+   * atual; com um código anterior, acumula as entradas do intervalo.
+   */
+  lastSeen?: number | null;
 };
 
-const WhatsNewModal = ({ visible, onClose }: Props) => {
+const WhatsNewModal = ({ visible, onClose, lastSeen = null }: Props) => {
   const colors = useThemeColors();
   const { t } = useLanguage();
-  const features = changelogFor(APP_VERSION_CODE, t);
+  const builds = changelogBetween(lastSeen, APP_VERSION_CODE, t);
+  // Uma versão só não ganha cabeçalho: o título já diz de qual versão se trata
+  // e o número do build ali seria ruído.
+  const since = builds.length > 1 ? lastSeen : null;
 
   return (
     <Modal
@@ -140,38 +46,64 @@ const WhatsNewModal = ({ visible, onClose }: Props) => {
             <Text style={styles.badgeText}>✨</Text>
           </View>
           <Text style={[styles.title, { color: colors.text }]}>
-            {t('wn_title', { version: APP_VERSION })}
+            {since != null
+              ? t('wn_title_since', { code: since })
+              : t('wn_title', { version: APP_VERSION })}
           </Text>
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            {t('wn_subtitle')}
+            {since != null ? t('wn_subtitle_since') : t('wn_subtitle')}
           </Text>
 
-          {features.length > 0 && (
+          {builds.length > 0 && (
             <ScrollView
               style={styles.list}
               showsVerticalScrollIndicator={false}>
-              {features.map((feature, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.row,
-                    i > 0 && {
-                      borderTopWidth: StyleSheet.hairlineWidth,
-                      borderTopColor: colors.border,
-                    },
-                  ]}>
-                  <View
-                    style={[styles.iconChip, { backgroundColor: colors.surfaceAlt }]}>
-                    <Text style={styles.iconChipText}>{feature.icon}</Text>
-                  </View>
-                  <View style={styles.rowText}>
-                    <Text style={[styles.rowTitle, { color: colors.text }]}>
-                      {feature.title}
-                    </Text>
-                    <Text style={[styles.rowDesc, { color: colors.textMuted }]}>
-                      {feature.desc}
-                    </Text>
-                  </View>
+              {builds.map((build, buildIndex) => (
+                <View key={build.code}>
+                  {since != null && (
+                    <>
+                      {buildIndex > 0 && (
+                        <View
+                          style={[
+                            styles.groupDivider,
+                            { backgroundColor: colors.border },
+                          ]}
+                        />
+                      )}
+                      <Text
+                        style={[styles.buildLabel, { color: colors.textMuted }]}>
+                        {t('wn_build_label', { code: build.code })}
+                      </Text>
+                    </>
+                  )}
+                  {build.entries.map((feature, i) => (
+                    <View
+                      key={i}
+                      style={[
+                        styles.row,
+                        i > 0 && {
+                          borderTopWidth: StyleSheet.hairlineWidth,
+                          borderTopColor: colors.border,
+                        },
+                      ]}>
+                      <View
+                        style={[
+                          styles.iconChip,
+                          { backgroundColor: colors.surfaceAlt },
+                        ]}>
+                        <Text style={styles.iconChipText}>{feature.icon}</Text>
+                      </View>
+                      <View style={styles.rowText}>
+                        <Text style={[styles.rowTitle, { color: colors.text }]}>
+                          {feature.title}
+                        </Text>
+                        <Text
+                          style={[styles.rowDesc, { color: colors.textMuted }]}>
+                          {feature.desc}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
                 </View>
               ))}
             </ScrollView>
@@ -235,6 +167,16 @@ const styles = StyleSheet.create({
   list: {
     marginTop: spacing.sm,
     maxHeight: 340,
+  },
+  buildLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginTop: spacing.sm,
+  },
+  groupDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginTop: spacing.sm,
   },
   row: {
     flexDirection: 'row',
