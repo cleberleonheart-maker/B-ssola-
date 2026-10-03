@@ -135,15 +135,30 @@ export const ensureCloudUser = async (): Promise<string | null> => {
       // 15 s, e não os 6 s do default: em dados móveis um round-trip de auth a
       // frio passa facilmente disso, e o timeout virava "não foi possível iniciar
       // o rastreio" sem que houvesse nada de errado com o Supabase.
-      const { data } = await withTimeout(client.auth.getSession(), 15000);
+      const { data, error: sessionError } = await withTimeout(
+        client.auth.getSession(),
+        15000,
+      );
+      if (sessionError) {
+        noteCloudError('sessao', sessionError.message);
+      }
       if (data?.session?.user) {
         currentUserId = data.session.user.id;
         return currentUserId;
       }
-      const { data: signInData } = await withTimeout(
+      const { data: signInData, error: signInError } = await withTimeout(
         client.auth.signInAnonymously(),
         15000,
       );
+      // O `error` era descartado e o Alert dizia "sem user id na resposta", o
+      // que manda procurar um bug no parsing quando a causa está sempre aqui:
+      // com o provider anónimo desligado no projeto, o GoTrue responde 422
+      // `anonymous_provider_disabled` e é essa frase que tem de chegar ao ecrã.
+      if (signInError) {
+        noteCloudError('login anonimo', signInError.message);
+        currentUserId = null;
+        return null;
+      }
       currentUserId = signInData?.user?.id ?? null;
       if (!currentUserId) {
         noteCloudError('login anonimo', 'sem user id na resposta');

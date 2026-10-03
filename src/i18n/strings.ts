@@ -489,6 +489,9 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     wn_minimap_title: 'Um mapa que não pede nada à rede',
     wn_minimap_desc: 'Há um mapa novo no telemóvel e um mini-mapa na página do rastreio ao vivo. Desenha a sua posição, o rumo, o círculo de precisão e o caminho que andou desde que abriu, com três níveis de ampliação. Não há tiles nem pedidos: não mostra ruas, mostra você — e funciona sem internet.',
 
+    wn_cloudreason_title: 'O rastreio diz agora por que não liga',
+    wn_cloudreason_desc: 'Quando o servidor recusava a ligação, o alerta dizia só "sem user id na resposta", apontando para um defeito que não existia. Passa a mostrar a frase do próprio servidor — por exemplo, quando as contas anónimas estão desligadas no projeto.',
+
     wn_livenative_title: 'Rastreio ao vivo sobrevive ao app fechado',
     wn_livenative_desc: 'A posição passa a ser enviada pelo serviço do próprio Android, e não mais pelo app. Se o sistema encerrar o Bússola para economizar memória, o rastreio continua e o link não fica parado.',
     wn_liveexpired_title: 'Fim de rastreio explicado',
@@ -1268,6 +1271,9 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
 
     wn_minimap_title: 'A map that asks the network for nothing',
     wn_minimap_desc: 'There is a new map on the phone and a mini-map on the live tracking page. It draws your position, your heading, the accuracy circle and the way you have walked since opening, with three zoom levels. There are no tiles and no requests: it shows no streets, it shows you — and it works with no internet.',
+
+    wn_cloudreason_title: 'Tracking now says why it will not connect',
+    wn_cloudreason_desc: 'When the server refused the connection, the alert only said "no user id in the response", pointing at a flaw that did not exist. It now shows the message from the server itself — for instance when anonymous accounts are disabled on the project.',
     wn_livenative_title: 'Live tracking survives the app being closed',
     wn_livenative_desc: 'Your position is now sent by the Android service itself instead of by the app. If the system shuts Bussola down to save memory, tracking carries on and the link never freezes.',
     wn_liveexpired_title: 'The end of tracking is explained',
@@ -2046,6 +2052,9 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
 
     wn_minimap_title: 'Un mapa que no le pide nada a la red',
     wn_minimap_desc: 'Hay un mapa nuevo en el móvil y un mini-mapa en la página del rastreo en vivo. Dibuja su posición, el rumbo, el círculo de precisión y el camino que ha caminado desde que abrió, con tres niveles de ampliación. No hay tiles ni peticiones: no muestra calles, le muestra a usted — y funciona sin internet.',
+
+    wn_cloudreason_title: 'El rastreo ahora dice por qué no conecta',
+    wn_cloudreason_desc: 'Cuando el servidor rechazaba la conexión, el aviso solo decía "sin user id en la respuesta", señalando un fallo que no existía. Ahora muestra la frase del propio servidor, por ejemplo cuando las cuentas anónimas están desactivadas en el proyecto.',
     wn_livenative_title: 'El rastreo en vivo sobrevive a la app cerrada',
     wn_livenative_desc: 'La posición la envía ahora el propio servicio de Android, y no la app. Si el sistema cierra Bussola para ahorrar memoria, el rastreo sigue y el enlace no se queda quieto.',
     wn_liveexpired_title: 'El fin del rastreo se explica',

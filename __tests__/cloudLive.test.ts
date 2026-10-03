@@ -75,6 +75,37 @@ describe('pushLivePosition', () => {
     );
     warn.mockRestore();
   });
+
+  it('o provider anonimo desligado chega ao Alert com a frase do Supabase', async () => {
+    // Era este o caso que aparecia no aparelho: o GoTrue responde 422 com
+    // `anonymous_provider_disabled`, o `error` era descartado e o alerta dizia
+    // "sem user id na resposta" -- que manda caçar um bug no parsing quando o
+    // problema e uma opcao do projeto.
+    jest.doMock('@react-native-async-storage/async-storage', () => ({}));
+    jest.doMock('@supabase/supabase-js', () => ({
+      createClient: jest.fn(() => ({
+        auth: {
+          getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
+          signInAnonymously: jest.fn().mockResolvedValue({
+            data: { user: null, session: null },
+            error: { message: 'Anonymous sign-ins are disabled' },
+          }),
+        },
+      })),
+    }));
+    let cloud!: typeof import('../src/services/cloud');
+    jest.isolateModules(() => {
+      cloud = jest.requireActual('../src/services/cloud') as typeof import('../src/services/cloud');
+    });
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(cloud.ensureCloudUser()).resolves.toBeNull();
+
+    expect(cloud.takeCloudError()).toBe(
+      'login anonimo: Anonymous sign-ins are disabled',
+    );
+    warn.mockRestore();
+  });
 });
 
 /**

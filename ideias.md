@@ -588,3 +588,15 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       preto, sem o traço azul. O `setAttribute` do browser erraria o mesmo,
       portanto isto nunca tinha sido visto em nenhum browser — o `document`
       falso do `liveViewer.test.js` foi que devolveu o erro.
+
+## ✅ Feitos (v7.29 · code 160)
+- [x] **95. 📡 O login anónimo dizia "sem user id na resposta"** — o
+      `ensureCloudUser` destruturava só o `{ data }` de `signInAnonymously()` e
+      descartava o `error`, por isso a razão verdadeira nunca chegava ao ecrã. O
+      servidor respondia `422 anonymous_provider_disabled` ("Anonymous sign-ins
+      are disabled") porque a entrada anónima estava desligada no projeto
+      Supabase, e o alerta mandava procurar um defeito no parsing da resposta.
+      Agora o `error` é lido e a frase do servidor aparece no diálogo. É o mesmo
+      padrão do #91: a causa existe, só não estava a ser mostrada. Em paralelo,
+      ligar "Anonymous sign-ins" no painel do Supabase é o que faz o rastreio
+      ao vivo arrancar sem novo APK.
