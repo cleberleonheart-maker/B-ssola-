@@ -86,9 +86,37 @@ const warnDisabled = (): void => {
 let currentUserId: string | null | undefined;
 let ensurePromise: Promise<string | null> | null = null;
 
+/**
+ * Motivo da última falha de nuvem, para o erro na tela deixar de ser genérico.
+ *
+ * Antes desta variável, um `📡` que não arrancava dizia só "não foi possível
+ * iniciar o rastreio ao vivo": `pushLivePosition` devolvia `!error` sem guardá-lo
+ * e `ensureCloudUser` engolia a exceção. O Supabase estava inteiro — tabela,
+ * policy, chave, auth anónimo — e a única pista na mão era o texto do alerta,
+ * o que obriga a eliminar por tentativa. Guarda-se a causa e mostra-se.
+ *
+ * Nunca inclui o token nem a key: é lida por um humano, e vai para o Alert.
+ */
+let lastCloudError: string | null = null;
+
+/** Lê e limpa a última falha de nuvem. */
+export const takeCloudError = (): string | null => {
+  const error = lastCloudError;
+  lastCloudError = null;
+  return error;
+};
+
+export const noteCloudError = (scope: string, error: unknown): void => {
+  const message =
+    error instanceof Error ? error.message : String(error ?? 'desconhecido');
+  lastCloudError = `${scope}: ${message}`;
+  console.warn(`[cloud] ${lastCloudError}`);
+};
+
 export const ensureCloudUser = async (): Promise<string | null> => {
   if (!client) {
     warnDisabled();
+    noteCloudError('cliente', 'Supabase nao configurado');
     return null;
   }
   if (currentUserId) {
@@ -99,17 +127,25 @@ export const ensureCloudUser = async (): Promise<string | null> => {
   }
   ensurePromise = (async () => {
     try {
-      const { data } = await withTimeout(client.auth.getSession());
+      // 15 s, e não os 6 s do default: em dados móveis um round-trip de auth a
+      // frio passa facilmente disso, e o timeout virava "não foi possível iniciar
+      // o rastreio" sem que houvesse nada de errado com o Supabase.
+      const { data } = await withTimeout(client.auth.getSession(), 15000);
       if (data?.session?.user) {
         currentUserId = data.session.user.id;
         return currentUserId;
       }
       const { data: signInData } = await withTimeout(
         client.auth.signInAnonymously(),
+        15000,
       );
       currentUserId = signInData?.user?.id ?? null;
+      if (!currentUserId) {
+        noteCloudError('login anonimo', 'sem user id na resposta');
+      }
       return currentUserId;
-    } catch {
+    } catch (error) {
+      noteCloudError('login anonimo', error);
       currentUserId = null;
       return null;
     }
@@ -328,7 +364,10 @@ export const pushLivePosition = async (
   hdg: number | null,
   expiresAt: number,
 ): Promise<boolean> => {
-  if (!client) return false;
+  if (!client) {
+    noteCloudError('live push', 'Supabase nao configurado');
+    return false;
+  }
   try {
     const { error } = await withTimeout(
       client.from('live_shares').upsert(
@@ -344,9 +383,15 @@ export const pushLivePosition = async (
         },
         { onConflict: 'token' },
       ),
+      15000,
     );
-    return !error;
-  } catch {
+    if (error) {
+      noteCloudError('live push', error.message);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    noteCloudError('live push', error);
     return false;
   }
 };

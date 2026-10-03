@@ -5,8 +5,19 @@ import {
   ensureCloudUser,
   pushLivePosition,
   deleteLiveShareRow,
+  noteCloudError,
+  takeCloudError,
 } from './cloud';
 import type { LocationFix } from './locationService';
+
+/**
+ * Motivo da falha, para o Alert deixar de dizer só "não foi possível".
+ *
+ * O `📡` que não arranca é o pior caso do app: a pessoa está numa emergência e o
+ * ecrã recusa-se sem dizer porquê. O `console.warn` sozinho não chega, porque
+ * ninguém vai abrir o Metro numa emergência — a causa vai no próprio diálogo.
+ */
+export const livePushError = (): string | null => takeCloudError();
 
 const PREFIX = 'bussola:live:';
 const ACTIVE_KEY = 'bussola:live:active';
@@ -106,7 +117,10 @@ export const pushLiveFix = async (
   fix: LocationFix,
   magneticHeading: number | null = null,
 ): Promise<boolean> => {
-  if (!isCloudEnabled()) return false;
+  if (!isCloudEnabled()) {
+    noteCloudError('cloud desligada', 'SUPABASE_URL/ANON_KEY ausentes');
+    return false;
+  }
   // A identidade vem sempre daqui, e nao da sessao: o stopLiveShare tambem usa
   // ensureCloudUser(), e um id guardado na sessao poderia nao bater com o dele
   // — a linha ficaria orfa na tabela.

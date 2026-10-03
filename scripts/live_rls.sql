@@ -14,7 +14,7 @@
 -- Idempotente. Rode no Supabase > SQL Editor > New query.
 -- ============================================================
 
--- =====...=============================================================
+-- ============================================================
 create table if not exists public.live_shares (
   token text not null,
   user_id text not null,

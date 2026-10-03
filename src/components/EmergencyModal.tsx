@@ -14,6 +14,7 @@ import {
   startLiveShare,
   stopLiveShare,
   pushLiveFix,
+  livePushError,
   livePushCredentials,
   liveLink,
   liveCountdown,
@@ -219,7 +220,11 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
       const sent = await pushLiveFix(s, locationRef.current, headingRef.current);
       if (!sent) {
         await stopLiveShare(s.token);
-        Alert.alert(t('live_title'), t('live_error'));
+        // A causa entra no diálogo: "não foi possível" sem dizer o quê obriga a
+        // eliminar por tentativa, e quem está a tentar arrancar o rastreio pode
+        // estar numa emergência.
+        const cause = livePushError();
+        Alert.alert(t('live_title'), t('live_error') + (cause ? `\n\n${cause}` : ''));
         return;
       }
       const owner = await ensureService(s, true);
