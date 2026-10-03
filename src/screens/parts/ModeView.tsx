@@ -16,6 +16,7 @@ import SunWatchView from '../../components/SunWatchView';
 import TargetNavBar from '../../components/TargetNavBar';
 import TheodoliteView from '../../components/TheodoliteView';
 import TrackView from '../../components/TrackView';
+import MiniMapView from '../../components/MiniMapView';
 import TriangulationView from '../../components/TriangulationView';
 import WindView from '../../components/WindView';
 import { useLanguage } from '../../i18n/LanguageContext';
@@ -48,6 +49,7 @@ const MODE_LABEL_KEY: Record<DisplayMode, string> = {
   car: 'ui_mode_car',
   tri: 'ui_mode_tri',
   track: 'ui_card_track',
+  map: 'ui_card_map',
   notes: 'ui_card_notes',
   odometer: 'ui_card_odometer',
   selftest: 'ui_card_selftest',
@@ -233,6 +235,10 @@ const ModeView = (props: Props) => {
       ) : displayMode === 'track' ? (
         <View style={styles.trackArea}>
           <TrackView active location={location} heading={heading} mils={useMils} />
+        </View>
+      ) : displayMode === 'map' ? (
+        <View style={styles.trackArea}>
+          <MiniMapView active location={location} heading={heading} />
         </View>
       ) : displayMode === 'notes' ? (
         <View style={styles.trackArea}>

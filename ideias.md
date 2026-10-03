@@ -549,3 +549,42 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
 - [ ] **89. 🧭 Dois rumos para a mesma linha** — `resolveLiveHeading` do JS e o do
       Kotlin concordam por construção agora, mas nada impede que o próximo que
       mexer num mexa só num. Vale um teste de paridade sobre os dois.
+
+## ✅ Feitos (v7.28 · code 159)
+- [x] **90. 🗺️ Mapa novo, sem rede** — não havia forma nenhuma de ver onde se
+      está. Entrou um modo "📍 Onde estou" (`MiniMapView`) com três níveis de
+      ampliação (400/150/50 m), e a página `web/live.html` ganhou um mini-mapa
+      para quem recebe o link do rastreio. Sem tiles e sem pedidos: a projeção é
+      uma função pura das coordenadas (`utils/trackProjection.ts`), o que faz o
+      desenho funcionar offline por construção. A janela segue a pessoa em vez de
+      se ajustar ao percurso, e o breadcrumb só aceita um ponto novo depois de
+      5 m — sem isso um GPS parado a oscilar um metro desenhava um trançado.
+      Fecha a ideia #48 pela parte que é geolocalização sem base cartográfica.
+- [x] **91. 🐛 A nuvem nunca chegou a ligar no telemóvel** — o `createClient` do
+      `supabase-js` atirava "Invalid supabaseUrl: Provided URL is malformed."
+      porque o Hermes não regista um `URL` global, e a excepção era engolida
+      pelo `try/catch` de `cloud.ts`. O `client` ficava `null` e o sintoma era
+      "Supabase não configurado" — que manda culpar o projeto e as credenciais.
+      Agora a razão verdadeira chega ao diálogo. Este bug arrastava a memória da
+      assistente, a procura de novidades e o rastreio ao vivo, e durante várias
+      versões ninguém viu nada: o Node tem `URL`, portanto a suite de testes
+      nunca o apanhou. O polyfill (`react-native-url-polyfill/auto`) tem de ser o
+      primeiro import de `index.js`, e a ordem é verificada por teste — se alguém
+      mexer, o aparelho volta a falhar em silêncio.
+
+### Dívidas que ficaram do mesmo commit
+- [ ] **92. 📜 O trajecto do viewer vive só na página** — `live_shares` é um
+      `upsert` por token: uma linha, um ponto, sem histórico. O que a página
+      desenha é o que ela viu desde que abriu, e diz isso por baixo do mapa.
+      Quem precisar do percurso completo precisa de uma tabela de pontos.
+- [ ] **93. 🗺️ Sem base cartográfica** — o mapa mostra a sua posição, o rumo, o
+      círculo de precisão e a escala, mas não ruas nem nomes de rua. É uma
+      decisão (zero pedidos, zero tiles, funciona sem rede), não um esquecimento;
+      fica escrito para o próximo não tratar a ausência como bug.
+- [ ] **94. 🧪 Um bug que só os stubs apanharam** — o `svgNode` do `live.html`
+      fazia `setAttribute.apply(node, [[...], [...]])`, e o `apply` com uma
+      lista de pares punha o primeiro par como nome e o segundo como valor: o
+      `fill` do traço saía `fill,none` e o caminho desenhava-se preenchido a
+      preto, sem o traço azul. O `setAttribute` do browser erraria o mesmo,
+      portanto isto nunca tinha sido visto em nenhum browser — o `document`
+      falso do `liveViewer.test.js` foi que devolveu o erro.

@@ -9,10 +9,18 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const booted = [];
 
+// O mapa e SVG criado com `createElementNS` e escrito por `setAttribute`, o
+// que os stubs originais nao tinham. `children` e um array simples: o viewer
+// so acrescenta — nao ha nada a remover nem a reordenar.
 const makeNode = (id) => ({
   id,
   textContent: '',
   href: '',
+  children: [],
+  attrs: {},
+  setAttribute(name, value) { this.attrs[name] = String(value); },
+  getAttribute(name) { return this.attrs[name]; },
+  appendChild(child) { this.children.push(child); return child; },
   classList: {
     _set: new Set(),
     add(c) { this._set.add(c); },
@@ -29,6 +37,7 @@ const boot = (hash, fetchImpl) => {
   const document = {
     hidden: false,
     getElementById: (id) => (nodes[id] = nodes[id] || makeNode(id)),
+    createElementNS: (_ns, tag) => makeNode(tag),
     addEventListener: (type, fn) => listeners.push([type, fn]),
   };
   const ctx = {
@@ -74,11 +83,15 @@ const fix = (over) =>
     over || {},
   );
 
-describe('viewer do rastreio ao vivo', () => {
-  afterEach(() => {
-    while (booted.length) booted.pop().halt();
-  });
+// O teardown vive aqui em cima, e não dentro de um `describe`: o viewer deixa
+// um `setInterval` de 1 s e um `setTimeout` de poll vivos, e um `afterEach`
+// preso a um só bloco deixava os testes do mini mapa a correr sem ser
+// desligados — o jest passava tudo e depois não saía.
+afterEach(() => {
+  while (booted.length) booted.pop().halt();
+});
 
+describe('viewer do rastreio ao vivo', () => {
   it('avisa quando o link não tem código', async () => {
     const { nodes } = boot('', reply([]));
     await wait(30);
@@ -267,5 +280,156 @@ describe('viewer do rastreio ao vivo', () => {
     await wait(30);
     expect(calls).toBe(2);
     expect(app.nodes.liveTag.textContent).toMatch(/AO VIVO/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// O mini mapa. Sem tiles e sem pedidos: um SVG desenhado a partir das
+// coordenadas. `live_shares` guarda um unico ponto por token, portanto o
+// trajecto e o que o viewer viu desde que abriu a pagina.
+// ---------------------------------------------------------------------------
+describe('mini mapa da pagina', () => {
+  const SP = { latitude: -23.5505199, longitude: -46.6333094 };
+  const norte = (metros) => ({ latitude: SP.latitude + metros / 111320 });
+
+  // O SVG tem dois `circle` (o anel de precisao e o ponto) e dois `text` (o
+  // norte e a escala): a etiqueta do elemento nao chega para os distinguir. E o
+  // `id` posto em `buildMap` que os separa.
+  const parts = (app) => {
+    const svg = app.nodes.map.children[0];
+    if (!svg) throw new Error('o mapa ainda nao tem SVG');
+    const byId = {};
+    svg.children.forEach((c) => { byId[c.attrs.id] = c; });
+    return byId;
+  };
+
+  const TAG = {
+    path: 'mapTrail',
+    ring: 'mapRing',
+    arrow: 'mapArrow',
+    dot: 'mapDot',
+    scaleText: 'mapScaleText',
+  };
+
+  it('a primeira posicao abre o mapa', async () => {
+    const { nodes } = boot('#tkn=abc', reply([fix()]));
+    await wait(30);
+    expect(nodes.map.classList.contains('hidden')).toBe(false);
+    expect(nodes.map.children).toHaveLength(1);
+  });
+
+  it('sem posicao nao ha mapa, e nao um mapa vazio', async () => {
+    const { nodes } = boot('#tkn=abc', reply([]));
+    await wait(30);
+    expect(nodes.map.classList.contains('hidden')).toBe(true);
+    expect(nodes.map.children).toHaveLength(0);
+  });
+
+  it('a posicao actual fica no centro do mapa', async () => {
+    const app = boot('#tkn=abc', reply([fix()]));
+    await wait(30);
+    const g = parts(app);
+    // Caixa de 300 px: o centro e (150, 150).
+    expect(Number(g[TAG.dot].getAttribute('cx'))).toBeCloseTo(150, 6);
+    expect(Number(g[TAG.dot].getAttribute('cy'))).toBeCloseTo(150, 6);
+  });
+
+  it('o mapa diz que o trajecto comeca quando a pagina abre', async () => {
+    const { nodes } = boot('#tkn=abc', reply([fix()]));
+    await wait(30);
+    expect(nodes.mapNote.textContent).toMatch(/desde que abriste/i);
+    expect(nodes.mapNote.classList.contains('hidden')).toBe(false);
+  });
+
+  it('andar longe de verdad acrescenta um ponto ao trajecto', async () => {
+    let calls = 0;
+    const app = boot('#tkn=abc', () => {
+      calls += 1;
+      return reply([fix(calls === 1 ? {} : { latitude: norte(40).latitude })]);
+    });
+    await wait(30);
+    const antes = parts(app)[TAG.path].getAttribute('d');
+
+    app.again();
+    await wait(40);
+
+    const depois = parts(app)[TAG.path].getAttribute('d');
+    expect(depois).not.toBe(antes);
+    expect(depois.match(/[ML] /g)).toHaveLength(2);
+  });
+
+  it('oscilar um metro nao desenha tracos de ruido', async () => {
+    let calls = 0;
+    const app = boot('#tkn=abc', () => {
+      calls += 1;
+      return reply([fix(calls === 1 ? {} : { latitude: norte(0.5).latitude })]);
+    });
+    await wait(30);
+    const antes = parts(app)[TAG.path].getAttribute('d');
+
+    app.again();
+    await wait(40);
+
+    // Nao se compara o `d` byte a byte: a janela segue a pessoa, portanto meio
+    // metro de deriva deslocam o trilho todo de meio pixel. O que nao pode
+    // acontecer e o trilho ganhar um comando novo por causa do ruido.
+    expect(parts(app)[TAG.path].getAttribute('d').match(/[ML] /g)).toHaveLength(
+      antes.match(/[ML] /g).length,
+    );
+  });
+
+  it('a precisao vira um circulo do raio certo', async () => {
+    const app = boot('#tkn=abc', reply([fix({ accuracy: 50 })]));
+    await wait(30);
+    const ring = parts(app)[TAG.ring];
+    expect(ring.getAttribute('opacity')).not.toBe('0');
+    expect(Number(ring.getAttribute('r'))).toBeGreaterThan(1);
+  });
+
+  it('sem precisao o circulo desaparece em vez de virar raio zero', async () => {
+    const app = boot('#tkn=abc', reply([fix({ accuracy: null })]));
+    await wait(30);
+    expect(parts(app)[TAG.ring].getAttribute('opacity')).toBe('0');
+  });
+
+  it('sem rumo a seta desaparece em vez de apontar a norte', async () => {
+    const app = boot('#tkn=abc', reply([fix({ heading: null })]));
+    await wait(30);
+    expect(parts(app)[TAG.arrow].getAttribute('opacity')).toBe('0');
+  });
+
+  it('a seta aponta no rumo, e nao para cima', async () => {
+    // 90° e para leste: a ponta da seta fica a direita do ponto.
+    const app = boot('#tkn=abc', reply([fix({ heading: 90 })]));
+    await wait(30);
+    const arrow = parts(app)[TAG.arrow];
+    expect(arrow.getAttribute('opacity')).toBe('1');
+    expect(Number(arrow.getAttribute('x2'))).toBeGreaterThan(Number(arrow.getAttribute('x1')));
+    expect(Number(arrow.getAttribute('y2'))).toBeCloseTo(Number(arrow.getAttribute('y1')), 6);
+  });
+
+  it('a barra de escala diz metros, nao decimos de metro', async () => {
+    const app = boot('#tkn=abc', reply([fix()]));
+    await wait(30);
+    expect(parts(app)[TAG.scaleText].textContent).toMatch(/^\d+(\.\d+)? (m|km)$/);
+  });
+
+  it('quando o link expira o mapa some com as coordenadas', async () => {
+    const app = boot('#tkn=abc', reply([fix({ expires_at: new Date(Date.now() - 1000).toISOString() })]));
+    await wait(30);
+    expect(app.nodes.map.classList.contains('hidden')).toBe(true);
+  });
+
+  it('quando a pessoa encerra, o mapa fica com a ultima posicao', async () => {
+    let calls = 0;
+    const app = boot('#tkn=abc', () => {
+      calls += 1;
+      return reply(calls === 1 ? [fix()] : []);
+    });
+    await wait(30);
+    app.again();
+    await wait(40);
+    expect(app.nodes.note.textContent).toMatch(/encerrado/i);
+    expect(app.nodes.map.classList.contains('hidden')).toBe(false);
   });
 });

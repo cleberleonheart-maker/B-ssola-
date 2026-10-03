@@ -27,6 +27,7 @@
     "react-native-screens": "^4.27.0",
     "react-native-sensors": "^7.3.6",
     "react-native-tts": "^4.1.1",
+    "react-native-url-polyfill": "^2.0.0",
     "react-native-vision-camera": "^5.2.3"
   },
   "devDependencies": {

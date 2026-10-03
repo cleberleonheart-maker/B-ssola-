@@ -10,6 +10,7 @@ import { useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import { formatDistance, haversine, initialBearing, normalizeAzimuth } from '../utils/geo';
+import { polylineSegments, projectTrack } from '../utils/trackProjection';
 import { cardinalOf, formatAzimuth } from '../utils/compass';
 import { serializeTrackToGpx } from '../utils/gpx';
 import { shareTrackGpx } from '../services/trackShare';
@@ -32,6 +33,18 @@ import { flushOdometer } from '../services/odometerService';
 const MIN_SEGMENT_M = 3;
 const MIN_GAP_MS = 1000;
 const ARRIVE_BACK_METERS = 15;
+
+// A caixa da pré-visualização. A projeção usa estes números e não os seus
+// próprios: quando os dois viviam separados, o desenho saía 2x mais largo que
+// a caixa (o `280` servia de referência nos dois eixos e havia um `* 2.04`
+// sem justificação) e o trilho transbordava por cima do cartão.
+const PREVIEW_WIDTH = 280;
+const PREVIEW_HEIGHT = 168;
+const PREVIEW_VIEWPORT = {
+  width: PREVIEW_WIDTH,
+  height: PREVIEW_HEIGHT,
+  padding: 16,
+};
 
 type Props = {
   active: boolean;
@@ -178,43 +191,18 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
     const maxDraw = 500;
     const step = Math.max(1, Math.ceil(simplified.length / maxDraw));
     const drawn = simplified.filter((_, i) => i % step === 0 || i === simplified.length - 1);
-    const lats = drawn.map(p => p.lat);
-    const lons = drawn.map(p => p.lon);
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-    const minLon = Math.min(...lons);
-    const maxLon = Math.max(...lons);
-    const latSpan = Math.max(maxLat - minLat, 1e-6);
-    const lonSpan = Math.max(maxLon - minLon, 1e-6);
-    const pad = 0.1;
-    const padLat = latSpan * pad;
-    const padLon = lonSpan * pad;
-    const totalLat = latSpan + padLat * 2;
-    const totalLon = lonSpan + padLon * 2;
-    const canvas = 280;
-    const scale = Math.min(canvas / totalLon, canvas / totalLat) * 2.04;
-    return drawn.map((p, i) => ({
-      x: (p.lon - minLon + padLon) * scale,
-      y: (maxLat + padLat - p.lat) * scale,
-      alt: p.alt,
-      i,
-    })) as (DrawPoint & { i: number })[];
+    const projection = projectTrack(drawn, PREVIEW_VIEWPORT);
+    return projection.points.map((q, i) => ({
+      x: q.x,
+      y: q.y,
+      alt: drawn[i].alt,
+    })) as DrawPoint[];
   }, [points, saved]);
 
-  const segments = useMemo(() => {
-    const out: { x: number; y: number; w: number; a: number }[] = [];
-    for (let i = 1; i < drawPoints.length; i++) {
-      const a = drawPoints[i - 1];
-      const b = drawPoints[i];
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
-      const len = Math.hypot(dx, dy);
-      if (len < 1) continue;
-      const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
-      out.push({ x: (a.x + b.x) / 2 - len / 2, y: (a.y + b.y) / 2 - 1, w: len, a: angle });
-    }
-    return out;
-  }, [drawPoints]);
+  const segments = useMemo(
+    () => polylineSegments(drawPoints.map(({ x, y }) => ({ x, y }))),
+    [drawPoints],
+  );
 
   const removeTrack = useCallback(async (id: string) => {
     const next = await deleteTrack(id);
@@ -687,16 +675,15 @@ const createStyles = (colors: {
       fontSize: 13,
     },
     canvas: {
-      width: 280,
-      height: 168,
+      width: PREVIEW_WIDTH,
+      height: PREVIEW_HEIGHT,
       alignSelf: 'center',
       marginVertical: spacing.md,
       backgroundColor: colors.surfaceAlt,
       borderRadius: radius.md,
       borderWidth: 1,
       borderColor: colors.border,
-      justifyContent: 'center',
-      alignItems: 'center',
+      overflow: 'hidden',
     },
     dot: {
       position: 'absolute',

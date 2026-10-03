@@ -17,6 +17,10 @@
          letter-spacing:.8px; border-radius:999px; padding:5px 12px; margin-bottom:14px; }
   .tag.warn { background:rgba(245,181,68,.16); color:var(--warn); }
   .coords { font:700 23px/1.45 ui-monospace,Menlo,monospace; }
+  .map { width:100%; max-width:300px; height:300px; margin:0 auto 6px; background:var(--bg);
+         border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+  .map svg { display:block; width:100%; height:100%; }
+  .mapnote { color:var(--muted); font-size:11px; line-height:1.5; margin:0 0 12px; }
   .meta { color:var(--muted); font-size:13px; margin:8px 0 0; }
   .count { color:var(--accent); font-size:15px; font-weight:700; margin:12px 0 16px; }
   .btn { display:block; background:var(--accent); color:#08111f; font-weight:800; font-size:15px; padding:14px 0;
@@ -33,6 +37,8 @@
     <div class="sub">Localização em tempo real · expira sozinha</div>
     <span class="tag hidden" id="liveTag">● AO VIVO</span>
     <div id="coordsRow" class="hidden">
+      <div class="map hidden" id="map"></div>
+      <div class="mapnote hidden" id="mapNote"></div>
       <div class="coords" id="coords">—</div>
       <div class="meta" id="meta"></div>
       <div class="count" id="count"></div>
@@ -62,6 +68,131 @@
   var busy = false;
   var done = false;
 
+  // ==========================================================================
+  // Geometria do mini mapa. Isto e uma copia de `src/utils/trackProjection.ts`
+  // do app, em ES5 e sem dependencias, para a pagina ficar num ficheiro so.
+  // Nao ha tiles, nem Leaflet, nem pedidos: e uma funcao pura das coordenadas,
+  // que e o que faz o desenho funcionar offline.
+  //
+  // `__tests__/trackProjectionParity.test.ts` corre as duas versoes no mesmo
+  // fixture e compara os numeros. Se uma mexer e a outra nao, esse teste
+  // acende em vez de as duas divergirem em silencio.
+  // ==========================================================================
+  var METERS_PER_DEGREE_LAT = 111320;
+  var MIN_SPAN_METERS = 400;
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+
+  var MAP_SIZE = 300;
+  var MAP_PADDING = 16;
+  // A janela e centrada na ultima posicao e tem largura fixa: o mapa segue a
+  // pessoa em vez de se ajustar ao percurso, que e o que se quer enquanto se
+  // tenta orientar-se. O mesmo motivo pelo qual o `MiniMapView` do app faz
+  // isto.
+  var MAP_SPAN_METERS = 300;
+
+  // Um ponto novo so entra no trajecto quando a pessoa andou `TRACK_MIN_STEP_METERS`.
+  // Sem isto, um GPS parado a oscilar um metro enche a lista em segundos.
+  //
+  // Aqui nao ha filtro de tempo, ao contrario do `MiniMapView` do app: o poll e
+  // de 5 s, portanto o intervalo ja e o ritmo. Um filtro de 2 s so conseguia
+  // descartar movimento a serio — o GPS parado ja estava barrado pelos 5 m, e
+  // 40 m andados entre dois polls iam pela borda fora sem razao.
+  var TRACK_MIN_STEP_METERS = 5;
+  var TRACK_MAX_POINTS = 500;
+
+  function clamp(v, min, max) { return v < min ? min : v > max ? max : v; }
+
+  function projectTrack(points, viewport) {
+    if (!points.length) {
+      return { points: [], scale: 0, center: null, spanMeters: { width: 0, height: 0 }, atMinimumSpan: true };
+    }
+    var padding = clamp(
+      viewport.padding == null ? 12 : viewport.padding,
+      0,
+      Math.min(viewport.width, viewport.height) / 2
+    );
+    var innerWidth = Math.max(viewport.width - padding * 2, 1);
+    var innerHeight = Math.max(viewport.height - padding * 2, 1);
+
+    var minLat = points[0].lat, maxLat = points[0].lat;
+    var minLon = points[0].lon, maxLon = points[0].lon;
+    for (var i = 0; i < points.length; i++) {
+      if (points[i].lat < minLat) minLat = points[i].lat;
+      if (points[i].lat > maxLat) maxLat = points[i].lat;
+      if (points[i].lon < minLon) minLon = points[i].lon;
+      if (points[i].lon > maxLon) maxLon = points[i].lon;
+    }
+
+    var followed = viewport.center || null;
+    var center = followed || { lat: (minLat + maxLat) / 2, lon: (minLon + maxLon) / 2 };
+    var metersPerDegreeLon = METERS_PER_DEGREE_LAT * Math.cos(center.lat * Math.PI / 180);
+
+    var rawWidth = (maxLon - minLon) * metersPerDegreeLon;
+    var rawHeight = (maxLat - minLat) * METERS_PER_DEGREE_LAT;
+    var atMinimumSpan = !followed && (rawWidth < MIN_SPAN_METERS || rawHeight < MIN_SPAN_METERS);
+
+    var spanWidth = followed
+      ? Math.max(viewport.spanMeters == null ? MIN_SPAN_METERS : viewport.spanMeters, 1)
+      : Math.max(rawWidth, MIN_SPAN_METERS);
+    var spanHeight = followed ? spanWidth : Math.max(rawHeight, MIN_SPAN_METERS);
+
+    var scale = Math.min(innerWidth / spanWidth, innerHeight / spanHeight);
+    var originX = viewport.width / 2;
+    var originY = viewport.height / 2;
+
+    return {
+      points: points.map(function (p) {
+        return {
+          x: originX + (p.lon - center.lon) * metersPerDegreeLon * scale,
+          y: originY - (p.lat - center.lat) * METERS_PER_DEGREE_LAT * scale,
+        };
+      }),
+      scale: scale,
+      center: center,
+      spanMeters: { width: spanWidth, height: spanHeight },
+      atMinimumSpan: atMinimumSpan,
+    };
+  }
+
+  function niceScaleBar(projection, width, maxFraction) {
+    if (!projection.center || projection.scale <= 0) return null;
+    var budget = Math.max(width, 0) * (maxFraction == null ? 0.3 : maxFraction);
+    var raw = budget / projection.scale;
+    // A conta e `largura * fraccao / escala`: quantos metros cabem nessa
+    // fatia. Multiplicar a escala pela fraccao daria a unidade errada.
+    if (raw < 1) return { meters: 1, pixels: projection.scale };
+    var magnitude = Math.pow(10, Math.floor(Math.log(raw) / Math.LN10));
+    var normalized = raw / magnitude;
+    var step = normalized >= 5 ? 5 : normalized >= 2 ? 2 : 1;
+    var meters = step * magnitude;
+    return { meters: meters, pixels: meters * projection.scale };
+  }
+
+  function polylinePath(points) {
+    if (!points.length) return '';
+    var round = function (v) { return Math.round(v * 100) / 100; };
+    var out = [];
+    for (var i = 0; i < points.length; i++) {
+      out.push((i === 0 ? 'M' : 'L') + ' ' + round(points[i].x) + ' ' + round(points[i].y));
+    }
+    return out.join(' ');
+  }
+
+  function haversineMeters(lat1, lon1, lat2, lon2) {
+    var R = 6371000;
+    var dLat = (lat2 - lat1) * Math.PI / 180;
+    var dLon = (lon2 - lon1) * Math.PI / 180;
+    var a = Math.pow(Math.sin(dLat / 2), 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.pow(Math.sin(dLon / 2), 2);
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+  }
+
+  function fmtDistance(meters) {
+    if (meters >= 1000) return (meters / 1000).toFixed(meters >= 10000 ? 0 : 1) + ' km';
+    if (meters >= 100) return Math.round(meters) + ' m';
+    return meters.toFixed(1) + ' m';
+  }
+
   function $(id) { return document.getElementById(id); }
   function fmt(v, isLat) {
     var hemi = isLat ? (v >= 0 ? 'N' : 'S') : (v >= 0 ? 'E' : 'W');
@@ -84,7 +215,12 @@
   }
   function setNote(text) { $('note').textContent = text; }
   function showRetry(on) { $('retry').classList.toggle('hidden', !on); }
-  function showCoords(on) { $('coordsRow').classList.toggle('hidden', !on); }
+  // Sem coordenadas nao ha mapa: a caixa e a nota vivem dentro da linha de
+  // coordenadas, e um mapa sem posicao nenhuma seria pior do que nenhum.
+  function showCoords(on) {
+    $('coordsRow').classList.toggle('hidden', !on);
+    if (!on) hideMap();
+  }
   function setTag(text, warn) {
     var el = $('liveTag');
     if (!text) { el.classList.add('hidden'); return; }
@@ -155,12 +291,171 @@
       })
       .catch(function () { ended(); });
   }
+  // --------------------------------------------------------------------------
+  // O trajecto. `live_shares` e um `upsert` por token: uma linha, um ponto. O
+  // servidor nao guarda historico, portanto o trajecto aqui e o que o viewer
+  // viu desde que abriu a pagina — dai o texto por baixo do mapa. Quem precisar
+  // do percurso completo precisa de uma tabela de pontos, e fica registado como
+  // divida no `ideias.md`.
+  // --------------------------------------------------------------------------
+  var track = [];
+
+  function pushTrack(p) {
+    var here = { lat: p.latitude, lon: p.longitude };
+    var last = track.length ? track[track.length - 1] : null;
+    if (last) {
+      var moved = haversineMeters(last.lat, last.lon, here.lat, here.lon);
+      if (moved < TRACK_MIN_STEP_METERS) return;
+    }
+    track.push(here);
+    if (track.length > TRACK_MAX_POINTS) track.shift();
+  }
+
+  function trackMeters() {
+    var total = 0;
+    for (var i = 1; i < track.length; i++) {
+      total += haversineMeters(track[i - 1].lat, track[i - 1].lon, track[i].lat, track[i].lon);
+    }
+    return total;
+  }
+
+  // --------------------------------------------------------------------------
+  // Desenho. Os elementos sao criados uma vez e depois so mudam os atributos:
+  // a cada poll de 5 s nao vale a pena deitar o SVG abaixo e refaze-lo.
+  //
+  // O rumo e uma `rotate` do SVG, que e diferente do `transform: rotate` de uma
+  // `View` que o app usa — mesma matematica, mecanismo nativo de cada lado.
+  // --------------------------------------------------------------------------
+  var gMap = null;
+
+  function svgNode(tag, attrs) {
+    var n = document.createElementNS(SVG_NS, tag);
+    // `setAttribute` e uma funcao de dois argumentos: a lista de pares vai um a
+    // um. Com `apply`, o DOM do browser pegava no primeiro par como nome e no
+    // segundo como valor — o `fill` do traco saia "fill,none" e o caminho
+    // desenhava-se preenchido a preto, sem o traco azul por cima.
+    if (attrs) {
+      for (var i = 0; i < attrs.length; i++) n.setAttribute(attrs[i][0], attrs[i][1]);
+    }
+    return n;
+  }
+
+  // Os `id` nao sao cosmetica: o SVG tem dois `circle` (o anel de precisao e o
+  // ponto) e dois `text` (o norte e a escala), e sem eles nao ha como dizer
+  // qual e qual — nem a ler no inspector do browser, nem num teste.
+  function buildMap() {
+    if (gMap) return gMap;
+    var svg = svgNode('svg', [
+      ['viewBox', '0 0 ' + MAP_SIZE + ' ' + MAP_SIZE],
+      ['width', String(MAP_SIZE)],
+      ['height', String(MAP_SIZE)],
+    ]);
+    var g = {
+      svg: svg,
+      path: svgNode('path', [['id', 'mapTrail'], ['fill', 'none'], ['stroke', '#4da3ff'],
+                             ['stroke-width', '2.5'],
+                             ['stroke-linecap', 'round'], ['stroke-linejoin', 'round']]),
+      ring: svgNode('circle', [['id', 'mapRing'], ['fill', 'none'], ['stroke', '#93a3c4'],
+                               ['stroke-width', '1']]),
+      arrow: svgNode('line', [['id', 'mapArrow'], ['stroke', '#ff4d6d'], ['stroke-width', '3'],
+                              ['stroke-linecap', 'round']]),
+      dot: svgNode('circle', [['id', 'mapDot'], ['fill', '#2fd66b'], ['stroke', '#0b1220'],
+                              ['stroke-width', '2']]),
+      north: svgNode('text', [['id', 'mapNorth'], ['fill', '#93a3c4'], ['font-size', '11'],
+                              ['font-weight', '700'], ['x', '10'], ['y', '18']]),
+      scaleLine: svgNode('line', [['id', 'mapScaleLine'], ['stroke', '#eaf0fb'],
+                                  ['stroke-width', '2']]),
+      scaleText: svgNode('text', [['id', 'mapScaleText'], ['fill', '#eaf0fb'], ['font-size', '10'],
+                                  ['font-weight', '700']]),
+    };
+    g.north.textContent = 'N';
+    svg.appendChild(g.path);
+    svg.appendChild(g.ring);
+    svg.appendChild(g.arrow);
+    svg.appendChild(g.dot);
+    svg.appendChild(g.north);
+    svg.appendChild(g.scaleLine);
+    svg.appendChild(g.scaleText);
+    $('map').appendChild(svg);
+    gMap = g;
+    return g;
+  }
+
+  function drawMap(p) {
+    if (!track.length) return;
+    var here = { lat: p.latitude, lon: p.longitude };
+    var projection = projectTrack(track.concat([here]), {
+      width: MAP_SIZE,
+      height: MAP_SIZE,
+      padding: MAP_PADDING,
+      center: here,
+      spanMeters: MAP_SPAN_METERS,
+    });
+    var g = buildMap();
+    var me = projection.points[projection.points.length - 1];
+
+    // O traço vai só pelos pontos gravados. A posição actual entra na
+    // projeção para o ponto ficar no centro, mas nao no caminho: cada poll
+    // acrescentava um segmento de meio pixel quando o GPS oscilava sem a
+    // pessoa andar, e o trilho passava a tremer. O mesmo que o `MiniMapView`
+    // faz com `projection.points.slice(0, -1)`.
+    g.path.setAttribute('d', polylinePath(projection.points.slice(0, -1)));
+
+    if (p.accuracy != null && p.accuracy > 0) {
+      var r = Math.max(4, Math.min(p.accuracy * projection.scale, MAP_SIZE / 2));
+      g.ring.setAttribute('cx', String(me.x));
+      g.ring.setAttribute('cy', String(me.y));
+      g.ring.setAttribute('r', String(r));
+      g.ring.setAttribute('opacity', '0.6');
+    } else {
+      g.ring.setAttribute('opacity', '0');
+    }
+
+    if (p.heading != null) {
+      var rad = (p.heading - 90) * Math.PI / 180;
+      var len = 26;
+      g.arrow.setAttribute('x1', String(me.x));
+      g.arrow.setAttribute('y1', String(me.y));
+      g.arrow.setAttribute('x2', String(me.x + Math.cos(rad) * len));
+      g.arrow.setAttribute('y2', String(me.y + Math.sin(rad) * len));
+      g.arrow.setAttribute('opacity', '1');
+    } else {
+      g.arrow.setAttribute('opacity', '0');
+    }
+
+    g.dot.setAttribute('cx', String(me.x));
+    g.dot.setAttribute('cy', String(me.y));
+    g.dot.setAttribute('r', '6');
+
+    var bar = niceScaleBar(projection, MAP_SIZE, 0.25);
+    if (bar) {
+      var bx = 12, by = MAP_SIZE - 12;
+      g.scaleLine.setAttribute('x1', String(bx));
+      g.scaleLine.setAttribute('y1', String(by));
+      g.scaleLine.setAttribute('x2', String(bx + bar.pixels));
+      g.scaleLine.setAttribute('y2', String(by));
+      g.scaleText.setAttribute('x', String(bx));
+      g.scaleText.setAttribute('y', String(by - 6));
+      g.scaleText.textContent = fmtDistance(bar.meters);
+    }
+    $('map').classList.remove('hidden');
+    $('mapNote').textContent = 'Trajecto desde que abriste esta página · ' + fmtDistance(trackMeters());
+    $('mapNote').classList.remove('hidden');
+  }
+
+  function hideMap() {
+    $('map').classList.add('hidden');
+    $('mapNote').classList.add('hidden');
+  }
+
   function render(p) {
     everHad = true;
     expiresAt = p.expires_at ? new Date(p.expires_at).getTime() : 0;
     lastFixAt = p.updated_at ? new Date(p.updated_at).getTime() : 0;
     if (expiresAt && expiresAt <= Date.now()) { expired(); return; }
     showCoords(true);
+    pushTrack(p);
+    drawMap(p);
     $('coords').textContent = fmt(p.latitude, true) + '   ' + fmt(p.longitude, false);
     var bits = [];
     if (p.accuracy != null) bits.push('±' + Math.round(p.accuracy) + ' m');

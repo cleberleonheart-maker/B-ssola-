@@ -11,7 +11,7 @@ import {
 import { createTranslator } from '../src/i18n/strings';
 
 const t = createTranslator('pt');
-const CURRENT = 158;
+const CURRENT = 159;
 
 const titles = (entries: ChangelogEntry[]) => entries.map(e => e.title);
 
@@ -24,8 +24,8 @@ describe('changelogFor', () => {
 
   it('cai na entrada conhecida imediatamente abaixo quando o build não tem uma', () => {
     // Build novo cujo changelog ainda não foi escrito, ou código muito à frente.
-    expect(changelogFor(159, t)).toEqual(changelogFor(158, t));
-    expect(changelogFor(200, t)).toEqual(changelogFor(158, t));
+    expect(changelogFor(160, t)).toEqual(changelogFor(159, t));
+    expect(changelogFor(200, t)).toEqual(changelogFor(159, t));
   });
 
   it('devolve vazio quando não há build conhecido abaixo', () => {
@@ -41,14 +41,16 @@ describe('changelogFor', () => {
 
 describe('changelogBetween — o que acumula', () => {
   it('uma versão de intervalo mostra só ela', () => {
-    expect(changelogBetween(157, CURRENT, t)).toEqual([
-      { code: 158, entries: changelogFor(158, t) },
+    expect(changelogBetween(158, CURRENT, t)).toEqual([
+      { code: CURRENT, entries: changelogFor(CURRENT, t) },
     ]);
   });
 
   it('acumula várias versões, da mais nova para a mais antiga', () => {
     const builds = changelogBetween(151, CURRENT, t);
-    expect(builds.map(b => b.code)).toEqual([158, 157, 156, 155, 154, 153, 152]);
+    expect(builds.map(b => b.code)).toEqual([
+      159, 158, 157, 156, 155, 154, 153, 152,
+    ]);
   });
 
   it('o grupo mais novo é sempre a versão que está instalada', () => {
@@ -71,22 +73,22 @@ describe('changelogBetween — o que acumula', () => {
   it('traduz para o idioma pedido', () => {
     const en = changelogBetween(157, CURRENT, createTranslator('en'));
     expect(en[0].entries[0].title).toBe(
-      createTranslator('en')('wn_livenative_title'),
+      createTranslator('en')('wn_cloudsilent_title'),
     );
-    expect(en[0].entries[0].title).not.toBe(changelogFor(158, t)[0].title);
+    expect(en[0].entries[0].title).not.toBe(changelogFor(CURRENT, t)[0].title);
   });
 });
 
 describe('changelogBetween — o que não acumula', () => {
   it('instalação nova mostra só a versão atual, não as 20 anteriores', () => {
     expect(changelogBetween(null, CURRENT, t)).toEqual([
-      { code: 158, entries: changelogFor(158, t) },
+      { code: CURRENT, entries: changelogFor(CURRENT, t) },
     ]);
   });
 
   it('a mesma versão não repete o que já foi visto', () => {
     expect(changelogBetween(CURRENT, CURRENT, t)).toEqual([
-      { code: 158, entries: changelogFor(158, t) },
+      { code: CURRENT, entries: changelogFor(CURRENT, t) },
     ]);
   });
 
@@ -97,19 +99,19 @@ describe('changelogBetween — o que não acumula', () => {
   });
 
   /**
-   * O build 159 subiu e o changelog ainda não foi escrito. Se o grupo do build
-   * atual não entrasse na lista, quem vinha do 157 veria um modal vazio: o
-   * 158 já foi visto e a entrada dele foi consumida pela de cima.
+   * O build 160 subiu e o changelog ainda não foi escrito. Se o grupo do build
+   * atual não entrasse na lista, quem vinha do 158 veria um modal vazio: o
+   * 159 já foi visto e a entrada dele foi consumida pela de cima.
    */
   it('build novo sem changelog escrito mostra o que houve por último', () => {
-    const builds = changelogBetween(157, 159, t);
-    expect(builds.map(b => b.code)).toEqual([159]);
-    expect(builds[0].entries).toEqual(changelogFor(158, t));
+    const builds = changelogBetween(158, 160, t);
+    expect(builds.map(b => b.code)).toEqual([160]);
+    expect(builds[0].entries).toEqual(changelogFor(159, t));
   });
 
   it('a entrada do build mais recente não aparece duplicada sob o código antigo', () => {
     // O mesmo título nos dois grupos seria duas linhas iguais na tela.
-    const titles = changelogBetween(157, 159, t).flatMap(b =>
+    const titles = changelogBetween(158, 160, t).flatMap(b =>
       b.entries.map(e => e.title),
     );
     expect(new Set(titles).size).toBe(titles.length);
@@ -118,7 +120,7 @@ describe('changelogBetween — o que não acumula', () => {
   it('build muito à frente mostra a entrada conhecida mais recente', () => {
     const builds = changelogBetween(500, 501, t);
     expect(builds.map(b => b.code)).toEqual([501]);
-    expect(builds[0].entries).toEqual(changelogFor(158, t));
+    expect(builds[0].entries).toEqual(changelogFor(CURRENT, t));
   });
 });
 
@@ -165,7 +167,7 @@ describe('última versão vista', () => {
 
   it('o que está gravado decide o que o modal mostra', async () => {
     await markChangelogSeen(151);
-    expect(changelogBetween(await loadChangelogSeen(), CURRENT, t).length).toBe(7);
+    expect(changelogBetween(await loadChangelogSeen(), CURRENT, t).length).toBe(8);
   });
 
   it('valor corrompido vira null em vez de NaN no meio do cálculo', async () => {

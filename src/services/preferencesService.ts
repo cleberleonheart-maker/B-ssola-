@@ -13,6 +13,7 @@ export type DisplayMode =
   | 'sun'
   | 'wind'
   | 'track'
+  | 'map'
   | 'notes'
   | 'height'
   | 'car'
@@ -77,6 +78,7 @@ export const loadDisplayMode = async (): Promise<DisplayMode> => {
       'sun',
       'wind',
       'track',
+      'map',
       'notes',
       'height',
       'car',

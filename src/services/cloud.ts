@@ -26,6 +26,10 @@ export const cloudEndpoint = (): CloudEndpoint | null =>
   isCloudEnabled() ? { url: SUPABASE_URL, anonKey: SUPABASE_ANON_KEY } : null;
 
 let client: SupabaseClient | null = null;
+// A excepcao do `createClient` ficava so no Metro, e o unico sintoma no aparelho
+// era "cliente nao configurado" — que parece problema de configuracao quando o
+// problema e o ambiente. Fica aqui para o Alert mostrar a frase verdadeira.
+let clientError: string | null = null;
 if (isCloudEnabled()) {
   try {
     client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -37,7 +41,8 @@ if (isCloudEnabled()) {
       },
     });
   } catch (e) {
-    console.warn('[cloud] falha ao criar cliente Supabase (Hermes/URL)', e);
+    clientError = e instanceof Error ? e.message : String(e);
+    console.warn('[cloud] falha ao criar cliente Supabase', clientError);
   }
 }
 
@@ -116,7 +121,7 @@ export const noteCloudError = (scope: string, error: unknown): void => {
 export const ensureCloudUser = async (): Promise<string | null> => {
   if (!client) {
     warnDisabled();
-    noteCloudError('cliente', 'Supabase nao configurado');
+    noteCloudError('cliente', clientError ?? 'Supabase nao configurado');
     return null;
   }
   if (currentUserId) {

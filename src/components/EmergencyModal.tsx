@@ -219,12 +219,18 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
       // upsert falhar, em vez de mandar um link que ninguem vai ver.
       const sent = await pushLiveFix(s, locationRef.current, headingRef.current);
       if (!sent) {
+        // Ler a causa ANTES do `stopLiveShare`: a limpeza volta a chamar
+        // `ensureCloudUser` e, se voltar a falhar, sobrescreve a razao original
+        // com a dela.
+        const cause = livePushError();
         await stopLiveShare(s.token);
         // A causa entra no diálogo: "não foi possível" sem dizer o quê obriga a
         // eliminar por tentativa, e quem está a tentar arrancar o rastreio pode
         // estar numa emergência.
-        const cause = livePushError();
-        Alert.alert(t('live_title'), t('live_error') + (cause ? `\n\n${cause}` : ''));
+        Alert.alert(
+          t('live_title'),
+          t('live_error') + (cause ? `\n\n${cause}` : ''),
+        );
         return;
       }
       const owner = await ensureService(s, true);

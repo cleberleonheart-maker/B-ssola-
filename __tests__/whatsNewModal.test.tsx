@@ -44,19 +44,19 @@ describe('WhatsNewModal', () => {
   it('renderiza o Modal quando visible é verdadeiro', async () => {
     const r = await render(null);
     expect(r.root.findAllByType(Modal)).toHaveLength(1);
-    expect(texts(r)).toContain(t('wn_livenative_title'));
+    expect(texts(r)).toContain(t('wn_cloudsilent_title'));
   });
 
   it('sem última versão vista, mostra só a atual e sem cabeçalho de build', async () => {
     const shown = texts(await render(null));
-    expect(shown).toContain(t('wn_livenative_title'));
+    expect(shown).toContain(t('wn_cloudsilent_title'));
     expect(shown).toContain(t('wn_title', { version: APP_VERSION }));
-    expect(shown).not.toContain(t('wn_build_label', { code: 158 }));
+    expect(shown).not.toContain(t('wn_build_label', { code: 159 }));
   });
 
   it('com última versão vista, acumula as versões do intervalo', async () => {
     const shown = texts(await render(151));
-    // Uma entrada de cada build de 152 a 158.
+    // Uma entrada de cada build de 152 a 159.
     expect(shown).toContain(t('wn_livesrumo_title'));
     expect(shown).toContain(t('wn_updatefix_title'));
     expect(shown).toContain(t('wn_tidy_title'));
@@ -73,20 +73,20 @@ describe('WhatsNewModal', () => {
 
   it('no acumulado, cada build aparece com seu número', async () => {
     const shown = texts(await render(151));
-    for (const code of [158, 157, 156, 155, 154, 153, 152]) {
+    for (const code of [159, 158, 157, 156, 155, 154, 153, 152]) {
       expect(shown).toContain(t('wn_build_label', { code }));
     }
   });
 
   it('o grupo mais novo é o da versão instalada', async () => {
     const labels = texts(await render(151)).filter(s => s.includes('Build '));
-    expect(labels[0]).toBe(t('wn_build_label', { code: 158 }));
+    expect(labels[0]).toBe(t('wn_build_label', { code: 159 }));
   });
 
   it('a mesma versão vista não abre o modal com nada de novo', async () => {
-    const shown = texts(await render(158));
-    expect(shown).toContain(t('wn_livenative_title'));
-    expect(shown).not.toContain(t('wn_title_since', { code: 158 }));
+    const shown = texts(await render(159));
+    expect(shown).toContain(t('wn_cloudsilent_title'));
+    expect(shown).not.toContain(t('wn_title_since', { code: 159 }));
   });
 
   it('uma entrada repetida em vários builds não vira linha duplicada', async () => {

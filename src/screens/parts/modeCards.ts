@@ -19,6 +19,7 @@ export const buildModeCards = (t: Translator): ModeCard[] => [
   { key: 'sun', icon: '☀️', label: t('ui_mode_sun').replace(/^\S+\s*/, ''), sub: t('ui_card_sun') },
   { key: 'wind', icon: '🍃', label: t('ui_mode_wind').replace(/^\S+\s*/, ''), sub: t('ui_card_wind') },
   { key: 'track', icon: '🗺️', label: t('ui_mode_track').replace(/^\S+\s*/, ''), sub: t('ui_card_track') },
+  { key: 'map', icon: '📍', label: t('ui_mode_map').replace(/^\S+\s*/, ''), sub: t('ui_card_map') },
   { key: 'notes', icon: '📓', label: t('ui_mode_notes').replace(/^\S+\s*/, ''), sub: t('ui_card_notes') },
   { key: 'odometer', icon: '📏', label: t('ui_mode_odometer').replace(/^\S+\s*/, ''), sub: t('ui_card_odometer') },
   { key: 'height', icon: '⌖', label: t('ui_mode_height').replace(/^\S+\s*/, ''), sub: t('ui_card_height') },
