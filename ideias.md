@@ -283,7 +283,7 @@ foram encontrados de verdade, não ideias soltas.
       ficava sem rumo. Normaliza para 0-360 e trata NaN/Infinity como ausente. O
       `EmergencyModal` passa o rumo num ref para o interval de 10 s. 4 testes em
       `bugfixes.test.ts` + 4 em `liveSession.test.ts`.
-- [ ] **55. ⏱️ Tirar o "SEM SINAL" piscando** — app empurra a cada 10 s e o viewer
+- [x] **55. ⏱️ Tirar o "SEM SINAL" piscando** — app empurra a cada 10 s e o viewer
       considera stale acima de 25 s. **Causa raiz confirmada: não era folga do viewer.**
       Com o app em background o Android estrangula o `setInterval` e o `LocationManager`
       para de entregar fix — o caso de uso real (aparelho no bolso durante uma emergência).
@@ -291,12 +291,13 @@ foram encontrados de verdade, não ideias soltas.
       `LiveTracking` + `ACCESS_BACKGROUND_LOCATION`/`FOREGROUND_SERVICE_LOCATION`, com
       notificação persistente e ação "Parar"; sem a permissão o app avisa em vez de prometer
       que funciona. 9 testes em `__tests__/liveTracking.test.ts`.
-      **Falta: testar com a tela apagada no aparelho antes de fechar como concluída.**
       Não aumentar o stale do viewer — isso só mascara o sumiço.
-      *Status: código pronto (155), ainda não verificado em campo. Protocolo: instalar o
-      APK do CI, iniciar o rastreio, travar a tela, deixar 2–3 min e ver se a etiqueta
-      fica `● AO VIVO` estável; repetir em segundo plano e com a economia de energia do
-      sistema ligada. Não dá para buildar localmente (#59/#61).*
+      **Fechado em 2026-10-04**: verificado em campo no aparelho, e o `● AO VIVO`
+      aguentou com a tela travada. Era o que faltava desde a 155 — o código estava
+      pronto há 22 builds e nenhuma das suítes apanha *throttling* do Android, que
+      só existe no aparelho. Uma dívida que só o campo fecha é uma dívida que
+      nenhuma CI pode fechar; fica escrito para a próxima não a contar como feita
+      só porque compila.
 
 - [x] **55b. 💀 Processo morto ≠ timer estrangulado** — a #55 fecha o caso do
       *throttling*: com o processo promovido, o `setInterval` do `EmergencyModal` volta
@@ -316,7 +317,11 @@ foram encontrados de verdade, não ideias soltas.
       **Fechado na v7.27 (code 158)**: o serviço passou a ser dono do push
       (`LiveTrackingSession.kt`), com `START_REDELIVER_INTENT` para o Intent
       voltar com o processo e `ownerRef` para dois autores não oscilarem o
-      `updated_at`. A linha ficou por fazer na v7.27 em diante.
+      `updated_at`. **Falta o teste de campo do `force-stop`** (2026-10-04): o
+      roteiro de tela travada da #55 foi verificado e aguentou, mas ninguém
+      matou o processo à força para ver se o `START_REDELIVER_INTENT` traz o
+      Intent de volta e o link continua a andar. Sem aparelho ligado não dá
+      para automatizar.
 - [ ] **56. 💥 Relatório de crash** — hoje um erro em produção é invisível; o usuário
       simplesmente vê o app fechar. Sentry daria o stack real.
 - [x] **57. 🧪 Testes dos componentes extraídos** — feito. 12 testes para as primitivas de
@@ -682,12 +687,12 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       gente que actualizou desde a 7.11 leu uma promessa falsa. Passou a dizer
       o que existe. A #41 fica aberta pelo que falta (o gesto), que é
       dependência nativa nova — mas já não é falsa.
+- [x] **55. ⏱️ Tirar o "SEM SINAL" piscando** — teste de campo verificado em
+      2026-10-04 no aparelho: com a tela travada o `● AO VIVO` aguentou. Fica a
+      nota onde está, com o porquê de só o campo fechar esta uma.
 - [x] **Limpeza de marcas erradas** — #94, #53, #32 e #55b estavam por fazer com
       o código no sítio há várias versões: o `svgNode` do `live.html` tem o `for`
       correcto desde a v7.28, o `changelogBetween` existe desde a v7.27, os mils
       estão na `CompassScreen` desde a v7.23 e o serviço nativo é dono do push
       desde a v7.27. Uma lista de dívidas em que metade já não é dívida é pior
       do que nenhuma: faz o próximo duvidar das que são.
-      A #55 continua aberta e é o único caso diferente: o código está pronto
-      desde a 155, falta o **teste de campo** (tela travada 2–3 min, economia de
-      energia ligada) — que é o que a nota dela já pedia.
