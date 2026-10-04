@@ -18,9 +18,17 @@ import {
   livePushCredentials,
   liveLink,
   liveCountdown,
+  liveDurationLabel,
   getActiveLiveSession,
   type LiveSession,
 } from '../services/liveShareService';
+import {
+  LIVE_DURATION_OPTIONS,
+  DEFAULT_LIVE_DURATION,
+  loadLiveDuration,
+  saveLiveDuration,
+  type LiveDuration,
+} from '../services/preferencesService';
 import {
   startLiveTracking,
   stopLiveTracking,
@@ -115,6 +123,9 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
 
   const [liveSession, setLiveSession] = useState<LiveSession | null>(null);
   const [liveBusy, setLiveBusy] = useState(false);
+  const [liveMinutes, setLiveMinutes] = useState<LiveDuration>(
+    DEFAULT_LIVE_DURATION,
+  );
   const [, setTick] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionRef = useRef<LiveSession | null>(null);
@@ -205,11 +216,35 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
     };
   }, [clearTicker, ensureService, startTicker]);
 
+  /**
+   * A duração escolhida da última vez é o default.
+   *
+   * Num SOS, escolher minutos com o dedo é mais um passo entre a decisão e o
+   * link a ser enviado. Guarda-se o valor para o seletor já vir com o que a
+   * pessoa costuma usar, e um valor gravado fora da lista (ou lixo) cai no
+   * default em vez de fazer o rastreio durar uma duración que ninguém escolheu.
+   */
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const saved = await loadLiveDuration();
+      if (mounted) setLiveMinutes(saved);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const chooseDuration = (minutes: LiveDuration) => {
+    setLiveMinutes(minutes);
+    void saveLiveDuration(minutes);
+  };
+
   const startLive = async () => {
     if (!hasFix || liveBusy || sessionRef.current) return;
     setLiveBusy(true);
     try {
-      const s = await startLiveShare(30);
+      const s = await startLiveShare(liveMinutes);
       if (!s) {
         Alert.alert(t('live_title'), t('live_need_cloud'));
         return;
@@ -236,7 +271,10 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
       const owner = await ensureService(s, true);
       startTicker(s, owner);
       try {
-        await Share.share({ message: t('live_shared') + ' ' + url });
+        await Share.share({
+          message:
+            t('live_shared', { time: liveDurationLabel(liveMinutes) }) + ' ' + url,
+        });
       } catch {}
     } catch {
       Alert.alert(t('live_title'), t('live_error'));
@@ -314,6 +352,44 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
                   {t('em_share_btn')}
                 </Text>
               </Pressable>
+
+              {!liveSession && (
+                <View style={styles.durationBlock}>
+                  <Text style={[styles.durationLabel, { color: colors.textMuted }]}>
+                    {t('live_duration')}
+                  </Text>
+                  <View style={styles.durationRow}>
+                    {LIVE_DURATION_OPTIONS.map(minutes => {
+                      const picked = minutes === liveMinutes;
+                      return (
+                        <Pressable
+                          key={minutes}
+                          onPress={() => chooseDuration(minutes)}
+                          style={[
+                            styles.durationChip,
+                            {
+                              backgroundColor: picked
+                                ? colors.primary
+                                : colors.surfaceAlt,
+                            },
+                          ]}>
+                          <Text
+                            style={[
+                              styles.durationChipText,
+                              {
+                                color: picked
+                                  ? colors.background
+                                  : colors.text,
+                              },
+                            ]}>
+                            {liveDurationLabel(minutes)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
 
               {liveSession ? (
                 <>
@@ -437,6 +513,31 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     marginTop: spacing.md,
+  },
+  durationBlock: {
+    width: '100%',
+    marginTop: spacing.md,
+  },
+  durationLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  durationRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  durationChip: {
+    flex: 1,
+    borderRadius: radius.full,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  durationChipText: {
+    fontSize: 13,
+    fontWeight: '800',
   },
   shareText: {
     fontSize: 16,

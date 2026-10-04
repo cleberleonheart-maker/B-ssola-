@@ -155,6 +155,35 @@ export const saveUseMils = async (enabled: boolean) => {
   await AsyncStorage.setItem(USE_MILS_KEY, enabled ? '1' : '0');
 };
 
+const LIVE_DURATION_KEY = '@bussola/liveDuration';
+
+/**
+ * Opções de duração do rastreio ao vivo, em minutos.
+ *
+ * O rastreio era fixo em 30 min. Uma trilha longa precisa de mais, e um recado
+ * rápido não precisa de manter a posição exposta meia hora. O mínimo é o que
+ * `startLiveShare` já aceita (`Math.max(5, minutes)`).
+ */
+export const LIVE_DURATION_OPTIONS = [15, 30, 60, 120] as const;
+export type LiveDuration = (typeof LIVE_DURATION_OPTIONS)[number];
+export const DEFAULT_LIVE_DURATION: LiveDuration = 30;
+
+const isLiveDuration = (v: number): v is LiveDuration =>
+  (LIVE_DURATION_OPTIONS as readonly number[]).includes(v);
+
+export const loadLiveDuration = async (): Promise<LiveDuration> => {
+  try {
+    const raw = Number(await AsyncStorage.getItem(LIVE_DURATION_KEY));
+    return isLiveDuration(raw) ? raw : DEFAULT_LIVE_DURATION;
+  } catch {
+    return DEFAULT_LIVE_DURATION;
+  }
+};
+
+export const saveLiveDuration = async (minutes: LiveDuration) => {
+  await AsyncStorage.setItem(LIVE_DURATION_KEY, String(minutes));
+};
+
 const LOCK_PIN_KEY = '@bussola/lockPin';
 
 export const loadLockPin = async (): Promise<string | null> => {

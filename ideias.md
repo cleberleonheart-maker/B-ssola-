@@ -600,3 +600,17 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       padrão do #91: a causa existe, só não estava a ser mostrada. Em paralelo,
       ligar "Anonymous sign-ins" no painel do Supabase é o que faz o rastreio
       ao vivo arrancar sem novo APK.
+
+
+## ✅ Feitos (v7.30 · code 161)
+- [x] **96. ⏱ O rastreio ao vivo durava sempre 30 minutos** — `startLiveShare(30)`
+      estava com o número escrito à mão no `EmergencyModal`, e o mesmo 30
+      aparecia também no rótulo do botão e na mensagem que se envia no
+      WhatsApp. Quem traceja uma trilha longa ficava a repetir o link a cada
+      meia hora; num recado rápido, pelo contrário, a posição continuava exposta
+      muito depois de já não ser preciso. Agora há quatro opções (15 min, 30
+      min, 1 h, 2 h) num seletor acima do botão, com a escolha memorizada — num
+      SOS, escolher minutos com o dedo é mais um passo entre a decisão e o link
+      sair. O texto partilhado deixou de ter a duração escrita dentro e passou
+      a ser preenchido com a escolha, para não voltar a mentir quando a opção
+      muda.

@@ -40,6 +40,20 @@ export const liveCountdown = (s: LiveSession): string => {
   return `${h}:${String(m).padStart(2, '0')}`;
 };
 
+/**
+ * Texto curto da duração escolhida: "15 min", "1 h", "2 h".
+ *
+ * Horas cheias viram "h" para o chip do seletor não ficar largo nem quebrar a
+ * linha; o resto sai com uma casa decimal. O mínimo de 5 min é o mesmo de
+ * `startLiveShare`, para o rótulo nunca prometer menos do que a sessão dura.
+ */
+export const liveDurationLabel = (minutes: number): string => {
+  const safe = Math.max(5, Math.round(minutes));
+  if (safe < 60) return `${safe} min`;
+  const hours = safe / 60;
+  return Number.isInteger(hours) ? `${hours} h` : `${hours.toFixed(1)} h`;
+};
+
 export const startLiveShare = async (
   minutes: number,
 ): Promise<LiveSession | null> => {
