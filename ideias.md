@@ -536,11 +536,13 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       `https`, o que resolve servidor falso mas não o binário trocado no caminho.
       Falta `expectedHash` do release + `crypto` no nativo, e um ecrã de
       "verificando" para não parecer que a instalação falhou.
-- [ ] **87. 🧨 `get_live_status` só funciona depois de aplicada no Supabase** —
-      aplicada no SQL Editor a 2026-10-03. O que fica é o processo: o
+- [ ] **87. 🧨 As RPCs só chegam à nuvem coladas à mão** — `get_live_status`
+      aplicada no SQL Editor a 2026-10-03 e `get_live_track` (que vem com a
+      tabela `live_points`) em 2026-10-04. O que fica é o processo: o
       `publicar-supabase.sh` só mexe em `app_version` e nenhuma das RPCs chega à
-      nuvem sozinha, e o `publicar.sh` local idem. Vale um `./scripts/publicar-rls.sh`
-      com a service_role, ou um passo no `publicar.sh`, antes que a próxima RPC
+      nuvem sozinha, e o `publicar.sh` local idem — o `live_points.sql` nem é
+      mencionado lá dentro. Vale um `./scripts/publicar-rls.sh` com a
+      service_role, ou um passo no `publicar.sh`, antes que a próxima RPC
       volta a ficar só no repositório.
 - [ ] **88. 🧪 Testes do serviço nativo** — o `compileDebugKotlin` garante que
       compila, não que `pushLivePosition` faz o upsert certo nem que o
@@ -631,12 +633,7 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       justificasse, e perder um troço do caminho é melhor do que perder o link.
       O Android grava pela mesma via do `pushLivePosition` de sempre, e o mesmo
       filtro de 5 m da janela evita o trançado com o GPS parado a oscilar.
-
-### Dívidas que ficaram do mesmo commit
-- [ ] **87b. 🧨 `live_points` só existe depois de aplicada no Supabase** — o
-      `scripts/live_points.sql` é idempotente, mas continua a ser um ficheiro do
-      repositório: sem ele colado no SQL Editor, `pushLivePoint` devolve `false`
-      em silêncio e o trajecto volta a ser só o que o viewer viu (o link
-      continua a funcionar, por isso o sintoma é discreto). É o mesmo problema do
-      #87, agora com mais um ficheiro na fila — e o `publicar.sh` nem menciona
-      este.
+      O `scripts/live_points.sql` foi aplicado no SQL Editor (verificado a
+      2026-10-04: a `get_live_track` responde), portanto a tabela e a RPC já
+      estão na nuvem — o que resta é o processo do #87, que agora tem mais um
+      ficheiro na fila.
