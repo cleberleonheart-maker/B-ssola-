@@ -573,10 +573,6 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       mexer, o aparelho volta a falhar em silêncio.
 
 ### Dívidas que ficaram do mesmo commit
-- [ ] **92. 📜 O trajecto do viewer vive só na página** — `live_shares` é um
-      `upsert` por token: uma linha, um ponto, sem histórico. O que a página
-      desenha é o que ela viu desde que abriu, e diz isso por baixo do mapa.
-      Quem precisar do percurso completo precisa de uma tabela de pontos.
 - [ ] **93. 🗺️ Sem base cartográfica** — o mapa mostra a sua posição, o rumo, o
       círculo de precisão e a escala, mas não ruas nem nomes de rua. É uma
       decisão (zero pedidos, zero tiles, funciona sem rede), não um esquecimento;
@@ -614,3 +610,33 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       sair. O texto partilhado deixou de ter a duração escrita dentro e passou
       a ser preenchido com a escolha, para não voltar a mentir quando a opção
       muda.
+
+
+## ✅ Feitos (v7.31 · code 162)
+- [x] **92. 📜 O trajecto do viewer vivia só na página** — `live_shares` é um
+      `upsert` por token: uma linha, um ponto, sem histórico. O que a página
+      desenhava era o que ela tinha visto desde que abriu, e confessava isso por
+      baixo do mapa; quem abrisse o link vinte minutos depois do início via só
+      uma recta do ponto actual, sem o caminho andado. Agora há uma segunda
+      tabela, `live_points`, onde cada fix é uma linha nova em vez de uma
+      sobrescrita: `live_shares` continua a ser a "posição agora" e a fonte da
+      verdade sobre se a sessão está viva, `live_points` é a memória do percurso.
+      O viewer lê o trajecto por uma RPC que devolve só o que apareceu depois do
+      último ponto (`id > after`), pelo `id` e não pelo relógio — o `id` é denso
+      e monotono, portanto "depois do ponto N" não tem buracos nem empates, ao
+      passo que `recorded_at` pode vir repetido (o serviço e o JS gravam no mesmo
+      segundo) e faria o viewer saltar pontos ou repetir o último. O preço é o
+      ponto gravado depois da posição e nunca antes: publicar um ponto de uma
+      sessão que não arrancou deixaria um trajecto no servidor sem linha que o
+      justificasse, e perder um troço do caminho é melhor do que perder o link.
+      O Android grava pela mesma via do `pushLivePosition` de sempre, e o mesmo
+      filtro de 5 m da janela evita o trançado com o GPS parado a oscilar.
+
+### Dívidas que ficaram do mesmo commit
+- [ ] **87b. 🧨 `live_points` só existe depois de aplicada no Supabase** — o
+      `scripts/live_points.sql` é idempotente, mas continua a ser um ficheiro do
+      repositório: sem ele colado no SQL Editor, `pushLivePoint` devolve `false`
+      em silêncio e o trajecto volta a ser só o que o viewer viu (o link
+      continua a funcionar, por isso o sintoma é discreto). É o mesmo problema do
+      #87, agora com mais um ficheiro na fila — e o `publicar.sh` nem menciona
+      este.

@@ -11,7 +11,7 @@ import {
 import { createTranslator } from '../src/i18n/strings';
 
 const t = createTranslator('pt');
-const CURRENT = 161;
+const CURRENT = 162;
 
 const titles = (entries: ChangelogEntry[]) => entries.map(e => e.title);
 
@@ -24,8 +24,8 @@ describe('changelogFor', () => {
 
   it('cai na entrada conhecida imediatamente abaixo quando o build não tem uma', () => {
     // Build novo cujo changelog ainda não foi escrito, ou código muito à frente.
-    expect(changelogFor(162, t)).toEqual(changelogFor(161, t));
-    expect(changelogFor(200, t)).toEqual(changelogFor(161, t));
+    expect(changelogFor(163, t)).toEqual(changelogFor(162, t));
+    expect(changelogFor(200, t)).toEqual(changelogFor(162, t));
   });
 
   it('devolve vazio quando não há build conhecido abaixo', () => {
@@ -41,7 +41,7 @@ describe('changelogFor', () => {
 
 describe('changelogBetween — o que acumula', () => {
   it('uma versão de intervalo mostra só ela', () => {
-    expect(changelogBetween(160, CURRENT, t)).toEqual([
+    expect(changelogBetween(161, CURRENT, t)).toEqual([
       { code: CURRENT, entries: changelogFor(CURRENT, t) },
     ]);
   });
@@ -49,7 +49,7 @@ describe('changelogBetween — o que acumula', () => {
   it('acumula várias versões, da mais nova para a mais antiga', () => {
     const builds = changelogBetween(151, CURRENT, t);
     expect(builds.map(b => b.code)).toEqual([
-      161, 160, 159, 158, 157, 156, 155, 154, 153, 152,
+      162, 161, 160, 159, 158, 157, 156, 155, 154, 153, 152,
     ]);
   });
 
@@ -73,7 +73,7 @@ describe('changelogBetween — o que acumula', () => {
   it('traduz para o idioma pedido', () => {
     const en = changelogBetween(157, CURRENT, createTranslator('en'));
     expect(en[0].entries[0].title).toBe(
-      createTranslator('en')('wn_liveduration_title'),
+      createTranslator('en')('wn_livetrack_title'),
     );
     expect(en[0].entries[0].title).not.toBe(changelogFor(CURRENT, t)[0].title);
   });
@@ -99,19 +99,19 @@ describe('changelogBetween — o que não acumula', () => {
   });
 
   /**
-   * O build 162 subiu e o changelog ainda não foi escrito. Se o grupo do build
-   * atual não entrasse na lista, quem vinha do 161 veria um modal vazio: o
-   * 161 já foi visto e a entrada dele foi consumida pela de cima.
+   * O build 163 subiu e o changelog ainda não foi escrito. Se o grupo do build
+   * atual não entrasse na lista, quem vinha do 162 veria um modal vazio: o
+   * 162 já foi visto e a entrada dele foi consumida pela de cima.
    */
   it('build novo sem changelog escrito mostra o que houve por último', () => {
-    const builds = changelogBetween(161, 162, t);
-    expect(builds.map(b => b.code)).toEqual([162]);
-    expect(builds[0].entries).toEqual(changelogFor(161, t));
+    const builds = changelogBetween(162, 163, t);
+    expect(builds.map(b => b.code)).toEqual([163]);
+    expect(builds[0].entries).toEqual(changelogFor(162, t));
   });
 
   it('a entrada do build mais recente não aparece duplicada sob o código antigo', () => {
     // O mesmo título nos dois grupos seria duas linhas iguais na tela.
-    const titles = changelogBetween(160, 162, t).flatMap(b =>
+    const titles = changelogBetween(161, 163, t).flatMap(b =>
       b.entries.map(e => e.title),
     );
     expect(new Set(titles).size).toBe(titles.length);
@@ -167,7 +167,7 @@ describe('última versão vista', () => {
 
   it('o que está gravado decide o que o modal mostra', async () => {
     await markChangelogSeen(151);
-    expect(changelogBetween(await loadChangelogSeen(), CURRENT, t).length).toBe(10);
+    expect(changelogBetween(await loadChangelogSeen(), CURRENT, t).length).toBe(11);
   });
 
   it('valor corrompido vira null em vez de NaN no meio do cálculo', async () => {

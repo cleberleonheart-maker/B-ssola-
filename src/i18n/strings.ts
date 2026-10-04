@@ -495,6 +495,9 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     wn_liveduration_title: 'Rastreio ao vivo pelo tempo que quiser',
     wn_liveduration_desc: 'A duração deixou de ser 30 minutos fixos. Há quatro opções — 15 min, 30 min, 1 h e 2 h — e a última usada fica marcada para a próxima. O botão e a mensagem que envia no WhatsApp passam a dizer o tempo que ficou escolhido.',
 
+    wn_livetrack_title: 'O link do rastreio mostra o caminho todo',
+    wn_livetrack_desc: 'A página deixa de desenhar só o que foi visto desde que abriu. Cada posição passa a ficar guardada à parte, e quem recebe o link vê o percurso completo — o mesmo que a pessoa andou, não só a parte que coincidiu com a consulta.',
+
     wn_livenative_title: 'Rastreio ao vivo sobrevive ao app fechado',
     wn_livenative_desc: 'A posição passa a ser enviada pelo serviço do próprio Android, e não mais pelo app. Se o sistema encerrar o Bússola para economizar memória, o rastreio continua e o link não fica parado.',
     wn_liveexpired_title: 'Fim de rastreio explicado',
@@ -1281,6 +1284,9 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
 
     wn_liveduration_title: 'Live tracking for as long as you need',
     wn_liveduration_desc: 'The duration is no longer a fixed 30 minutes. There are four choices — 15 min, 30 min, 1 h and 2 h — and the last one used stays selected for next time. The button and the message you share on WhatsApp now say the time that was chosen.',
+
+    wn_livetrack_title: 'The tracking link now shows the whole way',
+    wn_livetrack_desc: 'The page no longer draws only what it has seen since it was opened. Every position is now kept separately, so whoever gets the link sees the complete route — the one the person actually walked, not just the part that happened to be asked for.',
     wn_livenative_title: 'Live tracking survives the app being closed',
     wn_livenative_desc: 'Your position is now sent by the Android service itself instead of by the app. If the system shuts Bussola down to save memory, tracking carries on and the link never freezes.',
     wn_liveexpired_title: 'The end of tracking is explained',
@@ -2066,6 +2072,9 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
 
     wn_liveduration_title: 'Rastreo en vivo por el tiempo que quieras',
     wn_liveduration_desc: 'La duración ya no es fija de 30 minutos. Hay cuatro opciones — 15 min, 30 min, 1 h y 2 h — y la última usada queda marcada para la próxima. El botón y el mensaje que se comparte en WhatsApp ahora dicen el tiempo elegido.',
+
+    wn_livetrack_title: 'El enlace del rastreo ya muestra todo el camino',
+    wn_livetrack_desc: 'La página ya no dibuja solo lo que vio desde que se abrió. Ahora cada posición se guarda aparte, así que quien recibe el enlace ve el recorrido completo — el que hizo la persona, no solo la parte que coincidió con la consulta.',
     wn_livenative_title: 'El rastreo en vivo sobrevive a la app cerrada',
     wn_livenative_desc: 'La posición la envía ahora el propio servicio de Android, y no la app. Si el sistema cierra Bussola para ahorrar memoria, el rastreo sigue y el enlace no se queda quieto.',
     wn_liveexpired_title: 'El fin del rastreo se explica',

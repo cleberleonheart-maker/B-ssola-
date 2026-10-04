@@ -248,7 +248,7 @@ describe('sessão de live', () => {
   };
 
   it('grava o ponto do trajecto depois de gravar a posicao', async () => {
-    const { service, pushLivePosition, pushLivePoint } = loadService(1000);
+    const { service, pushLivePoint } = loadService(1000);
     const s = await service.startLiveShare(30);
 
     await expect(service.pushLiveFix(s!, fixCompleto)).resolves.toBe(true);
