@@ -106,26 +106,35 @@ export const getActiveLiveSession = async (): Promise<LiveSession | null> => {
 };
 
 /**
- * O *bearing* do GPS so existe quando ha deslocamento; parado, o Android devolve
+ * O *bearing* do GPS só existe quando ha deslocamento; parado, o Android devolve
  * `null`. O rumo da bussola e sempre disponivel, entao serve de reserva — sem ele
  * o viewer fica sem rumo justamente na emergencia com o aparelho no bolso.
  *
  * Preferimos o GPS quando existe por ser a referencia da plataforma. O rumo da
  * bussola ja vem com a declinacao aplicada (ver `CompassScreen.handleHeading`),
  * entao esta no mesmo referencial do resto do app e nao converte de novo.
+ *
+ * As duas regras abaixo — `>= 0` e normalizar para 0–360 — existem para bater
+ * certo com o `resolveLiveHeading` do Kotlin, que toma as decisões a partir do
+ * primeiro fix. Sem elas os dois lados discordavam em 360 (um escrevia "360°" no
+ * viewer, que parece leitura quebrada) e nos negativos, que são o sentinel do
+ * `hasBearing()`: o serviço tratava o -1 como "sem bearing" e caía na reserva,
+ * e o JS publicava-o como se fosse um rumo. `__tests__/liveHeadingParity.test.ts`
+ * corre os dois sobre o mesmo fixture.
  */
 export const resolveLiveHeading = (
   gpsHeading: number | null | undefined,
   magneticHeading: number | null | undefined,
 ): number | null => {
-  if (gpsHeading != null && Number.isFinite(gpsHeading)) {
-    return gpsHeading;
+  if (gpsHeading != null && Number.isFinite(gpsHeading) && gpsHeading >= 0) {
+    return normalizeHeading(gpsHeading);
   }
   if (magneticHeading != null && Number.isFinite(magneticHeading)) {
     return normalizeHeading(magneticHeading);
   }
   return null;
 };
+
 
 export const pushLiveFix = async (
   s: LiveSession,

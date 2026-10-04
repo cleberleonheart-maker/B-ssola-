@@ -548,9 +548,20 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       compila, não que `pushLivePosition` faz o upsert certo nem que o
       `START_REDELIVER_INTENT` traz o Intent de volta. Nenhum dos dois é testável
       em JVM sem extrair o parsing e o payload, que já são funções fora da classe.
-- [ ] **89. 🧭 Dois rumos para a mesma linha** — `resolveLiveHeading` do JS e o do
+- [x] **89. 🧭 Dois rumos para a mesma linha** — `resolveLiveHeading` do JS e o do
       Kotlin concordam por construção agora, mas nada impede que o próximo que
       mexer num mexa só num. Vale um teste de paridade sobre os dois.
+      **Fechado em 2026-10-04** com `__tests__/liveHeadingParity.test.ts`, que
+      translitera as duas funções do `LiveTrackingSession.kt` para JavaScript e
+      corre ambas sobre o mesmo fixture — escrever o Kotlin à mão no teste seria
+      uma terceira cópia, que divergiria sem ninguém ver. O teste apanhou logo
+      quatro divergências, todas no ramo do GPS: o JS publicava o bearing como
+      vinha, e o Kotlin normaliza e trata os negativos como sentinel, portanto em
+      360° escrevia "360°" no viewer e num `-1` publicava um rumo que é o
+      oposto do que o serviço publicava no fix seguinte. O JS passou a ter as
+      duas regras do Kotlin (`>= 0` e normalizar). Cada passo da transliteração
+      é conferido: se o Kotlin mudar de forma, o teste fica vermelho a pedir
+      atenção em vez de comparar duas coisas sem relação.
 
 ## ✅ Feitos (v7.28 · code 159)
 - [x] **90. 🗺️ Mapa novo, sem rede** — não havia forma nenhuma de ver onde se
