@@ -13,23 +13,20 @@ if ! command -v gh >/dev/null; then
 fi
 
 # O build.gradle nao tem fallback para o keystore de debug: sem estas variaveis
-# o assembleRelease aborta. O keystore local de producao vive em
-# ~/.bussola-keystore/ (fora do repo, junto de password.txt e do alias).
-KEYSTORE_DIR="${BUSSOLA_KEYSTORE_DIR:-$HOME/.bussola-keystore}"
+# o assembleRelease aborta. A chave de producao esta no CI (secrets) e numa
+# copia cifrada fora do aparelho -- nunca mais se le um ficheiro de senha do
+# disco. Build local de release e um caminho excepcional: defina
+# ANDROID_KEYSTORE_* no ambiente e aponte o keystore para um ficheiro de
+# descarte, nunca para o mesmo que assina o que os utilizadores ja tem.
 if [ -z "${ANDROID_KEYSTORE_FILE:-}" ]; then
-  [ -f "$KEYSTORE_DIR/bussola-release.keystore" ] || {
-    echo "Keystore de producao nao encontrado em $KEYSTORE_DIR." >&2
-    echo "Use o CI (secrets) ou defina ANDROID_KEYSTORE_* no ambiente." >&2
-    exit 1
+  [ -f "${HOME}/.bussola-keystore/bussola-release.keystore" ] && {
+    echo "AVISO: existe uma chave de producao em ~/.bussola-keystore/ e o script" >&2
+    echo "       ja nao a usa. Apague-a de vez, ou um APK assinado por engano" >&2
+    echo "       sai com a chave que actualiza o app de toda a gente." >&2
   }
-  [ -f "$KEYSTORE_DIR/password.txt" ] || {
-    echo "Senha do keystore nao encontrada: $KEYSTORE_DIR/password.txt" >&2
-    exit 1
-  }
-  export ANDROID_KEYSTORE_FILE="$KEYSTORE_DIR/bussola-release.keystore"
-  export ANDROID_KEYSTORE_PASSWORD="$(cat "$KEYSTORE_DIR/password.txt")"
-  export ANDROID_KEY_ALIAS="${ANDROID_KEY_ALIAS:-bussola}"
-  export ANDROID_KEY_PASSWORD="${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}"
+  echo "Assinatura de release so no CI: defina ANDROID_KEYSTORE_* para um" >&2
+  echo "keystore de descarte, ou use o CI (que tem a chave de producao)." >&2
+  exit 1
 fi
 
 echo "==> BUILD (assembleRelease)"

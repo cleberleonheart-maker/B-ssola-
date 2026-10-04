@@ -262,10 +262,63 @@ foram encontrados de verdade, não ideias soltas.
       commitado podia divergir do `version.properties` e o app anunciaria uma versão que
       não corresponde ao que foi compilado. Também entrou no filtro de paths o próprio
       workflow, para que mudar o pipeline dispare build em vez de ficar sem teste.
-- [ ] **52. 🔐 Assinar só no CI** — o aparelho é `f2fs` e não aplica bits de permissão
+- [x] **52. 🔐 Assinar só no CI** — o aparelho é `f2fs` e não aplica bits de permissão
       (testado: um arquivo `600` de root é legível por `nobody`), então a senha do
       keystore fica exposta a qualquer processo no aparelho. Movendo o keystore para
       fora — o `--clobber` e os secrets já funcionam — o aparelho nunca vê a chave.
+
+      **Premissa reconfirmada a 2026-10-04**, e é exacta: `su nobody -c cat`
+      leu um `600` de root em `/root`. O mount é mesmo `f2fs ... user_xattr,
+      acl, ...`.
+
+      **O que trava a ideia, e é o que este parágrafo existe para impedir**: o
+      CI tem a chave certa, mas *não se consegue provar*. O secret
+      `ANDROID_KEYSTORE_BASE64` é write-only — nem o `gh` nem ninguém o lê de
+      volta. O que se confirma é o que já foi provado: três builds seguidos
+      (161, 162, 163) saíram do CI e o gate "Confere a assinatura do APK"
+      comparou o certificado com `android/app/release-cert.sha256`
+      (`a793040…ae77`), batendo certo. O keystore local tem o mesmo
+      certificado.
+
+      Apagar `/root/.bussola-keystore/` sem uma cópia fora daqui deixa a chave
+      num sítio só, desse sítio não se consegue recuperar, e o pior caso não é
+      perder um build: é o Bússola deixar de poder ser actualizado para sempre,
+      porque o Android exige a mesma chave e a fuga seria mudar o
+      `applicationId` — cada utilizador a perder trilhas, notas e waypoints ao
+      reinstalar. Hoje a chave está em dois sítios e um deles é fraco em
+      permissões; isso é melhor do que num só e irrecuperável.
+
+      O risco já não é o "segredo trocado em silêncio": o gate "Confere a
+      assinatura do APK" compara o certificado com o que está no repositório, e
+      uma chave diferente aborta o build antes de publicar seja o que for. O
+      risco é só a chave **desaparecer** — aí não há build nenhum, e recuperar
+      passa por ter cópia noutro sítio.
+
+      **Feito a 2026-10-10**, nesta ordem:
+      1. Backup cifrado (AES-256, PBKDF2 200k) e **verificado por ida e volta**:
+         descifrei-o, abri o keystore com `keytool -list` e o certificado deu
+         `A7:93…:AE:77`, igual ao de `release-cert.sha256`. Dentro vão o
+         keystore, o `password.txt` e um `LEIA-ME.txt` com o alias e o
+         certificado; o `ks.b64` ficou de fora por ser o mesmo keystore em
+         base64. SHA-256 do `.enc`: `562ce813…d4a1a5`.
+      2. `/root/.bussola-keystore/` apagado com `shred`, e varri o aparelho à
+         procura de cópias — nenhuma em claro do Bússola sobrou.
+      3. `publicar.sh` já não lê `~/.bussola-keystore/`: sem `ANDROID_KEYSTORE_*`
+         aborta antes do build, e se o directório voltar a existir avisa que o
+         arquivo já não é usado. Assim um `publicar.sh` a correr por engano já
+         não assina nada com a chave que actualiza o app de toda a gente.
+      4. `PUBLICACAO-ATUALIZACAO.md` actualizado.
+
+      **Falta o dono passar a cópia cifrada para o pendrive** — e apagá-la da
+      pasta `Download` depois, conferindo o SHA-256 no destino. A cópia actual
+      está em `/sdcard/Download/bussola-chave-producao-2026-10-10.enc`, ou
+      seja, ainda dentro do aparelho: mais segura do que a chave em claro, não
+      mais segura do que o aparelho.
+
+      Uma coisa que isto não resolve, e que é do mesmo feitio: este aparelho tem
+      as chaves de produção de outros projectos na mesma postura fraca
+      (`gps-pro/gpspro.keystore` está mesmo na pasta `Download`). Não são
+      minhas para mexer, mas o `--clobber` do CI não protege ninguém lá.
 
 ### Produto
 - [x] **53. 📜 Changelog acumulado** — o `changelogFor` mostra só a entrada da versão

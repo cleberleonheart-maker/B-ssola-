@@ -59,8 +59,16 @@ Teste isolado: `/root/android-sdk/aapt2emu/aapt2 version` → funciona rápido
   fallback para o keystore de debug — um APK assinado com a chave de debug não
   poderia ser atualizado por cima de uma instalação já publicada.
   - No CI as quatro variáveis vêm dos *secrets* do repositório.
-  - Localmente, `publicar.sh` lê o keystore de produção de `~/.bussola-keystore/`
-    (`bussola-release.keystore`, `password.txt`, alias `bussola`).
+  - **A chave de produção não existe em nenhum ficheiro deste repositório, nem
+    fora dele, em claro.** Ficou só nos *secrets* do GitHub (que são write-only:
+    não se voltam a ler) e numa cópia cifrada (AES-256, PBKDF2) que o dono tem
+    fora do aparelho. Isto vale porque o `/root` é `f2fs` sem permissões
+    aplicadas — um ficheiro `600` de root era legível por qualquer processo.
+  - `publicar.sh` **não tem** caminho para a chave de produção: sem
+    `ANDROID_KEYSTORE_*` no ambiente aborta antes do build, e se ainda existir
+    um `~/.bussola-keystore/` avisa que o arquivo já não é usado. Um build
+    local de release é para assinar com um keystore de descarte; para
+    production, o CI.
 - `web/live.html` (viewer do rastreio ao vivo) é publicado no **GitHub Pages** por
   `.github/workflows/pages.yml`. Os antigos `scripts/live_bucket.sql` e
   `scripts/live_content_type.sql` foram removidos: a alternativa via Supabase Storage
