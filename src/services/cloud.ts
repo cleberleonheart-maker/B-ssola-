@@ -254,6 +254,12 @@ export type AppVersion = {
   update_url: string;
   message: string | null;
   required: boolean;
+  /**
+   * SHA-256 do APK anunciado, gravado pelo CI no mesmo instante que publica.
+   * Falta a coluna até `scripts/app_version_sha.sql` correr no SQL Editor — daí
+   * ser opcional, e não `string`.
+   */
+  apk_sha256?: string | null;
 };
 
 type CloudRecord = {

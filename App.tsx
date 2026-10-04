@@ -103,6 +103,8 @@ function Root() {
           updateUrl={availableUpdate?.updateUrl ?? ''}
           message={availableUpdate?.message ?? null}
           required={availableUpdate?.required ?? false}
+          apkSha256={availableUpdate?.apkSha256 ?? null}
+          hashConflict={availableUpdate?.hashConflict ?? false}
           onClose={closeUpdate}
         />
         {lock.pin !== null && !lock.unlocked && (

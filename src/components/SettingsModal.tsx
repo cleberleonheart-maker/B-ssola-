@@ -445,6 +445,8 @@ const SettingsModal = ({
         updateUrl={update?.updateUrl ?? ''}
         message={update?.message ?? null}
         required={update?.required ?? false}
+        apkSha256={update?.apkSha256 ?? null}
+        hashConflict={update?.hashConflict ?? false}
         onClose={() => setUpdate(null)}
       />
       <WhatsNewModal

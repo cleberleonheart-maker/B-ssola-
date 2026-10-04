@@ -617,10 +617,42 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       cobre versão ausente, `0`, string, versão futura e a gravação.
 
 ### Dívidas abertas do mesmo commit
-- [ ] **71b. 🔐 Verificar SHA-256 do APK antes de instalar** — a descarga passa a ser
+- [x] **71b. 🔐 Verificar SHA-256 do APK antes de instalar** — a descarga passa a ser
       `https`, o que resolve servidor falso mas não o binário trocado no caminho.
       Falta `expectedHash` do release + `crypto` no nativo, e um ecrã de
       "verificando" para não parecer que a instalação falhou.
+
+      **Código pronto a 2026-10-10**, a nada falta:
+      - `ApkDownloaderModule.verify(uri, expected)` lê o ficheiro **já em disco**
+        com `MessageDigest` e compara. Escolhi reler do disco em vez de hashear
+        durante o download: o que vai ser instalado é o que ficou gravado, e
+        reler dá um estado "a verificar" verdadeiro em vez de decorativo.
+      - **Se não bater, o ficheiro é apagado.** Deixá-lo na pasta Download seria
+        deixar um `.apk` com cara de atualização à espera de o utilizador tocar
+        nele a seguir — que é o que ele faria.
+      - `apkSha256` e `hashConflict` entram no `AvailableUpdate`; o modal tem
+        estado `verifying` e dois erros distintos: `upd_error_hash` (o ficheiro
+        não é o anunciado) e `upd_error_hash_conflict` (as fontes discordam, e
+        não instalamos).
+
+      **O truque é haver duas fontes, e nenhuma ser o app.** A GitHub calcula um
+      `digest` SHA-256 por asset na sua própria infraestrutura, e o CI grava o
+      hash na tabela `app_version`. Quem consiga mexer num dos dois esbarra na
+      comparação. Confirmei com a v163 em mãos: o `digest` que a GitHub publica
+      bate certo com o `sha256sum` do ficheiro descarregado
+      (`962f9c3d…8fa881`).
+
+      Um caso que deu a volta: se a release já tiver um asset **mais novo** do que
+      a linha da nuvem, os dois hashes são de ficheiros diferentes e compará-los
+      acusaria um conflito falso em todas as releases. Só se comparam quando
+      `asset.code === cloud.version_code` — e há teste para isso.
+
+      **Feito a 2026-10-10** (v7.33, code 164). A coluna `apk_sha256` já correu
+      no SQL Editor e foi confirmada por REST (o `select apk_sha256` devolveu a
+      linha em vez de reclamar da coluna), e o CI escreve o hash no mesmo PATCH
+      que publica a release — com uma segunda tentativa sem o campo, para a
+      coluna em falta nunca partir uma publicação.
+
 - [ ] **87. 🧨 As RPCs só chegam à nuvem coladas à mão** — `get_live_status`
       aplicada no SQL Editor a 2026-10-03 e `get_live_track` (que vem com a
       tabela `live_points`) em 2026-10-04. O que fica é o processo: o

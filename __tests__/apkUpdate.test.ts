@@ -15,12 +15,14 @@ type MockNative = {
   download: jest.Mock;
   install: jest.Mock;
   cancel: jest.Mock;
+  verify: jest.Mock;
 };
 
 const mockNative = (): MockNative => ({
   download: jest.fn(),
   install: jest.fn(),
   cancel: jest.fn().mockResolvedValue(true),
+  verify: jest.fn().mockResolvedValue(true),
 });
 
 const loadUpdater = (native: MockNative) => {
@@ -162,6 +164,78 @@ describe('apkUpdater — cancelamento e timeout', () => {
     await expect(mod.downloadApk(URL_OK, 'bussola.apk')).rejects.toThrow(
       'apk_downloader_unavailable',
     );
-    expect(updater.isApkDownloaderAvailable()).toBe(false);
+expect(updater.isApkDownloaderAvailable()).toBe(false);
+  });
+});
+
+const SHA_A = 'a'.repeat(64);
+const SHA_B = 'b'.repeat(64);
+
+describe('apkUpdater — conferir o hash antes de instalar', () => {
+  let native: MockNative;
+
+  beforeEach(() => {
+    native = mockNative();
+  });
+
+  afterEach(() => {
+    delete (NativeModules as Record<string, unknown>).ApkDownloader;
+    jest.restoreAllMocks();
+  });
+
+  it('aceita o prefixo sha256: que a GitHub devolve', () => {
+    const updater = loadUpdater(native);
+    expect(updater.normalizeSha256(`sha256:${SHA_A}`)).toBe(SHA_A);
+    expect(updater.normalizeSha256(`SHA-256:${SHA_A.toUpperCase()}`)).toBe(SHA_A);
+  });
+
+  it('trata hash mal formado como "não sei", nunca como "bate certo"', () => {
+    const updater = loadUpdater(native);
+    expect(updater.normalizeSha256('')).toBe('');
+    expect(updater.normalizeSha256(null)).toBe('');
+    expect(updater.normalizeSha256(undefined)).toBe('');
+    expect(updater.normalizeSha256('sha256:')).toBe('');
+    expect(updater.normalizeSha256(SHA_A.slice(0, 63))).toBe('');
+    // 65 caracteres: um a mais, e já não é o hash do ficheiro anunciado.
+    expect(updater.normalizeSha256(`${SHA_A}a`)).toBe('');
+    expect(updater.normalizeSha256('z'.repeat(64))).toBe('');
+  });
+
+  it('confere o ficheiro com o hash esperado', async () => {
+    const updater = loadUpdater(native);
+
+    await expect(updater.verifyApk('content://media/1', SHA_A)).resolves.toBe(true);
+    expect(native.verify).toHaveBeenCalledWith('content://media/1', SHA_A);
+  });
+
+  it('propaga hash_mismatch do nativo em vez de engolir', async () => {
+    const updater = loadUpdater(native);
+    native.verify.mockRejectedValue(new Error('O arquivo não é o APK anunciado'));
+
+    // Um `catch` que devolvesse `false` aqui transformava um APK trocado num
+    // "a verificação falhou, instalo assim mesmo".
+    await expect(updater.verifyApk('content://media/1', SHA_B)).rejects.toThrow(
+      'não é o APK anunciado',
+    );
+  });
+
+  it('não chama o nativo com hash ausente', async () => {
+    const updater = loadUpdater(native);
+
+    await expect(updater.verifyApk('content://media/1', 'nada')).rejects.toThrow(
+      'hash_missing',
+    );
+    expect(native.verify).not.toHaveBeenCalled();
+  });
+
+  it('rejeita quando o nativo antigo não tem verify', async () => {
+    const updater = loadUpdater({
+      download: jest.fn(),
+      install: jest.fn(),
+    } as unknown as MockNative);
+
+    await expect(updater.verifyApk('content://media/1', SHA_A)).rejects.toThrow(
+      'apk_verify_unavailable',
+    );
   });
 });

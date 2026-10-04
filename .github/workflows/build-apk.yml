@@ -175,15 +175,30 @@ jobs:
           CODE=$(grep -E '^versionCode=' android/app/version.properties | cut -d'=' -f2)
           NAME=$(grep -E '^versionName=' android/app/version.properties | cut -d'=' -f2)
           URL="https://github.com/$GITHUB_REPOSITORY/releases/download/bussola-apk/bussola-v${CODE}.apk"
-          BODY="{\"version_code\":$CODE,\"version_name\":\"$NAME\",\"update_url\":\"$URL\",\"message\":\"Nova versão disponível\",\"required\":false}"
-          curl -fsS -X PATCH "$SUPABASE_URL/rest/v1/app_version?id=eq.1" \
+          SHA=$(sha256sum /tmp/bussola-v${CODE}.apk | cut -d' ' -f1)
+          BODY="{\"version_code\":$CODE,\"version_name\":\"$NAME\",\"update_url\":\"$URL\",\"message\":\"Nova versão disponível\",\"required\":false,\"apk_sha256\":\"$SHA\"}"
+          # `apk_sha256` é a segunda fonte do hash, a par do `digest` que a GitHub
+          # calcula por asset: uma de cada lado. Sem a coluna (SQL ainda não
+          # corrido), o PATCH falha e a release não saía — daí a segunda
+          # tentativa sem o campo, que ainda publica o update.
+          if ! curl -fsS -X PATCH "$SUPABASE_URL/rest/v1/app_version?id=eq.1" \
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Content-Type: application/json" \
             -H "Prefer: return=representation" \
-            -d "$BODY" -o /tmp/app_version.json
+            -d "$BODY" -o /tmp/app_version.json; then
+            echo "::warning::PATCH com apk_sha256 falhou (coluna em falta?); a publicar sem o hash"
+            BODY="{\"version_code\":$CODE,\"version_name\":\"$NAME\",\"update_url\":\"$URL\",\"message\":\"Nova versão disponível\",\"required\":false}"
+            curl -fsS -X PATCH "$SUPABASE_URL/rest/v1/app_version?id=eq.1" \
+              -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+              -H "Content-Type: application/json" \
+              -H "Prefer: return=representation" \
+              -d "$BODY" -o /tmp/app_version.json
+          fi
           echo "app_version -> $CODE ($NAME)"
           echo "URL: $URL"
+          echo "sha256: $SHA"
 
       - name: Upload APK (artifact)
         uses: actions/upload-artifact@v4

@@ -18,6 +18,7 @@ import {
   installApk,
   isApkDownloaderAvailable,
   isDirectApkUrl,
+  verifyApk,
 } from '../services/apkUpdater';
 
 type Props = {
@@ -26,16 +27,22 @@ type Props = {
   updateUrl: string;
   message: string | null;
   required: boolean;
+  /** SHA-256 esperado; `null` quando nenhuma fonte o sabe. */
+  apkSha256: string | null;
+  /** As duas fontes discordam: não instalamos, e dizemos porquê. */
+  hashConflict: boolean;
   onClose: () => void;
 };
 
 type Status =
   | 'idle'
   | 'downloading'
+  | 'verifying'
   | 'installing'
   | 'permission'
   | 'error'
-  | 'insecure';
+  | 'insecure'
+  | 'untrusted';
 
 const UpdateAvailableModal = ({
   visible,
@@ -43,6 +50,8 @@ const UpdateAvailableModal = ({
   updateUrl,
   message,
   required,
+  apkSha256,
+  hashConflict,
   onClose,
 }: Props) => {
   const colors = useThemeColors();
@@ -71,7 +80,7 @@ const UpdateAvailableModal = ({
     [onClose],
   );
 
-  const [errorKind, setErrorKind] = useState<'generic' | 'timeout'>('generic');
+  const [errorKind, setErrorKind] = useState<'generic' | 'timeout' | 'hash'>('generic');
 
   const openUpdate = useCallback(() => {
     if (running.current) {
@@ -86,6 +95,14 @@ const UpdateAvailableModal = ({
       // texto claro não vai para o navegador em silêncio — isso exporia o
       // download; o usuário escolhe abrir.
       setStatus('insecure');
+      return;
+    }
+    if (hashConflict) {
+      // Duas fontes com versões diferentes do mesmo ficheiro. Instalar seria
+      // apostar numa delas sem saber qual — e um APK trocado, assinado com a
+      // nossa chave, é exactamente o que o Android não apanha: instala por
+      // cima. Recusar é a única resposta honesta.
+      setStatus('untrusted');
       return;
     }
     running.current = true;
@@ -103,12 +120,38 @@ const UpdateAvailableModal = ({
       .then(result => {
         setPercent(100);
         apkUri.current = result.uri;
-        if (result.uri) {
-          launchInstall(result.uri);
-        } else {
+        if (!result.uri) {
           setStatus('error');
           running.current = false;
+          return;
         }
+        if (!apkSha256) {
+          // Nenhuma fonte sabe o hash. Instalar sem conferidor continua a ser
+          // melhor do que não instalar, e é o que o app fazia até agora — mas
+          // assim que a coluna `apk_sha256` existir, o hash passa a vir.
+          launchInstall(result.uri);
+          return;
+        }
+        setStatus('verifying');
+        verifyApk(result.uri, apkSha256)
+          .then(() => launchInstall(result.uri))
+          .catch(error => {
+            // `hash_mismatch` ou `hash_missing`: o arquivo não é o anunciado.
+            // O nativo já o apagou, e um erro genérico aqui seria mentira — não
+            // foi uma falha de rede, foi um APK que não devia ser instalado.
+            //
+            // `apk_verify_unavailable` é outra coisa: o módulo nativo não tem
+            // `verify`, o que significa um APK mal construído. Aí dizer "o
+            // ficheiro não é o anunciado" seria inventar um diagnóstico.
+            if (error?.message === 'apk_verify_unavailable') {
+              setErrorKind('generic');
+            } else {
+              setErrorKind('hash');
+            }
+            setStatus('error');
+            running.current = false;
+            apkUri.current = null;
+          });
       })
       .catch(error => {
         // `download_cancelled` é o nosso próprio cancelamento ou o timeout:
@@ -123,17 +166,21 @@ const UpdateAvailableModal = ({
         setStatus('error');
         running.current = false;
       });
-  }, [updateUrl, versionName, launchInstall]);
+  }, [updateUrl, versionName, apkSha256, hashConflict, launchInstall]);
 
   const cancelDownload = useCallback(() => {
-    if (!running.current) {
+    // Só durante o download. Na fase de verificar não há nada para cancelar:
+    // `cancelApkDownload` só conhece o download em curso, e chamar o botão
+    // aqui punha o ecrã em "inativo" enquanto a verificação acabava e abria a
+    // instalação na mesma — cancelar que não cancela.
+    if (!running.current || status !== 'downloading') {
       return;
     }
     cancelApkDownload();
     running.current = false;
     setStatus('idle');
     setPercent(0);
-  }, []);
+  }, [status]);
 
   /**
    * Sem disparo automático. O modal abre sozinho ao detectar uma versão nova,
@@ -199,6 +246,15 @@ const UpdateAvailableModal = ({
             </View>
           )}
 
+          {status === 'verifying' ? (
+            <View style={styles.progressBlock}>
+              <ActivityIndicator color={colors.primary} />
+              <Text style={[styles.progressText, { color: colors.textMuted }]}>
+                {t('upd_verifying')}
+              </Text>
+            </View>
+          ) : null}
+
           {status === 'permission' ? (
             <Text style={[styles.statusText, { color: colors.text }]}>
               {t('upd_allow_install')}
@@ -211,7 +267,21 @@ const UpdateAvailableModal = ({
                 styles.statusText,
                 { color: colors.danger ?? colors.primary },
               ]}>
-              {errorKind === 'timeout' ? t('upd_error_timeout') : t('upd_error')}
+              {errorKind === 'timeout'
+                ? t('upd_error_timeout')
+                : errorKind === 'hash'
+                  ? t('upd_error_hash')
+                  : t('upd_error')}
+            </Text>
+          ) : null}
+
+          {status === 'untrusted' ? (
+            <Text
+              style={[
+                styles.statusText,
+                { color: colors.danger ?? colors.primary },
+              ]}>
+              {t('upd_error_hash_conflict')}
             </Text>
           ) : null}
 
@@ -231,7 +301,9 @@ const UpdateAvailableModal = ({
                 {t('upd_cancel')}
               </Text>
             </Pressable>
-          ) : (
+          ) : null}
+
+          {status === 'downloading' || status === 'verifying' ? null : (
             <Pressable
               onPress={() => {
                 if (status === 'permission' && apkUri.current) {
@@ -250,7 +322,7 @@ const UpdateAvailableModal = ({
                 <ActivityIndicator color={colors.background} />
               ) : (
                 <Text style={[styles.buttonText, { color: colors.background }]}>
-                  {status === 'error' || status === 'insecure'
+                  {status === 'error' || status === 'insecure' || status === 'untrusted'
                     ? t('upd_retry')
                     : t('upd_install')}
                 </Text>

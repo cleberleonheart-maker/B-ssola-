@@ -188,6 +188,76 @@ class ApkDownloaderModule(
     }.start()
   }
 
+  /**
+   * Confere o SHA-256 do arquivo já em disco antes de o mandar instalar.
+   *
+   * O hash esperado não vem do próprio APK: vem de fora (a GitHub calcula um
+   * `digest` por asset, e o CI grava outro na nuvem), por isso comparar é o que
+   * distingue "o arquivo é o que o servidor anunciou" de "o arquivo que chegou
+   * é outro". O HTTPS resolve o servidor falso; isto resolve o binário trocado
+   * no caminho.
+   *
+   * Se não bater, o arquivo é apagado. Deixá-lo na pasta Downloads seria deixar
+   * um `.apk` com cara de atualização à espera de alguém tocar nele — que é
+   * exactamente o que o utilizador faria a seguir.
+   */
+  @ReactMethod
+  fun verify(uriString: String, expected: String, promise: Promise) {
+    val expectedNorm = normHash(expected)
+    if (uriString.isEmpty()) {
+      promise.reject("verify_failed", "Arquivo do APK indisponível")
+      return
+    }
+    if (expectedNorm.isEmpty()) {
+      promise.reject("hash_missing", "Hash esperado ausente ou mal formado")
+      return
+    }
+    Thread {
+      var input: java.io.InputStream? = null
+      try {
+        val uri = Uri.parse(uriString)
+        input = reactContext.contentResolver.openInputStream(uri)
+          ?: throw IllegalStateException("não foi possível abrir o APK")
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        val buffer = ByteArray(64 * 1024)
+        while (true) {
+          val read = input.read(buffer)
+          if (read <= 0) break
+          digest.update(buffer, 0, read)
+        }
+        val found = digest.digest().joinToString("") {
+          String.format("%02x", it.toInt() and 0xff)
+        }
+        if (found == expectedNorm) {
+          promise.resolve(true)
+        } else {
+          deleteUri(uri)
+          promise.reject(
+            "hash_mismatch",
+            "O arquivo não é o APK anunciado ($found)",
+          )
+        }
+      } catch (error: Exception) {
+        promise.reject("verify_failed", error.message ?: "Falha ao verificar", error)
+      } finally {
+        try {
+          input?.close()
+        } catch (_: Exception) {
+        }
+      }
+    }.start()
+  }
+
+  /** Minúsculo, sem `sha256:` e sem separadores. Inválido volta vazio. */
+  private fun normHash(value: String): String {
+    val cleaned = value.trim().lowercase().removePrefix("sha-256:").removePrefix("sha256:")
+    return if (cleaned.length == 64 && cleaned.all { it in "0123456789abcdef" }) {
+      cleaned
+    } else {
+      ""
+    }
+  }
+
   /** Apaga o arquivo meio baixado, seja do MediaStore ou do diretório interno. */
   private fun deletePartial(insertedUri: android.net.Uri?, fileName: String) {
     if (insertedUri != null) {

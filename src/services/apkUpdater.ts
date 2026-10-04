@@ -4,6 +4,7 @@ type ApkDownloaderNative = {
   download(url: string, fileName: string, id: string): Promise<boolean>;
   install(uri: string): Promise<boolean>;
   cancel?(id: string): Promise<boolean>;
+  verify?(uri: string, expectedSha256: string): Promise<boolean>;
 };
 
 const native = NativeModules.ApkDownloader as ApkDownloaderNative | undefined;
@@ -161,6 +162,43 @@ export const cancelApkDownload = (
     native.cancel(current.id).catch(() => {});
   }
   current.reject(new Error(reason));
+};
+
+/**
+ * Normaliza um SHA-256 para 64 hexágonos minúsculos, aceitando o prefixo
+ * `sha256:` que a GitHub devolve. Qualquer outra coisa devolve `''`: um hash
+ * mal formado tem de contar como "não sei", nunca como "bate certo".
+ */
+export const normalizeSha256 = (value?: string | null): string => {
+  const cleaned = (value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/^sha-?256:/, '')
+    .trim();
+  return /^[0-9a-f]{64}$/.test(cleaned) ? cleaned : '';
+};
+
+/**
+ * Confere o SHA-256 do arquivo já baixado, antes de o mandar instalar.
+ *
+ * O hash esperado vem de fora do APK: a GitHub calcula um `digest` por asset e
+ * o CI grava outro na nuvem. Como as duas coisas são feitas por quem não é o
+ * app, comparar o que chegou com o que foi anunciado é o que apanha um binário
+ * trocado no caminho — o que o `https` sozinho não apanha.
+ *
+ * Rejeita com `hash_mismatch` quando não bate, e nesse caso o nativo já apagou
+ * o arquivo: não pode ficar um `.apk` na pasta Downloads, porque o próximo
+ * toque do utilizador instala-o sem perguntar.
+ */
+export const verifyApk = (uri: string, expected: string): Promise<boolean> => {
+  if (!native?.verify) {
+    return Promise.reject(new Error('apk_verify_unavailable'));
+  }
+  const hash = normalizeSha256(expected);
+  if (!hash) {
+    return Promise.reject(new Error('hash_missing'));
+  }
+  return native.verify(uri, hash);
 };
 
 export const installApk = (uri: string): Promise<boolean> => {

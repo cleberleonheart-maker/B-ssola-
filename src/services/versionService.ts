@@ -4,7 +4,7 @@ import {
   fetchLatestAppVersion,
   type AppVersion,
 } from './cloud';
-import { isDirectApkUrl } from './apkUpdater';
+import { isDirectApkUrl, normalizeSha256 } from './apkUpdater';
 
 const LAST_OFFER_KEY = '@bussola/lastUpdateOffer';
 
@@ -14,6 +14,15 @@ export type AvailableUpdate = {
   updateUrl: string;
   message: string | null;
   required: boolean;
+  /** SHA-256 esperado, ou `null` se nenhuma das fontes o souber. */
+  apkSha256: string | null;
+  /**
+   * As duas fontes discordam. Alguém trocou o asset ou a linha da nuvem, e isso
+   * não se resolve escolhendo a que parece mais certa: o app recusa-se a
+   * instalar. Um APK substituido por outro, assinado com a nossa chave, é o
+   * caso que o Android não apanha.
+   */
+  hashConflict: boolean;
 };
 
 const GITHUB_RELEASE_URL =
@@ -23,6 +32,8 @@ type ReleaseAsset = {
   code: number;
   name: string;
   url: string;
+  /** `digest` que a GitHub calcula por asset, independente do nosso CI. */
+  sha256: string;
 };
 
 const pickBestDirectAsset = (
@@ -39,10 +50,36 @@ const pickBestDirectAsset = (
       continue;
     }
     if ((best?.code ?? 0) < c) {
-      best = { code: c, name: String(a?.name ?? ''), url };
+      best = {
+        code: c,
+        name: String(a?.name ?? ''),
+        url,
+        sha256: normalizeSha256(String(a?.digest ?? '')),
+      };
     }
   }
   return best;
+};
+
+/**
+ * Junta as duas fontes de hash. Só se comparam quando falam do mesmo APK: o
+ * asset escolhido pode ser mais novo do que a linha da nuvem, e nesse caso os
+ * dois hashes são de ficheiros diferentes — compará-los dava um conflito falso
+ * a cada release.
+ */
+const resolveHash = (
+  fromCloud: string | null | undefined,
+  fromAsset: string | null | undefined,
+  sameRelease: boolean,
+): { sha256: string | null; conflict: boolean } => {
+  const cloud = normalizeSha256(fromCloud ?? '');
+  const asset = sameRelease ? normalizeSha256(fromAsset ?? '') : '';
+  if (cloud && asset) {
+    return cloud === asset
+      ? { sha256: cloud, conflict: false }
+      : { sha256: null, conflict: true };
+  }
+  return { sha256: cloud || asset || null, conflict: false };
 };
 
 const fetchLatestDirectAsset = async (): Promise<ReleaseAsset | null> => {
@@ -103,12 +140,19 @@ export const checkForUpdate = async (options?: {
       ? cloud.update_url
       : (asset?.url ?? '');
     if (url) {
+      const hash = resolveHash(
+        cloud.apk_sha256,
+        asset?.sha256,
+        asset?.code === cloud.version_code,
+      );
       candidate = {
         versionCode: cloud.version_code,
         versionName: cloud.version_name,
         updateUrl: url,
         message: cloud.message,
         required: !!cloud.required,
+        apkSha256: hash.sha256,
+        hashConflict: hash.conflict,
       };
     }
   }
@@ -120,6 +164,8 @@ export const checkForUpdate = async (options?: {
       updateUrl: asset.url,
       message: null,
       required: false,
+      apkSha256: asset.sha256 || null,
+      hashConflict: false,
     };
   }
 
