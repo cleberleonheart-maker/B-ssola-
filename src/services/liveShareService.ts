@@ -4,6 +4,7 @@ import {
   isCloudEnabled,
   ensureCloudUser,
   pushLivePosition,
+  pushLivePoint,
   deleteLiveShareRow,
   noteCloudError,
   takeCloudError,
@@ -140,15 +141,34 @@ export const pushLiveFix = async (
   // — a linha ficaria orfa na tabela.
   const userId = await ensureCloudUser();
   if (!userId) return false;
-  return pushLivePosition(
+  const heading = resolveLiveHeading(fix.heading, magneticHeading);
+  const pushed = await pushLivePosition(
     s.token,
     userId,
     fix.latitude,
     fix.longitude,
     fix.accuracy ?? null,
-    resolveLiveHeading(fix.heading, magneticHeading),
+    heading,
     s.expiresAt,
   );
+  if (!pushed) return false;
+  // A posicao actual e o que mantem o link vivo; o ponto e o trajecto (#92).
+  // Vem depois e sem bloquear: se esta gravacao falhar, quem esta a ver o link
+  // continua a ver para onde a pessoa esta agora, so com um troco a menos no
+  // caminho. O inverso — gravar o ponto e falhar a posicao — deixaria o link
+  // morto com pontos ja publicados.
+  await pushLivePoint(
+    s.token,
+    userId,
+    fix.latitude,
+    fix.longitude,
+    fix.accuracy ?? null,
+    heading,
+    fix.speed ?? null,
+    fix.altitude ?? null,
+    s.expiresAt,
+  );
+  return true;
 };
 
 /**

@@ -416,6 +416,60 @@ export const pushLivePosition = async (
   }
 };
 
+/**
+ * Acrescenta um ponto ao trajecto da sessao (#92).
+ *
+ * `live_shares` guarda um unico ponto por token — um `upsert` sobrescreve o
+ * anterior — e por isso nao guardava o caminho percorrido. Esta e a segunda
+ * tabela: um `insert` por fix, com o servidor a numerar (`id`), que e o que o
+ * viewer usa para pedir so o que ainda nao viu.
+ *
+ * Devolve `false` sem lancar pelo mesmo motivo de `pushLivePosition`: perder um
+ * ponto e melhor do que perder a sessao. Quem chama grava a posicao actual
+ * primeiro e so depois o ponto, portanto um `false` aqui deixa um buraco no
+ * trajecto e nada mais.
+ */
+export const pushLivePoint = async (
+  token: string,
+  userId: string,
+  lat: number,
+  lng: number,
+  acc: number | null,
+  hdg: number | null,
+  spd: number | null,
+  alt: number | null,
+  expiresAt: number,
+): Promise<boolean> => {
+  if (!client) {
+    noteCloudError('live point', 'Supabase nao configurado');
+    return false;
+  }
+  try {
+    const { error } = await withTimeout(
+      client.from('live_points').insert({
+        token,
+        user_id: userId,
+        latitude: lat,
+        longitude: lng,
+        accuracy: acc,
+        heading: hdg,
+        speed: spd,
+        altitude: alt,
+        expires_at: new Date(expiresAt).toISOString(),
+      }),
+      15000,
+    );
+    if (error) {
+      noteCloudError('live point', error.message);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    noteCloudError('live point', error);
+    return false;
+  }
+};
+
 export const deleteLiveShareRow = async (
   token: string,
   userId: string,
@@ -424,6 +478,13 @@ export const deleteLiveShareRow = async (
   try {
     await withTimeout(
       client.from('live_shares').delete().eq('token', token).eq('user_id', userId),
+    );
+    // O trajecto segue a linha: uma sessao encerrada tem de levar os pontos
+    // embora. Nao e erro grave se falhar — a `live_points` tem `expires_at` e a
+    // RPC esconde o que passou do prazo — mas a tentativa fica, para nao
+    // deixar lixo de cada sessao que termina.
+    await withTimeout(
+      client.from('live_points').delete().eq('token', token).eq('user_id', userId),
     );
     return true;
   } catch {

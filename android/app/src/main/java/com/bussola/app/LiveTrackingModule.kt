@@ -315,7 +315,14 @@ class LiveTrackingService : Service(), SensorEventListener {
       )
 
     // `locationListener` roda na main looper: a rede nunca pode entrar aqui.
-    worker.execute { pushLivePosition(cfg, fix, at) }
+    worker.execute {
+      // A posicao actual primeiro: e ela que mantem o link vivo, e uma falha
+      // aqui nao pode ser seguida de um ponto publicado para um link morto.
+      // O ponto do trajecto (#92) vem depois e sem bloquear o proximo fix — se
+      // falhar, o link continua a vivo e o trajecto ganha um buraco, que e o
+      // mal menor.
+      if (pushLivePosition(cfg, fix, at)) pushLivePoint(cfg, fix)
+    }
   }
 
   private fun stopTracking() {

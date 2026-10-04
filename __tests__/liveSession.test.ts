@@ -26,12 +26,31 @@ const loadService = (
       _expiresAt: number,
     ) => true,
   );
+  // O ponto do trajecto (#92) e um `insert` separado: `live_shares` guarda um
+  // unico ponto por token, e o caminho percorrido precisa de quantas linhas
+  // houve. O mock do modulo `cloud` tem de o expor, senao o `pushLiveFix` rebenta
+  // nele — e rebentar no mock e o unico sinal de que o teste ainda cobre a
+  // ordem das escritas.
+  const pushLivePoint = jest.fn(
+    async (
+      _token: string,
+      _userId: string,
+      _lat: number,
+      _lng: number,
+      _acc: number | null,
+      _heading: number | null,
+      _speed: number | null,
+      _altitude: number | null,
+      _expiresAt: number,
+    ) => true,
+  );
   const userId = opts?.userId === undefined ? 'user-1' : opts.userId;
   jest.doMock('@react-native-async-storage/async-storage', () => ({ __esModule: true, default: AsyncStorage }));
   jest.doMock('../src/services/cloud', () => ({
     isCloudEnabled: jest.fn(() => opts?.cloudEnabled !== false),
     ensureCloudUser: jest.fn(async () => userId),
     pushLivePosition,
+    pushLivePoint,
     deleteLiveShareRow,
   }));
   jest.spyOn(Date, 'now').mockReturnValue(now);
@@ -39,7 +58,7 @@ const loadService = (
   jest.isolateModules(() => {
     service = jest.requireActual('../src/services/liveShareService') as typeof import('../src/services/liveShareService');
   });
-  return { service, store, deleteLiveShareRow, pushLivePosition };
+  return { service, store, deleteLiveShareRow, pushLivePosition, pushLivePoint };
 };
 
 const MS_PER_MIN = 60000;
@@ -212,6 +231,77 @@ describe('sessão de live', () => {
       NaN,
     );
     expect(pushLivePosition.mock.calls[0][5]).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // O trajecto (#92): cada fix vai para `live_points`, depois da posicao actual.
+  // -------------------------------------------------------------------------
+  const fixCompleto = {
+    latitude: -15.8,
+    longitude: -47.9,
+    accuracy: 5,
+    altitude: 1100,
+    speed: 1.4,
+    provider: 'gps',
+    updatedAt: 1000,
+    heading: 90,
+  };
+
+  it('grava o ponto do trajecto depois de gravar a posicao', async () => {
+    const { service, pushLivePosition, pushLivePoint } = loadService(1000);
+    const s = await service.startLiveShare(30);
+
+    await expect(service.pushLiveFix(s!, fixCompleto)).resolves.toBe(true);
+
+    expect(pushLivePoint).toHaveBeenCalledWith(
+      s!.token,
+      'user-1',
+      -15.8,
+      -47.9,
+      5,
+      90,
+      1.4,
+      1100,
+      s!.expiresAt,
+    );
+  });
+
+  it('o ponto leva o mesmo rumo que a posicao', async () => {
+    // O rumo resolvido (GPS ou bussola, ja normalizado) tem de ser o mesmo nos
+    // dois lugares: com rumos diferentes, o ponto desenhado e a posicao lida
+    // apontavam para lados opostos no instante em que o servico assumia.
+    const { service, pushLivePosition, pushLivePoint } = loadService(1000);
+    const s = await service.startLiveShare(30);
+    await service.pushLiveFix(
+      s!,
+      { ...fixCompleto, heading: null },
+      187,
+    );
+    expect(pushLivePosition.mock.calls[0][5]).toBe(187);
+    expect(pushLivePoint.mock.calls[0][5]).toBe(187);
+  });
+
+  it('nao grava ponto quando a posicao actual falha', async () => {
+    // Ao contrario: publicar um ponto de uma sessao que nao arrancou deixava um
+    // trajecto no servidor sem linha que o justificasse, e o viewer mostrava um
+    // caminho para uma sessao morta.
+    const { service, pushLivePosition, pushLivePoint } = loadService(1000);
+    pushLivePosition.mockResolvedValueOnce(false);
+    const s = await service.startLiveShare(30);
+
+    await expect(service.pushLiveFix(s!, fixCompleto)).resolves.toBe(false);
+
+    expect(pushLivePoint).not.toHaveBeenCalled();
+  });
+
+  it('a posicao viva continua a valer quando o ponto falha', async () => {
+    // O inverso do anterior: perder um troco do caminho e melhor do que perder
+    // o link, que e o unico documento que quem procura a pessoa tem.
+    const { service, pushLivePoint } = loadService(1000);
+    pushLivePoint.mockResolvedValueOnce(false);
+    const s = await service.startLiveShare(30);
+
+    await expect(service.pushLiveFix(s!, fixCompleto)).resolves.toBe(true);
   });
 
   it('usa o mesmo userId no push e na remoção da linha', async () => {

@@ -34,25 +34,41 @@ const makeNode = (id) => ({
 const boot = (hash, fetchImpl) => {
   const nodes = {};
   const listeners = [];
+  const calls = [];
   const document = {
     hidden: false,
     getElementById: (id) => (nodes[id] = nodes[id] || makeNode(id)),
     createElementNS: (_ns, tag) => makeNode(tag),
     addEventListener: (type, fn) => listeners.push([type, fn]),
   };
+  const call = typeof fetchImpl === 'function' ? fetchImpl : () => fetchImpl;
   const ctx = {
     JSON, Math, Date, Number, String, Promise, Error, AbortController,
     setTimeout, clearTimeout, setInterval, clearInterval,
     location: { hash },
     window: { AbortController },
     document,
-    fetch: typeof fetchImpl === 'function' ? fetchImpl : () => fetchImpl,
+    // O `fetch` e envolvido para se poder perguntar depois "o que foi pedido e com
+    // que corpo". A embrrulha entra antes do script correr, porque o poll inicial
+    // dispara no fim do ficheiro — um embrulho instalado a posteriori perdia
+    // precisamente a primeira resposta, que e a que tem `p_after: 0`.
+    fetch: (url, opts) => {
+      let body = null;
+      try {
+        body = JSON.parse(opts && opts.body);
+      } catch {
+        body = null;
+      }
+      calls.push({ rpc: String(url).split('/rpc/')[1] || '', body });
+      return call(url, opts);
+    },
   };
   vm.createContext(ctx);
   vm.runInContext(script, ctx);
   const app = {
     nodes,
     document,
+    calls,
     listener: (type) => listeners.filter(([t]) => t === type).map(([, f]) => f)[0],
     again: () => vm.runInContext('poll();', ctx),
     halt: () => vm.runInContext('stop();', ctx),
@@ -61,12 +77,43 @@ const boot = (hash, fetchImpl) => {
   return app;
 };
 
+// Quantos pedidos foram para uma RPC. Um poll e duas RPCs desde a #92, portanto
+// contar `fetch` a secas mede o dobro do que o teste quer medir.
+const countRpc = (app, rpc) => app.calls.filter((c) => c.rpc === rpc).length;
+
 const reply = (body, status = 200) =>
   Promise.resolve({
     ok: status >= 200 && status < 300,
     status,
     json: () => Promise.resolve(body),
   });
+
+// A pagina chama duas RPCs por poll (#92): `get_live_position` para onde a pessoa
+// esta agora e `get_live_track` para o caminho que ela percorreu. Um `fetch` que
+// responde sempre com o mesmo corpo nao distingue as duas — e devolver a posicao
+// como se fosse um ponto do trajecto fazia os testes do mapa passarem sem
+// exercitar a RPC nova. O router diz o que responder a cada uma.
+const routes = (map) => (url) => {
+  const name = String(url).split('/rpc/')[1] || '';
+  const value = map[name];
+  if (typeof value === 'function') return value();
+  return reply(value === undefined ? [] : value);
+};
+
+const trackPoint = (id, metros, over) =>
+  Object.assign(
+    {
+      id,
+      latitude: -23.5505199 + metros / 111320,
+      longitude: -46.6333094,
+      accuracy: 12.4,
+      heading: 275,
+      speed: 1.4,
+      altitude: 760,
+      recorded_at: new Date().toISOString(),
+    },
+    over || {},
+  );
 
 const fix = (over) =>
   Object.assign(
@@ -184,17 +231,18 @@ describe('viewer do rastreio ao vivo', () => {
 
   it('segue tentando quando a linha continua viva e sem posicao', async () => {
     let positionCalls = 0;
-    const app = boot('#tkn=abc', (url) => {
-      if (String(url).indexOf('get_live_status') >= 0) {
-        return reply([{
-          expires_at: new Date(Date.now() + 600000).toISOString(),
-          updated_at: new Date().toISOString(),
-          expired: false,
-        }]);
-      }
-      positionCalls += 1;
-      return reply(positionCalls === 1 ? [fix()] : []);
-    });
+    const app = boot('#tkn=abc', routes({
+      get_live_position: () => {
+        positionCalls += 1;
+        return reply(positionCalls === 1 ? [fix()] : []);
+      },
+      get_live_track: [],
+      get_live_status: [{
+        expires_at: new Date(Date.now() + 600000).toISOString(),
+        updated_at: new Date().toISOString(),
+        expired: false,
+      }],
+    }));
     await wait(30);
     app.again();
     await wait(30);
@@ -202,6 +250,7 @@ describe('viewer do rastreio ao vivo', () => {
     app.again();
     await wait(30);
     expect(positionCalls).toBe(3);
+    expect(countRpc(app, 'get_live_track')).toBe(3);
   });
 
   it('trata erro de rede com estado offline e botão de atualizar', async () => {
@@ -213,12 +262,13 @@ describe('viewer do rastreio ao vivo', () => {
   });
 
   it('mantém a última posição visível quando a rede cai depois', async () => {
-    let calls = 0;
-    const app = boot('#tkn=abc', () => {
-      calls += 1;
-      return calls === 1 ? reply([fix()]) : Promise.reject(new Error('offline'));
-    });
+    let online = true;
+    const app = boot('#tkn=abc', routes({
+      get_live_position: () => (online ? reply([fix()]) : Promise.reject(new Error('offline'))),
+      get_live_track: () => (online ? reply([]) : Promise.reject(new Error('offline'))),
+    }));
     await wait(30);
+    online = false;
     app.again();
     await wait(30);
     expect(app.nodes.liveTag.textContent).toMatch(/SEM SINAL/);
@@ -249,49 +299,48 @@ describe('viewer do rastreio ao vivo', () => {
   });
 
   it('lê token com escape e evita polls sobrepostos', async () => {
-    let calls = 0;
-    const app = boot('#tkn=a%2Fb%20c', () => {
-      calls += 1;
-      return reply([fix()]);
-    });
+    const app = boot('#tkn=a%2Fb%20c', routes({
+      get_live_position: [fix()],
+      get_live_track: [],
+    }));
     await wait(30);
     expect(app.nodes.note.textContent).not.toMatch(/inválido/i);
     app.again();
     app.again();
     await wait(30);
-    expect(calls).toBe(2);
+    // Dois `poll()` seguidos, e nao quatro: o `busy` trava o segundo enquanto o
+    // primeiro espera pelas duas RPCs. Sem a trava seriam oito pedidos.
+    expect(countRpc(app, 'get_live_position')).toBe(2);
+    expect(countRpc(app, 'get_live_track')).toBe(2);
   });
 
   it('pausa na aba oculta e retoma ao voltar', async () => {
-    let calls = 0;
-    const app = boot('#tkn=abc', () => {
-      calls += 1;
-      return reply([fix()]);
-    });
+    const app = boot('#tkn=abc', routes({
+      get_live_position: [fix()],
+      get_live_track: [],
+    }));
     await wait(30);
     const onVisibility = app.listener('visibilitychange');
     expect(typeof onVisibility).toBe('function');
     app.document.hidden = true;
     onVisibility();
     await wait(60);
-    expect(calls).toBe(1);
+    expect(countRpc(app, 'get_live_position')).toBe(1);
     app.document.hidden = false;
     onVisibility();
     await wait(30);
-    expect(calls).toBe(2);
+    expect(countRpc(app, 'get_live_position')).toBe(2);
     expect(app.nodes.liveTag.textContent).toMatch(/AO VIVO/);
   });
 });
 
 // ---------------------------------------------------------------------------
 // O mini mapa. Sem tiles e sem pedidos: um SVG desenhado a partir das
-// coordenadas. `live_shares` guarda um unico ponto por token, portanto o
-// trajecto e o que o viewer viu desde que abriu a pagina.
+// coordenadas que o servidor devolveu. `live_shares` guarda um unico ponto por
+// token; o trajecto vem de `live_points`, que guarda um fix por linha (#92), e o
+// viewer le-o por `get_live_track`.
 // ---------------------------------------------------------------------------
 describe('mini mapa da pagina', () => {
-  const SP = { latitude: -23.5505199, longitude: -46.6333094 };
-  const norte = (metros) => ({ latitude: SP.latitude + metros / 111320 });
-
   // O SVG tem dois `circle` (o anel de precisao e o ponto) e dois `text` (o
   // norte e a escala): a etiqueta do elemento nao chega para os distinguir. E o
   // `id` posto em `buildMap` que os separa.
@@ -334,22 +383,73 @@ describe('mini mapa da pagina', () => {
     expect(Number(g[TAG.dot].getAttribute('cy'))).toBeCloseTo(150, 6);
   });
 
-  it('o mapa diz que o trajecto comeca quando a pagina abre', async () => {
-    const { nodes } = boot('#tkn=abc', reply([fix()]));
+  it('o mapa diz que o trajecto e o percurso completo, nao o que a pagina viu', async () => {
+    const app = boot('#tkn=abc', routes({
+      get_live_position: [fix()],
+      get_live_track: [trackPoint(7, 40)],
+    }));
     await wait(30);
-    expect(nodes.mapNote.textContent).toMatch(/desde que abriste/i);
-    expect(nodes.mapNote.classList.contains('hidden')).toBe(false);
+    expect(app.nodes.mapNote.textContent).toMatch(/completo/i);
+    expect(app.nodes.mapNote.classList.contains('hidden')).toBe(false);
   });
 
-  it('andar longe de verdad acrescenta um ponto ao trajecto', async () => {
-    let calls = 0;
-    const app = boot('#tkn=abc', () => {
-      calls += 1;
-      return reply([fix(calls === 1 ? {} : { latitude: norte(40).latitude })]);
-    });
+  it('abre o link a meio da sessao e desenha o caminho desde o inicio', async () => {
+    // A divida #92: antes, `live_shares` era um upsert e o viewer so desenhava o
+    // que tinha lido desde que a pagina abriu. Quem recebia o link vinte minutos
+    // depois via o ponto actual e uma recta ate ele. Aqui o servidor ja tem tres
+    // pontos de antes de a pagina existir, e o traco tem de sair com eles.
+    const app = boot('#tkn=abc', routes({
+      get_live_position: [fix()],
+      get_live_track: [trackPoint(1, 0), trackPoint(2, 40), trackPoint(3, 80)],
+    }));
+    await wait(30);
+    const d = parts(app)[TAG.path].getAttribute('d');
+    expect(d.match(/[ML] /g)).toHaveLength(3);
+    expect(app.nodes.mapNote.textContent).toMatch(/^Trajecto completo/);
+  });
+
+  it('cada poll pede so os pontos ainda vistos, pelo id', async () => {
+    let depois = null;
+    const app = boot('#tkn=abc', routes({
+      get_live_position: [fix()],
+      get_live_track: () => reply(depois === null ? [trackPoint(5, 0)] : depois),
+    }));
+    await wait(30);
+    depois = [trackPoint(9, 40)];
+    app.again();
+    await wait(40);
+
+    const pedidos = app.calls.filter((c) => c.rpc === 'get_live_track');
+    expect(pedidos[0].body).toEqual({ p_token: 'abc', p_after: 0 });
+    // Sem isto o poll seguinte trazia o caminho todo outra vez e o `id` nao
+    // servia para nada: 2 h de sessao a 10 s dariam 1440 linhas em cada poll.
+    expect(pedidos[1].body).toEqual({ p_token: 'abc', p_after: 5 });
+  });
+
+  it('um id repetido nao desenha o mesmo ponto outra vez', async () => {
+    const app = boot('#tkn=abc', routes({
+      get_live_position: [fix()],
+      get_live_track: [trackPoint(1, 0), trackPoint(2, 40)],
+    }));
+    await wait(30);
+    const antes = parts(app)[TAG.path].getAttribute('d').match(/[ML] /g).length;
+    app.again();
+    await wait(40);
+    // A segunda resposta traz os mesmos ids. Um poll repetido (o botao "Atualizar
+    // agora", a aba a voltar ao foreground) nao pode engordar o traco.
+    expect(parts(app)[TAG.path].getAttribute('d').match(/[ML] /g)).toHaveLength(antes);
+  });
+
+  it('andar longe de verdade acrescenta um ponto ao trajecto', async () => {
+    let enviados = [trackPoint(1, 0)];
+    const app = boot('#tkn=abc', routes({
+      get_live_position: [fix({ latitude: -23.5505199 + 80 / 111320 })],
+      get_live_track: () => reply(enviados),
+    }));
     await wait(30);
     const antes = parts(app)[TAG.path].getAttribute('d');
 
+    enviados = [trackPoint(1, 0), trackPoint(2, 40)];
     app.again();
     await wait(40);
 
@@ -358,24 +458,22 @@ describe('mini mapa da pagina', () => {
     expect(depois.match(/[ML] /g)).toHaveLength(2);
   });
 
-  it('oscilar um metro nao desenha tracos de ruido', async () => {
-    let calls = 0;
-    const app = boot('#tkn=abc', () => {
-      calls += 1;
-      return reply([fix(calls === 1 ? {} : { latitude: norte(0.5).latitude })]);
-    });
+  it('os pontos que nao mudam ficam fora do traco, mas o mapa continua', async () => {
+    // O servidor grava um fix de 10 em 10 s mesmo com a pessoa parada — e tem de
+    // gravar, porque "parada" e um facto que o traco esconde e a posicao actual
+    // nao. O filtro de 5 m e so do desenho.
+    const app = boot('#tkn=abc', routes({
+      get_live_position: [fix()],
+      get_live_track: () => reply([
+        trackPoint(1, 0),
+        trackPoint(2, 0.5),
+        trackPoint(3, 1),
+      ]),
+    }));
     await wait(30);
-    const antes = parts(app)[TAG.path].getAttribute('d');
-
-    app.again();
-    await wait(40);
-
-    // Nao se compara o `d` byte a byte: a janela segue a pessoa, portanto meio
-    // metro de deriva deslocam o trilho todo de meio pixel. O que nao pode
-    // acontecer e o trilho ganhar um comando novo por causa do ruido.
-    expect(parts(app)[TAG.path].getAttribute('d').match(/[ML] /g)).toHaveLength(
-      antes.match(/[ML] /g).length,
-    );
+    // Um ponto so no traco: o `d` tem um unico comando.
+    expect(parts(app)[TAG.path].getAttribute('d').match(/[ML] /g)).toHaveLength(1);
+    expect(app.nodes.map.classList.contains('hidden')).toBe(false);
   });
 
   it('a precisao vira um circulo do raio certo', async () => {
@@ -421,15 +519,31 @@ describe('mini mapa da pagina', () => {
   });
 
   it('quando a pessoa encerra, o mapa fica com a ultima posicao', async () => {
-    let calls = 0;
-    const app = boot('#tkn=abc', () => {
-      calls += 1;
-      return reply(calls === 1 ? [fix()] : []);
-    });
+    let vivo = true;
+    const app = boot('#tkn=abc', routes({
+      get_live_position: () => reply(vivo ? [fix()] : []),
+      get_live_track: [trackPoint(1, 0)],
+    }));
     await wait(30);
+    vivo = false;
     app.again();
     await wait(40);
     expect(app.nodes.note.textContent).toMatch(/encerrado/i);
+    expect(app.nodes.map.classList.contains('hidden')).toBe(false);
+  });
+
+  it('uma falha no trajecto nao diz que a pessoa desapareceu', async () => {
+    // O `get_live_track` responde 404 enquanto o SQL idempotente nao foi rodado
+    // no projecto. O erro e do trajecto, nao do link: dizer "sem conexao" seria
+    // mandar alguem a procura de alguem que esta la.
+    const app = boot('#tkn=abc', routes({
+      get_live_position: [fix()],
+      get_live_track: () => reply([], 404),
+    }));
+    await wait(30);
+    expect(app.nodes.liveTag.textContent).toMatch(/AO VIVO/);
+    expect(app.nodes.coords.textContent).toMatch(/S 23°/);
+    // E o mapa ainda aparece: so sem traco.
     expect(app.nodes.map.classList.contains('hidden')).toBe(false);
   });
 });

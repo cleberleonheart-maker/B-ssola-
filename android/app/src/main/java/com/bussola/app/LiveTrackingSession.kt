@@ -77,6 +77,32 @@ data class LiveSessionConfig(
       .put("expires_at", isoUtc(expiresAt))
       .put("updated_at", isoUtc(at))
       .toString()
+
+  /**
+   * Corpo do ponto do trajecto (ideia #92).
+   *
+   * `live_shares` e um upsert: uma linha, um ponto, e o anterior desaparece. O
+   * trajecto que o viewer desenha precisa de quantas linhas houve, por isso este
+   * vai para `live_points`, onde cada fix e um `insert` novo com o `id` numerado
+   * pelo servidor. O viewer pede "os pontos com id maior que o ultimo que vi", e
+   * por isso o `id` e o que importa: `recorded_at` pode repetir-se entre o JS e
+   * aqui e faria o viewer saltar pontos.
+   *
+   * O `expires_at` e copiado do mesmo sitio para permitir a purga: um ponto sem
+   * prazo nao pode ser distinguido de um de uma sessao a terminar.
+   */
+  fun pointPayload(fix: LiveFix): String =
+    JSONObject()
+      .put("token", token)
+      .put("user_id", userId)
+      .put("latitude", fix.latitude)
+      .put("longitude", fix.longitude)
+      .put("accuracy", fix.accuracy ?: JSONObject.NULL)
+      .put("heading", fix.heading ?: JSONObject.NULL)
+      .put("speed", fix.speed ?: JSONObject.NULL)
+      .put("altitude", fix.altitude ?: JSONObject.NULL)
+      .put("expires_at", isoUtc(expiresAt))
+      .toString()
 }
 
 private fun isoUtc(millis: Long): String =
@@ -125,12 +151,37 @@ fun liveSessionConfig(map: ReadableMap?): LiveSessionConfig? {
  * no proximo fix: um erro isolado nao pode virar sumico no link durante uma
  * emergencia. Por isso devolve so o booleano e nao lanca.
  */
-fun pushLivePosition(config: LiveSessionConfig, fix: LiveFix, at: Long): Boolean {
+fun pushLivePosition(config: LiveSessionConfig, fix: LiveFix, at: Long): Boolean =
+  post(config, "/rest/v1/live_shares?on_conflict=token", config.payload(fix, at), mergeDuplicates = true)
+
+/**
+ * Acrescenta o ponto ao trajecto (ideia #92).
+ *
+ * A mesma politica de `pushLivePosition`: devolve so o booleano. O
+ * `Prefer: resolution=merge-duplicates` nao vem aqui — em `live_points` nao ha
+ * conflito para resolver, e cada fix tem de ser uma linha nova.
+ */
+fun pushLivePoint(config: LiveSessionConfig, fix: LiveFix): Boolean =
+  post(config, "/rest/v1/live_points", config.pointPayload(fix), mergeDuplicates = false)
+
+/**
+ * Um POST para o REST com as credenciais da sessao.
+ *
+ * O `atraso`/`from` sao os mesmos em todas as chamadas e por isso vivem aqui, e
+ * nao repetidos em cada `setRequestProperty`: um erro de digitacao num header
+ * custaria um 401 em silencio, e o unico sintoma seria um link que nao actualiza
+ * durante uma emergencia.
+ */
+private fun post(
+  config: LiveSessionConfig,
+  path: String,
+  body: String,
+  mergeDuplicates: Boolean,
+): Boolean {
   var conn: HttpURLConnection? = null
   return try {
     conn =
-      (URL("${config.url}/rest/v1/live_shares?on_conflict=token").openConnection()
-          as HttpURLConnection)
+      (URL("${config.url}$path").openConnection() as HttpURLConnection)
         .apply {
           requestMethod = "POST"
           connectTimeout = 10000
@@ -140,11 +191,15 @@ fun pushLivePosition(config: LiveSessionConfig, fix: LiveFix, at: Long): Boolean
           setRequestProperty("Authorization", "Bearer ${config.accessToken}")
           setRequestProperty("Content-Type", "application/json")
           // Sem isso o on_conflict vira erro de chave duplicada.
-          setRequestProperty("Prefer", "resolution=merge-duplicates,return=minimal")
+          if (mergeDuplicates) {
+            setRequestProperty("Prefer", "resolution=merge-duplicates,return=minimal")
+          } else {
+            setRequestProperty("Prefer", "return=minimal")
+          }
         }
-    val body = config.payload(fix, at).toByteArray(Charsets.UTF_8)
-    conn.setFixedLengthStreamingMode(body.size)
-    conn.outputStream.use { it.write(body) }
+    val bytes = body.toByteArray(Charsets.UTF_8)
+    conn.setFixedLengthStreamingMode(bytes.size)
+    conn.outputStream.use { it.write(bytes) }
     val code = conn.responseCode
     if (code !in 200..299) {
       android.util.Log.w("Bussola", "push do live share respondeu $code")

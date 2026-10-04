@@ -90,15 +90,37 @@
   // isto.
   var MAP_SPAN_METERS = 300;
 
-  // Um ponto novo so entra no trajecto quando a pessoa andou `TRACK_MIN_STEP_METERS`.
-  // Sem isto, um GPS parado a oscilar um metro enche a lista em segundos.
+  // --------------------------------------------------------------------------
+  // O trajecto (ideia #92).
+  //
+  // Antes isto era o que o viewer tinha visto desde que abriu a pagina: o
+  // servidor guardava um unico ponto por token, porque `live_shares` e um
+  // `upsert`. Quem abrisse o link vinte minutos depois do inicio via o ponto
+  // actual e uma recta ate ele, sem o caminho percorrido.
+  //
+  // Agora o servidor guarda cada fix em `live_points` e o viewer le essa
+  // historia com `get_live_track(token, after)`: o `id` que a ultima resposta
+  // trouxe e o `after` do pedido seguinte, portanto cada poll traz so o que
+  // apareceu entretanto. O `after` e `id` e nao um carimbo de tempo porque o id
+  // e denso e monotono — dois pontos no mesmo segundo nao se atropelam.
+  // --------------------------------------------------------------------------
+
+  // Um ponto so entra no trajecto desenhado quando a pessoa andou
+  // `TRACK_MIN_STEP_METERS` desde o ultimo aceito. O servidor grava um fix a cada
+  // 10 s mesmo parado (e tem de gravar: quem nao se mexe continua a enviar
+  // posicao para o link saber que esta vivo), e um GPS parado a oscilar um metro
+  // a cada leitura desenhava um novelo em vez de um ponto.
   //
   // Aqui nao ha filtro de tempo, ao contrario do `MiniMapView` do app: o poll e
   // de 5 s, portanto o intervalo ja e o ritmo. Um filtro de 2 s so conseguia
   // descartar movimento a serio — o GPS parado ja estava barrado pelos 5 m, e
   // 40 m andados entre dois polls iam pela borda fora sem razao.
   var TRACK_MIN_STEP_METERS = 5;
-  var TRACK_MAX_POINTS = 500;
+  // Tecto, nao alvo: uma sessao de 2 h com push de 10 s da 720 pontos, e o
+  // traço de um ponto e um comando de path. O `shift()` existe so para um
+  // servidor a devolver mais do que o esperado — e nesse caso perder o mais
+  // antigo e melhor do que partir o navegador.
+  var TRACK_MAX_POINTS = 800;
 
   function clamp(v, min, max) { return v < min ? min : v > max ? max : v; }
 
@@ -292,13 +314,14 @@
       .catch(function () { ended(); });
   }
   // --------------------------------------------------------------------------
-  // O trajecto. `live_shares` e um `upsert` por token: uma linha, um ponto. O
-  // servidor nao guarda historico, portanto o trajecto aqui e o que o viewer
-  // viu desde que abriu a pagina — dai o texto por baixo do mapa. Quem precisar
-  // do percurso completo precisa de uma tabela de pontos, e fica registado como
-  // divida no `ideias.md`.
+  // O trajecto. A fonte e o servidor (#92), nao o que esta pagina viu: cada fix
+  // gravado pelo app e uma linha em `live_points`, e o viewer pede o que ha
+  // depois do ultimo `id` que leu. O filtro de 5 m continua a ser aqui — o
+  // servidor tem de guardar todos os pontos, mesmo com a pessoa parada, porque
+  // "parada" e um facto que o traço esconde mas a posicao actual nao.
   // --------------------------------------------------------------------------
   var track = [];
+  var trackAfter = 0;
 
   function pushTrack(p) {
     var here = { lat: p.latitude, lon: p.longitude };
@@ -309,6 +332,49 @@
     }
     track.push(here);
     if (track.length > TRACK_MAX_POINTS) track.shift();
+  }
+
+  /**
+   * Junta o que a RPC trouxe. `trackAfter` so anda para a frente e nunca
+   * reinicia: se um poll trouxesse zero pontos, o seguinte volta a perguntar a
+   * partir do mesmo `id`, e quem reescrevesse `track` perderia o caminho ja
+   * desenhado em vez de o continuar.
+   */
+  function ingestTrack(rows) {
+    if (!rows || !rows.length) return 0;
+    var added = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      // A RPC ja filtra por `id > after`, mas o `id` que ela devolve e a
+      // garantia de nao desenharmos o mesmo ponto duas vezes quando um poll se
+      // repete.
+      var id = r.id == null ? null : Number(r.id);
+      if (id != null && !isFinite(id)) id = null;
+      if (id != null) {
+        if (id <= trackAfter) continue;
+        trackAfter = id;
+      }
+      pushTrack(r);
+      added += 1;
+    }
+    return added;
+  }
+
+/**
+   * Le os pontos novos do servidor.
+   *
+   * Nunca rejeita: uma falha aqui e uma falha do trajecto, nao do link. Quem
+   * esta a ver a pessoa continua a receber a posicao actual, e e isso que
+   * orienta a busca num—for de emergencia. Perder um troco do caminho e melhor
+   * do que a pagina inteira passar a dizer "sem conexao".
+   */
+  function fetchTrack() {
+    return post('get_live_track', { p_token: tkn, p_after: trackAfter })
+      .then(function (rows) {
+        ingestTrack(rows);
+        return rows && rows.length;
+      })
+      .catch(function () { return 0; });
   }
 
   function trackMeters() {
@@ -382,7 +448,11 @@
   }
 
   function drawMap(p) {
-    if (!track.length) return;
+    // Sem pontos do servidor o mapa ainda aparece, so com a posicao actual e
+    // sem traco. E o que acontecia antes da #92 (o traco vinha do proprio
+    // push), e e o que evita que o mapa desapareca enquanto o
+    // `get_live_track` nao responde — ou ainda nao existe, porque o SQL
+    // idempotente ainda nao foi rodado no projecto.
     var here = { lat: p.latitude, lon: p.longitude };
     var projection = projectTrack(track.concat([here]), {
       width: MAP_SIZE,
@@ -439,7 +509,7 @@
       g.scaleText.textContent = fmtDistance(bar.meters);
     }
     $('map').classList.remove('hidden');
-    $('mapNote').textContent = 'Trajecto desde que abriste esta página · ' + fmtDistance(trackMeters());
+    $('mapNote').textContent = 'Trajecto completo · ' + fmtDistance(trackMeters());
     $('mapNote').classList.remove('hidden');
   }
 
@@ -454,7 +524,6 @@
     lastFixAt = p.updated_at ? new Date(p.updated_at).getTime() : 0;
     if (expiresAt && expiresAt <= Date.now()) { expired(); return; }
     showCoords(true);
-    pushTrack(p);
     drawMap(p);
     $('coords').textContent = fmt(p.latitude, true) + '   ' + fmt(p.longitude, false);
     var bits = [];
@@ -476,8 +545,13 @@
   function poll() {
     if (done || busy) return;
     busy = true;
-    post('get_live_position', { p_token: tkn })
-      .then(function (rows) {
+    // Os dois pedidos saem ao mesmo tempo, e nao um atras do outro: cada um
+    // pode demorar o timeout (8 s) e a posicao actual e o que nao pode ficar a
+    // espera do trajecto. `fetchTrack` nao rejeita, portanto um servidor de
+    // pontos em baixo nunca chega ao `catch` daqui.
+    Promise.all([post('get_live_position', { p_token: tkn }), fetchTrack()])
+      .then(function (out) {
+        var rows = out[0];
         errors = 0;
         showRetry(false);
         if (!rows || !rows.length) {

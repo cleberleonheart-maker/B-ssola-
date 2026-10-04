@@ -7,7 +7,14 @@ type UpsertResult = {
 
 const loadCloud = (result: UpsertResult) => {
   const upsert = jest.fn().mockResolvedValue(result);
-  const from = jest.fn(() => ({ upsert }));
+  const insert = jest.fn().mockResolvedValue(result);
+  // O `delete` do supabase-js e um encadeamento: cada `eq` devolve o proprio
+  // builder, senao a segunda comparacao rebenta em `undefined` e o teste passa
+  // a testar outra coisa sem dar conta.
+  const builder: { eq: jest.Mock } = { eq: jest.fn() };
+  builder.eq.mockReturnValue(builder);
+  const remove = jest.fn(() => builder);
+  const from = jest.fn((_table: string) => ({ upsert, insert, delete: remove }));
   jest.doMock('@react-native-async-storage/async-storage', () => ({}));
   jest.doMock('@supabase/supabase-js', () => ({
     createClient: jest.fn(() => ({
@@ -19,7 +26,7 @@ const loadCloud = (result: UpsertResult) => {
   jest.isolateModules(() => {
     cloud = jest.requireActual('../src/services/cloud') as typeof import('../src/services/cloud');
   });
-  return { cloud, from, upsert };
+  return { cloud, from, upsert, insert, remove, builder };
 };
 
 describe('pushLivePosition', () => {
@@ -105,6 +112,126 @@ describe('pushLivePosition', () => {
       'login anonimo: Anonymous sign-ins are disabled',
     );
     warn.mockRestore();
+  });
+});
+
+/**
+ * O trajecto (#92). `live_shares` e um `upsert` por token — uma linha, um
+ * ponto — e por isso o viewer so via o caminho percorrido se a pagina estivesse
+ * aberta desde o inicio. `live_points` e o registo: um `insert` por fix, com o
+ * `id` a ser posto pelo servidor porque e esse `id` que o viewer usa para pedir
+ * so o que ainda nao leu.
+ */
+describe('pushLivePoint', () => {
+  beforeEach(() => {
+    jest.resetModules();
+  });
+
+  afterEach(() => {
+    jest.dontMock('@react-native-async-storage/async-storage');
+    jest.dontMock('@supabase/supabase-js');
+    jest.resetModules();
+  });
+
+  it('vai para live_points, e nao para a linha do upsert', async () => {
+    const { cloud, from } = loadCloud({ error: null });
+
+    await expect(
+      cloud.pushLivePoint(
+        'lnv1',
+        'user-1',
+        -15.8,
+        -47.9,
+        5,
+        90,
+        1.4,
+        1100,
+        Date.now() + 60_000,
+      ),
+    ).resolves.toBe(true);
+
+    expect(from).toHaveBeenCalledWith('live_points');
+  });
+
+  it('grava as coordenadas, o dono e o prazo da sessao', async () => {
+    const { cloud, insert } = loadCloud({ error: null });
+    const expiresAt = Date.now() + 60_000;
+
+    await cloud.pushLivePoint(
+      'lnv1',
+      'user-1',
+      -15.8,
+      -47.9,
+      5,
+      90,
+      1.4,
+      1100,
+      expiresAt,
+    );
+
+    // Sem o `expires_at` o ponto nao se distingue de um de uma sessao a
+    // terminar, e a purga passa a precisar de adivinhar.
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        token: 'lnv1',
+        user_id: 'user-1',
+        latitude: -15.8,
+        longitude: -47.9,
+        accuracy: 5,
+        heading: 90,
+        speed: 1.4,
+        altitude: 1100,
+        expires_at: new Date(expiresAt).toISOString(),
+      }),
+    );
+  });
+
+  it('cada fix e uma linha nova: sem onConflict para resolver conflito', async () => {
+    const { cloud, insert } = loadCloud({ error: null });
+
+    await cloud.pushLivePoint('lnv1', 'user-1', -15.8, -47.9, null, null, null, null, Date.now());
+
+    // Um segundo argumento aqui seria `{ onConflict }`, e viraria update: o
+    // ponto anterior desapareceria e o trajecto voltava a ser uma recta.
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect(insert.mock.calls[0]).toHaveLength(1);
+  });
+
+  it('devolve false quando a RLS recusa o insert', async () => {
+    const { cloud, from } = loadCloud({
+      error: { message: 'new row violates row-level security policy' },
+    });
+
+    await expect(
+      cloud.pushLivePoint('lnv1', 'user-1', -15.8, -47.9, 5, 90, 1.4, 1100, Date.now()),
+    ).resolves.toBe(false);
+    expect(from).toHaveBeenCalledWith('live_points');
+  });
+});
+
+describe('deleteLiveShareRow', () => {
+  beforeEach(() => {
+    jest.resetModules();
+  });
+
+  afterEach(() => {
+    jest.dontMock('@react-native-async-storage/async-storage');
+    jest.dontMock('@supabase/supabase-js');
+    jest.resetModules();
+  });
+
+  it('apaga a linha e o trajecto, porque um link encerrado nao guarda caminho', async () => {
+    const { cloud, from, builder } = loadCloud({ error: null });
+
+    await expect(cloud.deleteLiveShareRow('lnv1', 'user-1')).resolves.toBe(true);
+
+    expect(from).toHaveBeenCalledWith('live_shares');
+    expect(from).toHaveBeenCalledWith('live_points');
+    // Duas condicoes por tabela: `token` e `user_id`. Sem a segunda, um id
+    // trocado ia apagar o trajecto de outra pessoa.
+    expect(builder.eq).toHaveBeenCalledTimes(4);
+    expect(builder.eq).toHaveBeenCalledWith('token', 'lnv1');
+    expect(builder.eq).toHaveBeenCalledWith('user_id', 'user-1');
   });
 });
 
