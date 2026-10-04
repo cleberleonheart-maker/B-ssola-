@@ -403,7 +403,7 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     wn_steady_title: 'Bússola mais estável',
     wn_steady_desc: 'O rumo com menos tremedeira quando parado e resposta rápida ao virar.',
     wn_campro_title: 'Zoom e lanterna na Visão',
-    wn_campro_desc: 'Use pinça ou os botões ×1–×6 para dar zoom e ligue a lanterna 🔦 no escuro.',
+    wn_campro_desc: 'Use os botões ×1–×6 para dar zoom e ligue a lanterna 🔦 no escuro.',
     wn_gpx_title: 'GPX otimizado',
     wn_gpx_desc: 'Arquivo GPX mais leve e traçado mais limpo, e ganho/perda de elevação sem ruído do altímetro.',
     wn_return_title: 'Rumo de volta sempre visível',
@@ -497,6 +497,11 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
 
     wn_livetrack_title: 'O link do rastreio mostra o caminho todo',
     wn_livetrack_desc: 'A página deixa de desenhar só o que foi visto desde que abriu. Cada posição passa a ficar guardada à parte, e quem recebe o link vê o percurso completo — o mesmo que a pessoa andou, não só a parte que coincidiu com a consulta.',
+
+    wn_liveheadingfix_title: 'O rumo no link de rastreio deixa de saltar',
+    wn_liveheadingfix_desc: 'O primeiro ponto era enviado pelo app e os seguintes pelo serviço do Android. As duas cópias discordavam no tratamento do rumo, e quando o serviço assumia a agulha podia dar um salto. Passam a decidir do mesmo jeito, com um teste que corre as duas sobre a mesma lista de leituras.',
+    wn_zoomtext_title: 'A Visão: o zoom é pelos botões',
+    wn_zoomtext_desc: 'A nota de novidades da 7.11 dizia "use pinça ou os botões ×1–×6", mas não havia pinça: a dependência do gesto nunca entrou. Passa a dizer o que existe — os botões ×1–×6 ao pé da mira — e a mesma nota aparece corrigida em português, inglês e espanhol.',
 
     wn_livenative_title: 'Rastreio ao vivo sobrevive ao app fechado',
     wn_livenative_desc: 'A posição passa a ser enviada pelo serviço do próprio Android, e não mais pelo app. Se o sistema encerrar o Bússola para economizar memória, o rastreio continua e o link não fica parado.',
@@ -1193,7 +1198,7 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     wn_steady_title: 'Steadier compass',
     wn_steady_desc: 'Less jitter when standing still and a fast response when you turn.',
     wn_campro_title: 'Camera zoom and torch',
-    wn_campro_desc: 'Pinch or use the ×1–×6 buttons to zoom and turn the torch on in the dark.',
+    wn_campro_desc: 'Use the ×1–×6 buttons to zoom and turn the torch on in the dark.',
     wn_gpx_title: 'Optimized GPX',
     wn_gpx_desc: 'Lighter GPX files, cleaner paths, and elevation gain/loss without altimeter noise.',
     wn_return_title: 'Return bearing always visible',
@@ -1287,6 +1292,11 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
 
     wn_livetrack_title: 'The tracking link now shows the whole way',
     wn_livetrack_desc: 'The page no longer draws only what it has seen since it was opened. Every position is now kept separately, so whoever gets the link sees the complete route — the one the person actually walked, not just the part that happened to be asked for.',
+
+    wn_liveheadingfix_title: 'The heading in the tracking link stops jumping',
+    wn_liveheadingfix_desc: 'The first point was sent by the app and the following ones by the Android service. The two copies disagreed on how to treat the heading, so when the service took over the arrow could jump. They now decide the same way, with a test that runs both over the same list of readings.',
+    wn_zoomtext_title: 'Vision: the zoom is on the buttons',
+    wn_zoomtext_desc: 'The what-is-new note from 7.11 said "pinch or use the ×1–×6 buttons", but there was no pinch: the gesture dependency never came in. It now says what is there — the ×1–×6 buttons under the sight — and the same note is corrected in Portuguese, English and Spanish.',
     wn_livenative_title: 'Live tracking survives the app being closed',
     wn_livenative_desc: 'Your position is now sent by the Android service itself instead of by the app. If the system shuts Bussola down to save memory, tracking carries on and the link never freezes.',
     wn_liveexpired_title: 'The end of tracking is explained',
@@ -1981,7 +1991,7 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     wn_steady_title: 'Brújula más estable',
     wn_steady_desc: 'Menos temblor al estar quieto y respuesta rápida al girar.',
     wn_campro_title: 'Zoom y linterna en Visión',
-    wn_campro_desc: 'Pellizca o usa los botones ×1–×6 para hacer zoom y enciende la linterna 🔦 en la oscuridad.',
+    wn_campro_desc: 'Usa los botones ×1–×6 para hacer zoom y enciende la linterna 🔦 en la oscuridad.',
     wn_gpx_title: 'GPX optimizado',
     wn_gpx_desc: 'Archivos GPX más livianos, rutas más limpias y ganancia/pérdida de altitud sin ruido del altímetro.',
     wn_return_title: 'Rumbo de vuelta siempre visible',
@@ -2075,6 +2085,11 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
 
     wn_livetrack_title: 'El enlace del rastreo ya muestra todo el camino',
     wn_livetrack_desc: 'La página ya no dibuja solo lo que vio desde que se abrió. Ahora cada posición se guarda aparte, así que quien recibe el enlace ve el recorrido completo — el que hizo la persona, no solo la parte que coincidió con la consulta.',
+
+    wn_liveheadingfix_title: 'El rumbo en el enlace del rastreo deja de saltar',
+    wn_liveheadingfix_desc: 'El primer punto lo enviaba la app y los siguientes el servicio de Android. Las dos copias discrepaban en cómo tratar el rumbo, así que cuando el servicio tomaba el relevo la flecha podía dar un salto. Ahora deciden igual, con una prueba que ejecuta ambas sobre la misma lista de lecturas.',
+    wn_zoomtext_title: 'Visión: el zoom es con los botones',
+    wn_zoomtext_desc: 'La nota de novedades de la 7.11 decía "pellizca o usa los botones ×1–×6", pero no había pellizco: la dependencia del gesto nunca entró. Ahora dice lo que hay — los botones ×1–×6 al pie de la mira — y la misma nota aparece corregida en portugués, inglés y español.',
     wn_livenative_title: 'El rastreo en vivo sobrevive a la app cerrada',
     wn_livenative_desc: 'La posición la envía ahora el propio servicio de Android, y no la app. Si el sistema cierra Bussola para ahorrar memoria, el rastreo sigue y el enlace no se queda quieto.',
     wn_liveexpired_title: 'El fin del rastreo se explica',

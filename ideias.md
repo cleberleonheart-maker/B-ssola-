@@ -268,10 +268,14 @@ foram encontrados de verdade, não ideias soltas.
       fora — o `--clobber` e os secrets já funcionam — o aparelho nunca vê a chave.
 
 ### Produto
-- [ ] **53. 📜 Changelog acumulado** — o `changelogFor` mostra só a entrada da versão
+- [x] **53. 📜 Changelog acumulado** — o `changelogFor` mostra só a entrada da versão
       atual. Quem salta do cod 80 para o 153 vê uma linha e não sabe o que houve no
       meio. Acumular as entradas entre a última versão vista (guardada no
       AsyncStorage) e a atual.
+      **Fechado na v7.27 (code 158)** com `changelogBetween()` em
+      `services/changelog.ts`: acumula o intervalo, grava-se ao *fechar* o modal
+      (a gravação ao abrir perdia o intervalo se o processo morresse com o modal
+      na tela) e uma entrada repetida em vários builds aparece uma vez só.
 - [x] **54. 🧭 Rumo magnético como reserva** — ✅ feito junto da auditoria pós-v7.26
       (bug nº 4 do commit `362b41b`). `resolveLiveHeading()` em `liveShareService.ts`
       prefere o bearing do GPS e cai na bússola magnética quando ele vem `null` — que é
@@ -294,7 +298,7 @@ foram encontrados de verdade, não ideias soltas.
       fica `● AO VIVO` estável; repetir em segundo plano e com a economia de energia do
       sistema ligada. Não dá para buildar localmente (#59/#61).*
 
-- [ ] **55b. 💀 Processo morto ≠ timer estrangulado** — a #55 fecha o caso do
+- [x] **55b. 💀 Processo morto ≠ timer estrangulado** — a #55 fecha o caso do
       *throttling*: com o processo promovido, o `setInterval` do `EmergencyModal` volta
       a puxar. O serviço é `START_STICKY`, então o Android recria o processo se ele
       morrer — **mas quem faz o push continua sendo o JavaScript**, e o `setInterval`
@@ -309,6 +313,10 @@ foram encontrados de verdade, não ideias soltas.
       questão de expiração: quem apaga a linha quando o prazo passa se o JS não
       volta? Teste de campo no mesmo roteiro da #55, com o app forçado a morrer
       (adb kill do processo).
+      **Fechado na v7.27 (code 158)**: o serviço passou a ser dono do push
+      (`LiveTrackingSession.kt`), com `START_REDELIVER_INTENT` para o Intent
+      voltar com o processo e `ownerRef` para dois autores não oscilarem o
+      `updated_at`. A linha ficou por fazer na v7.27 em diante.
 - [ ] **56. 💥 Relatório de crash** — hoje um erro em produção é invisível; o usuário
       simplesmente vê o app fechar. Sentry daria o stack real.
 - [x] **57. 🧪 Testes dos componentes extraídos** — feito. 12 testes para as primitivas de
@@ -349,8 +357,12 @@ foram encontrados de verdade, não ideias soltas.
 ## Ideias novas (23/09/2026, 4ª leva)
 - [ ] **31. 🔐 PIN/biometria no app** — trancar o app (privacidade, útil ao compartilhar
       o telefone). Configurável em Configurações.
-- [ ] **32. 🧭 Leitura em mil (militar)** — alternar azimute entre graus e **milésimos**
+- [x] **32. 🧭 Leitura em mil (militar)** — alternar azimute entre graus e **milésimos**
       (mrad/"mils", 6400/6000). Bom pra quem usa bússola tática.
+      **Fechado na v7.23 (code 153)**: `MILS_PER_DEG` em `utils/compass.ts` e a
+      opção que escreve o azimute em milésimos na `CompassScreen`. A linha ficou
+      por fazer durante as versões todas; o código estava lá desde o primeiro
+      backlog.
 - [x] **33. 📸 Waypoint pela câmera** — marcar um ponto distante sem chegar perto: 2+
       avistagens de lugares diferentes cruzam os rumos e **estimam a coordenada**
       (complemento da triangulação #27, usando teodolito + AR).
@@ -372,6 +384,10 @@ foram encontrados de verdade, não ideias soltas.
       zoom", mas só o botão ×1–×6 existe: não há `pinch`/`gesture` em
       `CameraARView`. O texto da v7.11 está errado; falta de fato o gesto via
       react-native-gesture-handler (que hoje nem é dependência do projeto).
+      **A mentira está corrigida (v7.32, code 163)**: o `wn_campro_desc` dizia
+      "use pinça" nos três idiomas e era verdade em nenhum — passou a dizer só
+      os botões. A linha continua aberta porque o que falta é o gesto, e isso é
+      dependência nativa nova; com o texto certo, já não é promessa vazia.
 - [ ] **42. 🎨 Tema "sol forte"** — tema de alto contraste para leitura outdoor sob sol
       direto (além do Noturno e Neon).
 - [ ] **43. ⚡ Performance: memoizar marcos** — evitar recálculo de distância/rumo de
@@ -590,13 +606,15 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       círculo de precisão e a escala, mas não ruas nem nomes de rua. É uma
       decisão (zero pedidos, zero tiles, funciona sem rede), não um esquecimento;
       fica escrito para o próximo não tratar a ausência como bug.
-- [ ] **94. 🧪 Um bug que só os stubs apanharam** — o `svgNode` do `live.html`
+- [x] **94. 🧪 Um bug que só os stubs apanharam** — o `svgNode` do `live.html`
       fazia `setAttribute.apply(node, [[...], [...]])`, e o `apply` com uma
       lista de pares punha o primeiro par como nome e o segundo como valor: o
       `fill` do traço saía `fill,none` e o caminho desenhava-se preenchido a
       preto, sem o traço azul. O `setAttribute` do browser erraria o mesmo,
       portanto isto nunca tinha sido visto em nenhum browser — o `document`
       falso do `liveViewer.test.js` foi que devolveu o erro.
+      **Corrigido** — `web/live.html:404` passa a correr o `for` par a par, com o
+      porquê no comentário. A linha continuava por fazer desde a v7.28.
 
 ## ✅ Feitos (v7.29 · code 160)
 - [x] **95. 📡 O login anónimo dizia "sem user id na resposta"** — o
@@ -648,3 +666,28 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       2026-10-04: a `get_live_track` responde), portanto a tabela e a RPC já
       estão na nuvem — o que resta é o processo do #87, que agora tem mais um
       ficheiro na fila.
+
+
+## ✅ Feitos (v7.32 · code 163)
+- [x] **89. 🧭 Dois rumos para a mesma linha** — fechado; ver a nota acima, onde
+      ficou. Resumo: `__tests__/liveHeadingParity.test.ts` translitera as duas
+      funções do `LiveTrackingSession.kt` e apanhou quatro divergências no ramo
+      do GPS (360, 725, -1 e -90), porque o JS publicava o bearing como vinha e
+      o Kotlin normaliza e trata os negativos como sentinel do `hasBearing()`.
+      A agulha saltava no instante em que o serviço assumia.
+- [x] **41. 📷 O texto da Visão prometia uma pinça que não existe** — o
+      `wn_campro_desc` do build 142 diz "use pinça ou os botões ×1–×6" nos três
+      idiomas, e não há pinça: o `CameraARView` só tem os botões e o
+      `react-native-gesture-handler` nunca chegou a ser dependência. Toda a
+      gente que actualizou desde a 7.11 leu uma promessa falsa. Passou a dizer
+      o que existe. A #41 fica aberta pelo que falta (o gesto), que é
+      dependência nativa nova — mas já não é falsa.
+- [x] **Limpeza de marcas erradas** — #94, #53, #32 e #55b estavam por fazer com
+      o código no sítio há várias versões: o `svgNode` do `live.html` tem o `for`
+      correcto desde a v7.28, o `changelogBetween` existe desde a v7.27, os mils
+      estão na `CompassScreen` desde a v7.23 e o serviço nativo é dono do push
+      desde a v7.27. Uma lista de dívidas em que metade já não é dívida é pior
+      do que nenhuma: faz o próximo duvidar das que são.
+      A #55 continua aberta e é o único caso diferente: o código está pronto
+      desde a 155, falta o **teste de campo** (tela travada 2–3 min, economia de
+      energia ligada) — que é o que a nota dela já pedia.
