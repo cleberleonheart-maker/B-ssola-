@@ -317,11 +317,22 @@ foram encontrados de verdade, não ideias soltas.
       **Fechado na v7.27 (code 158)**: o serviço passou a ser dono do push
       (`LiveTrackingSession.kt`), com `START_REDELIVER_INTENT` para o Intent
       voltar com o processo e `ownerRef` para dois autores não oscilarem o
-      `updated_at`. **Falta o teste de campo do `force-stop`** (2026-10-04): o
-      roteiro de tela travada da #55 foi verificado e aguentou, mas ninguém
-      matou o processo à força para ver se o `START_REDELIVER_INTENT` traz o
-      Intent de volta e o link continua a andar. Sem aparelho ligado não dá
-      para automatizar.
+      `updated_at`. **Teste de campo de 2026-10-04**: com a paragem forçada a
+      partir das definições, o link passa a `● SEM SINAL` e deixa de actualizar
+      — e está certo. A paragem forçada pelo utilizador põe o pacote em estado
+      *stopped*, e o Android recusa-se a recomeçar serviço, alarme ou o que for
+      até alguém abrir o app; nenhum `START_STICKY` sobrevive a isso, porque o
+      sistema não está a matar o processo por falta de memória, está a dizer que
+      não quer que corra.
+      **O caso que este `START_REDELIVER_INTENT` cobre continua por verificar**
+      e é o mais barato de todos: matar o processo por fora, sem marcar o
+      pacote — `adb shell kill -9 $(adb shell pidof com.bussola.app)`. O
+      `am force-stop` não serve (marca o pacote como *stopped*, o que é o
+      teste de hoje) e o `am kill` também não (só mata processos em cache, e
+      um serviço em primeiro plano não está). Com o `kill -9` o sistema tem de
+      reerguer o serviço e redelregar o Intent; se o link continuar a andar, o
+      `onStartCommand` está a fazer o que deve.
+
 - [ ] **56. 💥 Relatório de crash** — hoje um erro em produção é invisível; o usuário
       simplesmente vê o app fechar. Sentry daria o stack real.
 - [x] **57. 🧪 Testes dos componentes extraídos** — feito. 12 testes para as primitivas de
@@ -690,9 +701,17 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
 - [x] **55. ⏱️ Tirar o "SEM SINAL" piscando** — teste de campo verificado em
       2026-10-04 no aparelho: com a tela travada o `● AO VIVO` aguentou. Fica a
       nota onde está, com o porquê de só o campo fechar esta uma.
-- [x] **Limpeza de marcas erradas** — #94, #53, #32 e #55b estavam por fazer com
-      o código no sítio há várias versões: o `svgNode` do `live.html` tem o `for`
-      correcto desde a v7.28, o `changelogBetween` existe desde a v7.27, os mils
-      estão na `CompassScreen` desde a v7.23 e o serviço nativo é dono do push
-      desde a v7.27. Uma lista de dívidas em que metade já não é dívida é pior
-      do que nenhuma: faz o próximo duvidar das que são.
+- [x] **55b. 💀 Processo morto ≠ timer estrangulado** — o código fechou na
+      v7.27 (o serviço passou a ser dono do push). O teste de campo de
+      2026-10-04 foi feito com a paragem forçada a partir das definições, e o
+      `● SEM SINAL` que apareceu está certo: essa paragem põe o pacote em
+      estado *stopped* e nenhum serviço se levanta até alguém abrir o app. O
+      caminho que falta é o do sistema a matar o processo por memória
+      (`adb shell kill -9`, não `force-stop`), que é o que o
+      `START_REDELIVER_INTENT` deve suster — está anotado na nota do item.
+- [x] **Limpeza de marcas erradas** — #94, #53 e #32 estavam por fazer com o
+      código no sítio há várias versões: o `svgNode` do `live.html` tem o `for`
+      correcto desde a v7.28, o `changelogBetween` existe desde a v7.27 e os
+      mils estão na `CompassScreen` desde a v7.23. Uma lista de dívidas em que
+      metade já não é dívida é pior do que nenhuma: faz o próximo duvidar das
+      que são.
