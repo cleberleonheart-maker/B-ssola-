@@ -706,10 +706,13 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       ficheiro que ninguém confirmou ter corrido.
 
       **Falta uma aplicação, e é do dono — uma credencial, não um paste.** Com o
-      secret `SUPABASE_ACCESS_TOKEN` (personal access token da conta, com poder
-      de escrita na base de dados) no repositório, o workflow aplica os cinco
-      ficheiros sozinho em cada commit que os toque e volta a verificar:
-      `gh secret set SUPABASE_ACCESS_TOKEN`, uma vez. Sem esse secret, o
+      secret `SUPABASE_ACCESS_TOKEN` no repositório, o workflow aplica os cinco
+      ficheiros sozinho em cada commit que os toque e volta a verificar. O token
+      cria-se em `supabase.com/dashboard/account/tokens` e deve ser **scoped**
+      (`sbp_fc…`), só deste projecto e com escrita na base de dados — um "classic"
+      aparece como Legacy e leva o poder da conta toda, fatura incluída. Depois
+      `gh secret set SUPABASE_ACCESS_TOKEN`, e para não esperar por outro commit,
+      `gh workflow run verificar-nuvem.yml`. Sem esse secret, o
       workflow salta a aplicação com um `::warning::` que diz o que ficou por
       aplicar, e o ficheiro continua a ter de ser colado no SQL Editor — que é o
       que se fazia antes. De passagem, o login anónimo está ligado (o passo de

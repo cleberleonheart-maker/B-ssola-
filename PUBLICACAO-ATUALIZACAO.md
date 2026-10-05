@@ -97,11 +97,15 @@ Referência atual (o registro da v125 abaixo é histórico e ficou desatualizado
    diz o que ainda não chegou à nuvem. O `publicar-supabase.sh` só mexe em
    `app_version`, e DDL não passa pelo PostgREST: nem com `service_role`. O
    workflow "Schema do Supabase" aplica os cinco ficheiros sozinho em cada
-   commit que os toque, **se** o secret `SUPABASE_ACCESS_TOKEN` existir
-   (personal access token da conta, com poder de escrita na base de dados —
-   `gh secret set SUPABASE_ACCESS_TOKEN`, uma vez). Sem esse secret o workflow
-   salta a aplicação com um aviso e o ficheiro tem de ser colado no SQL Editor;
-   em-local, `./scripts/publicar-sql.sh scripts/live_rls.sql` faz o mesmo pela
+   commit que os toque, **se** o secret `SUPABASE_ACCESS_TOKEN` existir. Cria-se
+   em `supabase.com/dashboard/account/tokens`, e deve ser um token **scoped**
+   (`sbp_fc…`) com escopo só neste projecto e permissão de escrever na base de
+   dados — não um "classic", que aparece como Legacy e leva o poder da conta
+   toda. Depois `gh secret set SUPABASE_ACCESS_TOKEN` (cola quando ele pedir) e,
+   para aplicar sem esperar por outro commit, `gh workflow run
+   verificar-nuvem.yml`. Sem o secret, o workflow salta a aplicação com um aviso
+   e o ficheiro tem de ser colado no SQL Editor; em-local,
+   `./scripts/publicar-sql.sh scripts/live_rls.sql` faz o mesmo pela
    Management API ou por `psql`.
 6. `git push` na `main`: o workflow builda, assina, publica na tag `bussola-apk`
    e grava `app_version` no Supabase.

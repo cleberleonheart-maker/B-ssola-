@@ -25,9 +25,14 @@ name: Schema do Supabase
 #      service_role: a service_role salta a RLS das linhas mas continua a ser um
 #      cliente de REST, e o PostgREST nao corre DDL. Nao ha caminho para a
 #      base de dados sem uma credencial de conta, e essa credencial nao se
-#      inventa -- cria-se uma vez:
+#      inventa -- cria-se uma vez, em supabase.com/dashboard/account/tokens:
 #
-#        gh secret set SUPABASE_ACCESS_TOKEN     # token sbp_..., da conta
+#        gh secret set SUPABASE_ACCESS_TOKEN     # cola o token quando ele pedir
+#
+#      Cria um token SCOPED (comeca por sbp_fc), com o escopo neste projecto e
+#      permissao de escrever na base de dados -- e nao um "classic", que aparece
+#      marcado como Legacy e leva o poder da conta toda, incluindo a fatura.
+#      Se o token vazar, o estrago fica no que o escopo der.
 #
 #      Fica num workflow a parte, e nao como passo do build do APK, por duas
 #      razoes: um commit so de SQL nao deve gastar sete minutos a compilar o
