@@ -135,3 +135,32 @@ sem a chave, gere `scripts/app_version.sql` para colar no SQL Editor).
 Uma única linha (`id=1`) com `version_code`, `version_name`, `update_url`, `message`
 e `required`. É ela que faz o app exibir o prompt de atualização. Schema e RLS em
 `scripts/rls.sql`.
+
+## Tabela `crashes` — onde se lê um crash (ideia #56)
+No painel do Supabase, **Table Editor → `crashes`**. É a única tabela do
+repositório que se lê fora do servidor: as outras têm RLS por `user_id` e quem
+entra vê só as suas linhas, o que para um relatório de erro não serve de nada.
+Aqui a leitura é pelo `service_role` do painel, por isso vê todas — e é por isso
+que a tabela não guarda nada que identifique quem tinha o crash.
+
+Ordena por `happened_at` descendente. As colunas úteis:
+
+- `message` — a primeira linha do erro. É o que se lê primeiro para saber se é
+  um bug só.
+- `fingerprint` — hash da primeira linha, e o que permite contar: agrupar por
+  `fingerprint` diz "isto happenceu 400 vezes" sem ler 400 linhas. Duas linhas
+  com o mesmo fingerprint são o mesmo bug, mesmo com stacks diferentes.
+- `happened_at` / `reported_at` — quando o crash aconteceu e quando a app
+  arrancou a seguir para o enviar. A diferença entre as duas é o tempo que o
+  relatório passou na fila, e um valor grande significa que ninguém abriu a app
+  durante esse tempo.
+- `version_code` / `app_version` — em que build. Um erro que só aparece na 164 e
+  não na 163 é regressão, não bug antigo.
+- `expires_at` — 90 dias. A purga está em comentário no SQL porque precisa de
+  `pg_cron`; enquanto lá não estiver, as linhas mais antigas que 90 dias ficam
+  para fora e apagam-se à mão no Table Editor.
+
+Um relatório só chega aqui se a app **tiver arrancado** depois do crash: o
+reporter não tenta enviar durante o erro, porque uma app que acabou de partir não
+tem rede garantida. Por isso a tabela fica vazia nos testes de um utilizador que
+instala a app, abre, fecha, e não volta a abrir — e isso não é um bug.
