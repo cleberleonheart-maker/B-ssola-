@@ -5,7 +5,7 @@
 -- continua passando por RLS (admin bypass).
 
 -- =====...=============================================================
-oria persistente da assistente
+-- Memoria persistente da assistente
 -- =====...=============================================================
 -- O app faz upsert com onConflict('user_id') em {user_id, facts, history, updated_at}.
 create table if not exists public.virgin_memory (
@@ -126,7 +126,6 @@ create table if not exists public.app_version (
   message text,
   required boolean not null default false,
   constraint app_version_pkey primary key (id)
- melting scope
 );
 insert into public.app_version (id, version_code)
 values (1, 0)
