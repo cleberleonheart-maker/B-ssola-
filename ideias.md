@@ -705,19 +705,27 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       mentira que o #86 existia para acabar, outra vez, por causa de um
       ficheiro que ninguém confirmou ter corrido.
 
-      **Falta uma aplicação, e é do dono — uma credencial, não um paste.** Com o
-      secret `SUPABASE_ACCESS_TOKEN` no repositório, o workflow aplica os cinco
-      ficheiros sozinho em cada commit que os toque e volta a verificar. O token
-      cria-se em `supabase.com/dashboard/account/tokens` e deve ser **scoped**
-      (`sbp_fc…`), só deste projecto e com escrita na base de dados — um "classic"
-      aparece como Legacy e leva o poder da conta toda, fatura incluída. Depois
-      `gh secret set SUPABASE_ACCESS_TOKEN`, e para não esperar por outro commit,
-      `gh workflow run verificar-nuvem.yml`. Sem esse secret, o
-      workflow salta a aplicação com um `::warning::` que diz o que ficou por
-      aplicar, e o ficheiro continua a ter de ser colado no SQL Editor — que é o
-      que se fazia antes. De passagem, o login anónimo está ligado (o passo de
-      painel que o #95 deixou escrito): o `--auth` do verificador confirma, e
-      cada chamada cria um utilizador anónimo novo, por isso é opt-in.
+      **Fechado em 2026-10-05.** O secret `SUPABASE_ACCESS_TOKEN` existe (um
+      token *scoped*, `sbp_fc…`, só deste projecto e com escrita na base de
+      dados — um "classic" aparece como Legacy e leva o poder da conta toda,
+      fatura incluída), e o workflow aplica os cinco ficheiros sozinho em cada
+      commit que os toque. A `get_live_status` está na nuvem: a chamada de
+      teste devolve 200 e o `--strict` passa. Já não há nada para colar no SQL
+      Editor. Sem o secret, o workflow saltaria a aplicação com um
+      `::warning::` que diz o que ficou por aplicar.
+
+      Aplicar na nuvem foi o que apanhou o que o `pretest` não apanha: o
+      `rls.sql` e o `app_version.sql` declaravam `version_name` e `update_url`
+      como nullable, e na nuvem são NOT NULL — o `insert` de seeding morria com
+      23502. O PGlite monta o schema com os mesmos ficheiros, portanto só
+      prova que são coerentes consigo próprios; quem prova que batem certo com
+      a nuvem é correr lá. Os ficheiros é que se ajustaram. E o primeiro run
+     Automation apanhou o workflow ao contrário: `bash -e` com `pipefail` fazia
+      o passo de verificação dar vermelho quando a nuvem estava bem.
+
+      De passagem, o login anónimo está ligado (o passo de painel que o #95
+      deixou escrito): o `--auth` do verificador confirma, e cada chamada cria
+      um utilizador anónimo novo, por isso é opt-in.
 - [ ] **88. 🧪 Testes do serviço nativo** — o `compileDebugKotlin` garante que
       compila, não que `pushLivePosition` faz o upsert certo nem que o
       `START_REDELIVER_INTENT` traz o Intent de volta. Nenhum dos dois é testável
