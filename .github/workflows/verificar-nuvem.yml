@@ -1,0 +1,57 @@
+name: Verifica o schema na nuvem
+
+# Os ficheiros em scripts/*.SQL sao a unica copia do schema do Supabase, e ate
+# agora nada confirmava que tinha corrido. Duas consequencias reais, ambas
+# invisiveis daqui:
+#   - o rls.sql esteve com lixo no meio de um `create table` (nunca correu);
+#   - a get_live_status nunca foi criada na nuvem, e o viewer engole o 404 e
+#     escreve "encerrado pela pessoa" num prazo que so cumpriu.
+# A ideia #87 e exactamente esta: as RPCs so chegavam a nuvem coladas a mao.
+#
+# Fica num workflow a parte, e nao como passo do build do APK, por duas razoes:
+# um commit so de SQL nao deve gastar sete minutos a compilar o mesmo APK, e uma
+# falha de rede nao pode partir uma release.
+#
+# O job acaba a verde mesmo com objectos em falta: a informacao sai em
+# `::warning::` no proprio commit. Um X vermelho em todos os pushes ate alguem
+# aplicar o SQL treina o olho a ignora-lo, que e o que se quer evitar.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - 'web/live.html'
+      - 'src/services/cloud.ts'
+      - '.github/workflows/verificar-nuvem.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  schema:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Confere tabelas, funcoes e colunas
+        id: cloud
+        run: |
+          set -uo pipefail
+          # So a URL e a anon key, que sao publicas no app: nao ha secret
+          # nenhum neste workflow, e nao ha o que ler.
+          ./scripts/verificar-nuvem.sh 2>&1 | tee /tmp/nuvem.txt
+          echo "---"
+          grep -E '^  (FALTA|REDE|ERRO)' /tmp/nuvem.txt \
+            | sed 's/^ *//' \
+            | while IFS= read -r linha; do
+                echo "::warning::$linha"
+              done
+          {
+            echo '## Schema do Supabase'
+            echo
+            echo '```'
+            cat /tmp/nuvem.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

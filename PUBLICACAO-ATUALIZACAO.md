@@ -87,10 +87,20 @@ Referência atual (o registro da v125 abaixo é histórico e ficou desatualizado
    `versionCode`) e as chaves `wn_*` em `src/i18n/strings.ts` nos 3 idiomas.
 3. `./gradlew compileDebugKotlin` a partir de `android/` — o `tsc` não valida
    Kotlin e já deixou passar APIs removidas do SDK.
-4. `npm run lint && npm run typecheck && npm test` — o CI repete os três como gate.
-5. Se o commit mexer em `scripts/live_rls.sql`, cole o ficheiro no SQL Editor do
-   Supabase: o `publicar-supabase.sh` só mexe em `app_version` e nenhuma das duas
-   RPCs novas chega à nuvem sozinha.
+4. `npm run lint && npm run typecheck && npm test` — o CI repete os três como
+   gate. O `npm test` corre primeiro o `pretest`, que é o
+   `scripts/verificar-sql.mjs`: cada `scripts/*.sql` duas vezes contra um
+   Postgres a sério, e depois a conferência de que as tabelas, as RPCs e a
+   coluna do hash ficaram lá. Um `.sql` partido ou a meio apanha-se em segundos,
+   em vez de quando alguém o for colar no SQL Editor.
+5. `./scripts/verificar-nuvem.sh` — se o commit mexeu em `scripts/*.sql`, isto
+   diz o que ainda não chegou à nuvem. O `publicar-supabase.sh` só mexe em
+   `app_version`, e DDL não passa pelo PostgREST: nem com `service_role`. Para
+   gravar, `./scripts/publicar-sql.sh scripts/live_rls.sql` (Management API com
+   um personal access token da conta, ou `psql` com `SUPABASE_DB_URL`); sem
+   chave nenhuma, o ficheiro vai ter de ser colado no SQL Editor. O workflow
+   "Verifica o schema na nuvem" repete a verificação sozinho em cada commit que
+   toque nos SQL ou no `web/live.html`.
 6. `git push` na `main`: o workflow builda, assina, publica na tag `bussola-apk`
    e grava `app_version` no Supabase.
 

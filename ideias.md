@@ -599,6 +599,9 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       o viewer dizia "🛑 encerrado pela pessoa" nos dois, inclusive no prazo só
       cumprido. Nova RPC `get_live_status` (devolve carimbos, nunca coordenada)
       e `resolveEnd()` no `web/live.html`.
+      **Em 2026-10-05 descobriu-se que a RPC nunca foi criada na nuvem** — o
+      código estava certo e o `resolveEnd()` continuava a cair no `catch` que
+      escreve "encerrado". Ver o #87, que é onde ficou o que falta fazer.
 - [x] **78b. 🧪 Testes do cancelamento e do timeout** — fechado junto com o bug:
       o `downloadApk` agora rejeita por aqui quando o nativo resolve `false`, e o
       `UpdateAvailableModal` distingue `download_cancelled` de
@@ -653,14 +656,61 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       que publica a release — com uma segunda tentativa sem o campo, para a
       coluna em falta nunca partir uma publicação.
 
-- [ ] **87. 🧨 As RPCs só chegam à nuvem coladas à mão** — `get_live_status`
-      aplicada no SQL Editor a 2026-10-03 e `get_live_track` (que vem com a
-      tabela `live_points`) em 2026-10-04. O que fica é o processo: o
-      `publicar-supabase.sh` só mexe em `app_version` e nenhuma das RPCs chega à
-      nuvem sozinha, e o `publicar.sh` local idem — o `live_points.sql` nem é
-      mencionado lá dentro. Vale um `./scripts/publicar-rls.sh` com a
-      service_role, ou um passo no `publicar.sh`, antes que a próxima RPC
-      volta a ficar só no repositório.
+- [x] **87. 🧨 As RPCs só chegam à nuvem coladas à mão** — o processo era o que
+      ficava, e a ideia sugeria o caminho errado. DDL não passa pelo PostgREST:
+      a `service_role` salta a RLS das linhas e continua a ser um cliente REST,
+      portanto `./scripts/publicar-rls.sh` com a `service_role` nunca podia
+      funcionar. O que corre DDL é a Management API
+      (`POST /v1/projects/<ref>/database/query`, com um personal access token da
+      conta) ou o `psql` a falar com o Postgres — que é o que o SQL Editor faz.
+
+      **Feito a 2026-10-05**, com dois scripts e um workflow:
+      - `scripts/publicar-sql.sh <ficheiro.sql>` — aplica pela Management API
+        (ou `psql`, com `SUPABASE_DB_URL`), e **sai com erro** em vez de fingir
+        que publicou quando não há chave. O `psql` vai com `ON_ERROR_STOP=1`
+        porque sem isso devolve 0 depois de uma frase falhar — que é
+        precisamente como se aplica metade de um ficheiro sem dar por isso.
+      - `scripts/verificar-nuvem.sh` — o outro meio, e o mais barato: as seis
+        tabelas, as três RPCs e a coluna `apk_sha256`, cada uma por uma chamada
+        REST com a anon key (que é pública no `cloud.ts`, portanto não é
+        segredo e o workflow não precisa de nenhum). Um 200 prova que o objeto
+        existe *e* que o `anon` o pode usar. Sai com 1 em `--strict`.
+      - `scripts/verificar-sql.mjs` — a metade local, e a que impede a próxima
+        vez: corre cada `.sql` **duas vezes** contra um Postgres a sério
+        (PGlite, o motor em WASM, 26 MB de devDependency) e depois pergunta ao
+        catálogo se as tabelas, as funções — com o nome dos argumentos, que é
+        como o PostgREST casa — e a coluna do hash existem. Está no `pretest`,
+        portanto corre em cada `npm test` e em cada build do CI. Foi ele que
+        apanhou o `melting scope` no minuto a seguir a ser escrito, e apanha-o
+        em segundos contra os onze dias que ele lá ficou.
+      - `.github/workflows/verificar-nuvem.yml` — repete a verificação em cada
+        commit que toque em `scripts/**` ou no `web/live.html`, e põe o resultado
+        no resumo do run. Fica num workflow à parte para não gastar sete minutos
+        de APK num commit que só mexe em SQL, e para uma falha de rede não
+        partir uma release. O job acaba a verde com `::warning::`: um X
+        vermelho em todos os pushes até alguém aplicar o SQL treina o olho a
+        ignorá-lo.
+
+      **E ao construí-lo, apareceram as duas coisas que ele tinha de apanhar.**
+      O `rls.sql` tinha ` melting scope` dentro de um `create table` e
+      `oria persistente da assistente` solto no meio de um cabeçalho — o
+      ficheiro **nunca correu**, e estava assim desde 2026-09-25 (commits
+      `bde86c7` e `01e2a39`). E a `get_live_status` **não existe na nuvem**:
+      o `POST /rest/v1/rpc/get_live_status` responde `PGRST202`, com
+      `get_live_position` e `get_live_track` a responder 200. Ou seja, o #86
+      estava marcado como feito com a RPC escrita no `live_rls.sql` e o
+      `resolveEnd()` no `live.html` — e o `resolveEnd()` faz
+      `.catch(function () { ended(); })`, ou seja, o 404 da RPC ausente
+      escrevia **"🛑 encerrado pela pessoa"** num prazo que só cumpriu. Era a
+      mentira que o #86 existia para acabar, outra vez, por causa de um
+      ficheiro que ninguém confirmou ter corrido.
+
+      **Falta uma aplicação, e é do dono:** `./scripts/publicar-sql.sh
+      scripts/live_rls.sql` (ou colar o ficheiro no SQL Editor) para a
+      `get_live_status` existir. Depois, `./scripts/verificar-nuvem.sh` tem de
+      dizer que está tudo lá. De passagem, o login anónimo está ligado (o passo
+      manual que o #95 deixou escrito) — o `--auth` do verificador confirma,
+      e cada chamada cria um utilizador anónimo novo, por isso é opt-in.
 - [ ] **88. 🧪 Testes do serviço nativo** — o `compileDebugKotlin` garante que
       compila, não que `pushLivePosition` faz o upsert certo nem que o
       `START_REDELIVER_INTENT` traz o Intent de volta. Nenhum dos dois é testável
