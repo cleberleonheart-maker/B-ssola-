@@ -476,6 +476,60 @@ export const pushLivePoint = async (
   }
 };
 
+/** O que o `crashReporter` manda, e o que a tabela `crashes` tem. */
+export type CrashReport = {
+  message: string;
+  stack: string | null;
+  fingerprint: string;
+  appVersion: string;
+  versionCode: number;
+  happenedAt: string;
+  /** Prazo da purga: 90 dias. Um crash de há seis meses já não interessa. */
+  expiresAt: string;
+};
+
+/**
+ * Grava um crash (ideia #56).
+ *
+ * Devolve só o booleano, e nunca lança: quem chama é o tratamento de um erro,
+ * e um tratamento de erro que lança outra vez é como um crash se reproduz
+ * sozinho. O reporter também não trata o fracasso — se não há rede no arranque
+ * seguinte, o relatório fica na fila para a próxima vez.
+ */
+export const pushCrashReport = async (
+  userId: string,
+  report: CrashReport,
+): Promise<boolean> => {
+  if (!client) {
+    noteCloudError('crash', 'Supabase nao configurado');
+    return false;
+  }
+  try {
+    const { error } = await withTimeout(
+      client.from('crashes').insert({
+        user_id: userId,
+        message: report.message,
+        stack: report.stack,
+        fingerprint: report.fingerprint,
+        app_version: report.appVersion,
+        version_code: report.versionCode,
+        happened_at: report.happenedAt,
+        reported_at: new Date().toISOString(),
+        expires_at: report.expiresAt,
+      }),
+      15000,
+    );
+    if (error) {
+      noteCloudError('crash', error.message);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    noteCloudError('crash', error);
+    return false;
+  }
+};
+
 export const deleteLiveShareRow = async (
   token: string,
   userId: string,

@@ -7,6 +7,7 @@ import { LanguageProvider } from './src/i18n/LanguageContext';
 import { AssistantProvider } from './src/assistant/AssistantContext';
 import AssistantModal from './src/components/AssistantModal';
 import WhatsNewModal from './src/components/WhatsNewModal';
+import { CrashBoundary } from './src/components/CrashBoundary';
 import UpdateAvailableModal from './src/components/UpdateAvailableModal';
 import LocationGate from './src/components/LocationGate';
 import LockScreen from './src/components/LockScreen';
@@ -117,16 +118,18 @@ function Root() {
 
 function App() {
   return (
-    <SafeAreaProvider>
-      <LanguageProvider>
-        <ThemeProvider>
-          <AssistantProvider>
-            <Root />
-            <AssistantModal />
-          </AssistantProvider>
-        </ThemeProvider>
-      </LanguageProvider>
-    </SafeAreaProvider>
+    <CrashBoundary>
+      <SafeAreaProvider>
+        <LanguageProvider>
+          <ThemeProvider>
+            <AssistantProvider>
+              <Root />
+              <AssistantModal />
+            </AssistantProvider>
+          </ThemeProvider>
+        </LanguageProvider>
+      </SafeAreaProvider>
+    </CrashBoundary>
   );
 }
 

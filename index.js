@@ -16,5 +16,15 @@ import 'react-native-url-polyfill/auto';
 import { AppRegistry } from 'react-native';
 import App from './App';
 import { name as appName } from './app.json';
+import { flushCrashes, installCrashReporter } from './src/services/crashReporter';
+
+// Antes de `AppRegistry.registerComponent`: um erro nasce no primeiro render e
+// no arranque, e um handler instalado depois já não apanha nenhum dos dois.
+installCrashReporter();
+
+// O que ficou de crashes anteriores. Não é awaited de propósito: isto corre
+// antes de a app aparecer, e um `await` aqui seria um ecrã em branco à espera
+// de rede. O relatório vai quando pode, que é o que interessa.
+flushCrashes();
 
 AppRegistry.registerComponent(appName, () => App);

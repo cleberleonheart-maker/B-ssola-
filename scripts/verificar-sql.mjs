@@ -40,6 +40,7 @@ const FICHEIROS = [
   'live_points.sql',
   'app_version.sql',
   'app_version_sha.sql',
+  'crashes.sql',
 ];
 
 /** O que o `cloud.ts` toca, e o que o `web/live.html` chama sem login.
@@ -47,7 +48,15 @@ const FICHEIROS = [
  *  só o tipo: o PostgREST casa por nome, portanto um argumento renomeado no SQL
  *  e no `live.html` desemparelhados dão 404 em produção sem erro nenhum no
  *  repositório — que é o que o `verificar-nuvem.sh` vê. */
-const TABELAS = ['app_version', 'live_shares', 'live_points', 'virgin_memory', 'tracks', 'notes'];
+const TABELAS = [
+  'app_version',
+  'live_shares',
+  'live_points',
+  'virgin_memory',
+  'tracks',
+  'notes',
+  'crashes',
+];
 const FUNCOES = [
   'get_live_position(p_token text)',
   'get_live_status(p_token text)',
