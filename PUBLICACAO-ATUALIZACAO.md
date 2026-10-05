@@ -93,6 +93,17 @@ Referência atual (o registro da v125 abaixo é histórico e ficou desatualizado
    Postgres a sério, e depois a conferência de que as tabelas, as RPCs e a
    coluna do hash ficaram lá. Um `.sql` partido ou a meio apanha-se em segundos,
    em vez de quando alguém o for colar no SQL Editor.
+
+   Um teste que demora imenso tempo não é culpa do componente, e é melhor
+   aquecê-lo do que lhe esticar o prazo. As suítes que usam
+   `react-test-renderer` pagam a transformação do Babel de todo o `react-native`
+   no **primeiro** render — 15,9 s no `whatsNewModal`, 4,0 s no `miniMapView`,
+   contra 13–192 ms nos testes seguintes. Dentro do prazo, isso é um flake à
+   espera: o `whatsNewModal` chegou a falhar em uma de cada três execuções da
+   suite toda, e subir o prazo de 5 s para 30 s só comprou margem. A cura é um
+   render em `beforeAll`, que paga o frio fora do relógio dos testes: 15,9 s
+   → 42 ms e 4,0 s → 29 ms, ambos de volta ao prazo normal. Se um dia um teste
+   ficar lento a sério, o timeout deve ser o **dele** e não de toda a suíte.
 5. `./scripts/verificar-nuvem.sh` — se o commit mexeu em `scripts/*.sql`, isto
    diz o que ainda não chegou à nuvem. O `publicar-supabase.sh` só mexe em
    `app_version`, e DDL não passa pelo PostgREST: nem com `service_role`. O

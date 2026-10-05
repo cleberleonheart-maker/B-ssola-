@@ -60,6 +60,35 @@ const views = (r: ReactTestRenderer): Record<string, unknown>[] =>
     .map(n => StyleSheet.flatten(n.props.style as never) as Record<string, unknown>);
 
 describe('MiniMapView', () => {
+  /**
+   * O mesmo custo frio do `whatsNewModal`, aqui menor mas dentro do prazo por
+   * pouco: o primeiro teste gastava 4,0 s dos 5 s que o Jest dá, e os
+   * seguintes 14–84 ms. Com as 22 suites em paralelo é uma margem que não
+   * existe — o mesmo flake, à espera doCI lhe mudar a hora.
+   *
+   * O render de aquecimento tira o frio do caminho quente; a árvore é
+   * desmontada para não deixar efeitos vivos para os testes seguintes. Ver
+   * `whatsNewModal.test.tsx` para a conta completa: 15,9 s → 42 ms.
+   */
+  let aquecimento: ReactTestRenderer | undefined;
+
+  beforeAll(() => {
+    act(() => {
+      aquecimento = TestRenderer.create(
+        <LanguageProvider>
+          <ThemeProvider>
+            <MiniMapView active location={fix()} />
+          </ThemeProvider>
+        </LanguageProvider>,
+      );
+    });
+  }, 120_000);
+
+  afterAll(() => {
+    if (aquecimento) act(() => aquecimento?.unmount());
+    aquecimento = undefined;
+  });
+
   it('sem GPS diz que está à espera, em vez de desenhar o nada', () => {
     const r = render({ location: fix({ latitude: 0, longitude: 0, accuracy: null }) });
 

@@ -45,19 +45,42 @@ const texts = (r: ReactTestRenderer) =>
  * componente passar `lastSeen` errado (ou não passar), e nada reclamar.
  */
 describe('WhatsNewModal', () => {
-  // O prazo é o do primeiro teste, e não um global, porque o custo é todo dele:
-  // este é o primeiro render da suíte e paga a transformação do Babel de todo o
-  // `react-native`, do `i18n/strings` e do componente. Mede-se aqui 19 s; os
-  // testes seguintes gastam 14–200 ms. Com o prazo de 5 s do Jest este teste
-  // passou a falhar sozinho, conforme o `act()` bloque ou devolve a event loop
-  // ao timer — a mesma árvore, dois resultados, e a culpa apparentemente do
-  // componente. Um prazo que encompassa o trabalho é mais honesto do que
-  // fingir que o trabalho não existe.
+  /**
+   * O custo frio é pago aqui, e não dentro de um teste.
+   *
+   * O primeiro render desta suíte gastava 15,9 s — a transformação do Babel de
+   * `react-native`, do `i18n/strings` e do componente, mais o primeiro
+   * `act()` a construir as árvores. Os sete testes seguintes gastam 13–192 ms,
+   * porque já estão quentes. Esse frio estava dentro do relógio do primeiro
+   * teste, e é por isso que ele falhava sozinho: subir o prazo de 5 s para 30 s
+   * (`ad69437`) comprou margem em vez de tirar a causa, e voltou a estalar com
+   * as 22 suites a correr em paralelo.
+   *
+   * Um render de aquecimento em `beforeAll` tira o frio do caminho quente: o
+   * primeiro teste passou de 15,9 s para 42 ms e volta ao prazo normal do
+   * Jest, onde um teste lento deve aparecer como timeout de *si* e não
+   * emprestar o custo a toda a gente.
+   *
+   * A árvore do aquecimento desmonta-se no `afterAll`: ficar montada deixaria
+   * efeitos e timers vivos para os testes seguintes, e a culpa apareceria noutro
+   * sítio.
+   */
+  let aquecimento: ReactTestRenderer | undefined;
+
+  beforeAll(async () => {
+    aquecimento = await render(null);
+  }, 120_000);
+
+  afterAll(() => {
+    if (aquecimento) act(() => aquecimento?.unmount());
+    aquecimento = undefined;
+  });
+
   it('renderiza o Modal quando visible é verdadeiro', async () => {
     const r = await render(null);
     expect(r.root.findAllByType(Modal)).toHaveLength(1);
     expect(texts(r)).toContain(t('wn_apkhash_title'));
-  }, 30_000);
+  });
 
   it('sem última versão vista, mostra só a atual e sem cabeçalho de build', async () => {
     const shown = texts(await render(null));
