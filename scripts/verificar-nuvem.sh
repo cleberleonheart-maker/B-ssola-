@@ -34,13 +34,12 @@ for arg in "$@"; do
 done
 
 # Uma unica fonte da verdade: as credenciais vem do cloud.ts, nao de uma copia
-# aqui. Se um dia mudar la, este script muda sem ninguem se lembrar dele.
-read -r SUPABASE_URL SUPABASE_ANON_KEY < <(
-  sed -nE "s/^const SUPABASE_URL: string = '(.*)';\$/\\1/p;s/^const SUPABASE_ANON_KEY: string = '(.*)';\$/\\1/p" \
-    "$ROOT/src/services/cloud.ts" | tr '\n' ' '
-)
-SUPABASE_URL="${SUPABASE_URL:-https://wotzcykrvidbjkonaawx.supabase.co}"
-SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-}"
+# aqui. Se um dia mudar la, este script muda sem ninguem se lembrar dele. O
+# ambiente ganha, porque o CI define a URL por secret e nao deixa de ser a mesma.
+FICHEIRO_URL="$(sed -nE "s/^const SUPABASE_URL: string = '(.*)';\$/\\1/p" "$ROOT/src/services/cloud.ts")"
+FICHEIRO_ANON="$(sed -nE "s/^const SUPABASE_ANON_KEY: string = '(.*)';\$/\\1/p" "$ROOT/src/services/cloud.ts")"
+SUPABASE_URL="${SUPABASE_URL:-${FICHEIRO_URL:-https://wotzcykrvidbjkonaawx.supabase.co}}"
+SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-$FICHEIRO_ANON}"
 
 if [ -z "$SUPABASE_ANON_KEY" ]; then
   echo "Nao encontrei a anon key em src/services/cloud.ts" >&2

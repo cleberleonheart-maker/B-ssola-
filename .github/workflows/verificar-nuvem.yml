@@ -1,20 +1,41 @@
-name: Verifica o schema na nuvem
+name: Schema do Supabase
 
-# Os ficheiros em scripts/*.SQL sao a unica copia do schema do Supabase, e ate
-# agora nada confirmava que tinha corrido. Duas consequencias reais, ambas
-# invisiveis daqui:
+# Os ficheiros em scripts/*.SQL sao a unica copia do schema, e ate agora nada
+# confirmava que tinham corrido. Duas consequencias reais, ambas invisiveis
+# daqui:
 #   - o rls.sql esteve com lixo no meio de um `create table` (nunca correu);
 #   - a get_live_status nunca foi criada na nuvem, e o viewer engole o 404 e
 #     escreve "encerrado pela pessoa" num prazo que so cumpriu.
 # A ideia #87 e exactamente esta: as RPCs so chegavam a nuvem coladas a mao.
 #
-# Fica num workflow a parte, e nao como passo do build do APK, por duas razoes:
-# um commit so de SQL nao deve gastar sete minutos a compilar o mesmo APK, e uma
-# falha de rede nao pode partir uma release.
+# Duas fases, porque sao coisas differentes:
 #
-# O job acaba a verde mesmo com objectos em falta: a informacao sai em
-# `::warning::` no proprio commit. Um X vermelho em todos os pushes ate alguem
-# aplicar o SQL treina o olho a ignora-lo, que e o que se quer evitar.
+#   1. VERIFICAR — sempre. Nao precisa de segredo nenhum: a URL e a anon key
+#      sao publicas no `cloud.ts`, e um 200 numa chamada REST prova que o
+#      objecto existe E que o anon o pode usar. Sai a verde mesmo com objectos
+#      em falta, com a informacao em `::warning::`: um X vermelho em todos os
+#      pushes ate alguem mexer treina o olho a ignora-lo.
+#
+#   2. APLICAR — so se o secret SUPABASE_ACCESS_TOKEN existir. Aplica os cinco
+#      ficheiros pela Management API e volta a verificar. Sem esse secret o
+#      passo e' ignorado com um aviso, e o ficheiro continua a ter de ser
+#      colado no SQL Editor -- que e' o que se fazia antes.
+#
+#      A chave e' a da CONTA do Supabase (um personal access token), e nao a
+#      service_role: a service_role salta a RLS das linhas mas continua a ser um
+#      cliente de REST, e o PostgREST nao corre DDL. Nao ha caminho para a
+#      base de dados sem uma credencial de conta, e essa credencial nao se
+#      inventa -- cria-se uma vez:
+#
+#        gh secret set SUPABASE_ACCESS_TOKEN     # token sbp_..., da conta
+#
+#      Fica num workflow a parte, e nao como passo do build do APK, por duas
+#      razoes: um commit so de SQL nao deve gastar sete minutos a compilar o
+#      mesmo APK, e uma falha de rede nao pode partir uma release.
+#
+# Os cinco ficheiros sao aplicados pela ordem do `verificar-sql.mjs`, que os
+# corre duas vezes contra um Postgres a serio em cada `npm test` -- e' por isso
+# que a ordem e' a mesma e' por isso que repetir e' seguro.
 
 on:
   workflow_dispatch:
@@ -36,11 +57,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Confere tabelas, funcoes e colunas
-        id: cloud
         run: |
           set -uo pipefail
-          # So a URL e a anon key, que sao publicas no app: nao ha secret
-          # nenhum neste workflow, e nao ha o que ler.
           ./scripts/verificar-nuvem.sh 2>&1 | tee /tmp/nuvem.txt
           echo "---"
           grep -E '^  (FALTA|REDE|ERRO)' /tmp/nuvem.txt \
@@ -55,3 +73,42 @@ jobs:
             cat /tmp/nuvem.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Aplica os .sql na nuvem
+        if: ${{ env.SUPABASE_ACCESS_TOKEN != '' }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+        run: |
+          set -euo pipefail
+          # Aplica tudo, pela ordem do verificar-sql.mjs. Cada ficheiro e'
+          # idempotente e isso e' testado, por isso repetir nao parte nada -- e
+          # aplicar tudo e' melhor do que tentar perceber quais mudaram, que e'
+          # o tipo de conta que se engana.
+          ./scripts/publicar-sql.sh \
+            scripts/rls.sql \
+            scripts/live_rls.sql \
+            scripts/live_points.sql \
+            scripts/app_version.sql \
+            scripts/app_version_sha.sql
+
+      - name: Confirma que a aplicacao chegou a buen fim
+        if: ${{ env.SUPABASE_ACCESS_TOKEN != '' }}
+        run: ./scripts/verificar-nuvem.sh --strict
+
+      - name: Avisa que o SQL so chega a mao
+        if: ${{ env.SUPABASE_ACCESS_TOKEN == '' }}
+        run: |
+          echo "::warning::sem o secret SUPABASE_ACCESS_TOKEN este workflow nao escreve na nuvem: os .sql deste commit continuam a ter de ser colados no SQL Editor (ou corridos com ./scripts/publicar-sql.sh a partir de uma maquina com o token). Para automatizar de vez, uma vez so: gh secret set SUPABASE_ACCESS_TOKEN"
+          {
+            echo '### Sem chave de escrita'
+            echo
+            echo 'Falta o secret `SUPABASE_ACCESS_TOKEN` (personal access token da conta Supabase, com poder de escrita na base de dados). Sem ele os ficheiros `scripts/*.sql` deste commit **nao** chegaram a nuvem.'
+            echo
+            echo '```'
+            echo 'gh secret set SUPABASE_ACCESS_TOKEN'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

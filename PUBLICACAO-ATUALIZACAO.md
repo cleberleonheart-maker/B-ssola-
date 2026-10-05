@@ -95,12 +95,14 @@ Referência atual (o registro da v125 abaixo é histórico e ficou desatualizado
    em vez de quando alguém o for colar no SQL Editor.
 5. `./scripts/verificar-nuvem.sh` — se o commit mexeu em `scripts/*.sql`, isto
    diz o que ainda não chegou à nuvem. O `publicar-supabase.sh` só mexe em
-   `app_version`, e DDL não passa pelo PostgREST: nem com `service_role`. Para
-   gravar, `./scripts/publicar-sql.sh scripts/live_rls.sql` (Management API com
-   um personal access token da conta, ou `psql` com `SUPABASE_DB_URL`); sem
-   chave nenhuma, o ficheiro vai ter de ser colado no SQL Editor. O workflow
-   "Verifica o schema na nuvem" repete a verificação sozinho em cada commit que
-   toque nos SQL ou no `web/live.html`.
+   `app_version`, e DDL não passa pelo PostgREST: nem com `service_role`. O
+   workflow "Schema do Supabase" aplica os cinco ficheiros sozinho em cada
+   commit que os toque, **se** o secret `SUPABASE_ACCESS_TOKEN` existir
+   (personal access token da conta, com poder de escrita na base de dados —
+   `gh secret set SUPABASE_ACCESS_TOKEN`, uma vez). Sem esse secret o workflow
+   salta a aplicação com um aviso e o ficheiro tem de ser colado no SQL Editor;
+   em-local, `./scripts/publicar-sql.sh scripts/live_rls.sql` faz o mesmo pela
+   Management API ou por `psql`.
 6. `git push` na `main`: o workflow builda, assina, publica na tag `bussola-apk`
    e grava `app_version` no Supabase.
 

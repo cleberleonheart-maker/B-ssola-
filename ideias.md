@@ -705,12 +705,16 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       mentira que o #86 existia para acabar, outra vez, por causa de um
       ficheiro que ninguém confirmou ter corrido.
 
-      **Falta uma aplicação, e é do dono:** `./scripts/publicar-sql.sh
-      scripts/live_rls.sql` (ou colar o ficheiro no SQL Editor) para a
-      `get_live_status` existir. Depois, `./scripts/verificar-nuvem.sh` tem de
-      dizer que está tudo lá. De passagem, o login anónimo está ligado (o passo
-      manual que o #95 deixou escrito) — o `--auth` do verificador confirma,
-      e cada chamada cria um utilizador anónimo novo, por isso é opt-in.
+      **Falta uma aplicação, e é do dono — uma credencial, não um paste.** Com o
+      secret `SUPABASE_ACCESS_TOKEN` (personal access token da conta, com poder
+      de escrita na base de dados) no repositório, o workflow aplica os cinco
+      ficheiros sozinho em cada commit que os toque e volta a verificar:
+      `gh secret set SUPABASE_ACCESS_TOKEN`, uma vez. Sem esse secret, o
+      workflow salta a aplicação com um `::warning::` que diz o que ficou por
+      aplicar, e o ficheiro continua a ter de ser colado no SQL Editor — que é o
+      que se fazia antes. De passagem, o login anónimo está ligado (o passo de
+      painel que o #95 deixou escrito): o `--auth` do verificador confirma, e
+      cada chamada cria um utilizador anónimo novo, por isso é opt-in.
 - [ ] **88. 🧪 Testes do serviço nativo** — o `compileDebugKotlin` garante que
       compila, não que `pushLivePosition` faz o upsert certo nem que o
       `START_REDELIVER_INTENT` traz o Intent de volta. Nenhum dos dois é testável
