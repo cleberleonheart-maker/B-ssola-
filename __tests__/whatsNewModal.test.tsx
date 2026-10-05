@@ -45,11 +45,19 @@ const texts = (r: ReactTestRenderer) =>
  * componente passar `lastSeen` errado (ou não passar), e nada reclamar.
  */
 describe('WhatsNewModal', () => {
+  // O prazo é o do primeiro teste, e não um global, porque o custo é todo dele:
+  // este é o primeiro render da suíte e paga a transformação do Babel de todo o
+  // `react-native`, do `i18n/strings` e do componente. Mede-se aqui 19 s; os
+  // testes seguintes gastam 14–200 ms. Com o prazo de 5 s do Jest este teste
+  // passou a falhar sozinho, conforme o `act()` bloque ou devolve a event loop
+  // ao timer — a mesma árvore, dois resultados, e a culpa apparentemente do
+  // componente. Um prazo que encompassa o trabalho é mais honesto do que
+  // fingir que o trabalho não existe.
   it('renderiza o Modal quando visible é verdadeiro', async () => {
     const r = await render(null);
     expect(r.root.findAllByType(Modal)).toHaveLength(1);
     expect(texts(r)).toContain(t('wn_apkhash_title'));
-  });
+  }, 30_000);
 
   it('sem última versão vista, mostra só a atual e sem cabeçalho de build', async () => {
     const shown = texts(await render(null));
