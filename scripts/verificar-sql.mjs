@@ -169,6 +169,40 @@ for (const tabela of TABELAS) {
   }
 }
 
+// Escrever é a outra metade, e o SELECT de cima não a apanha. Uma tabela sem
+// política de INSERT é um 42501 em produção; uma política de INSERT sem
+// `auth.uid()` é pior — é qualquer pessoa a escrever linhas em nome de outra.
+// Nenhum dos dois dá sinal no repositório: o `cloud.ts` vê um erro numa escrita
+// que devia ter funcionado, e foi o que aconteceu com o `rls.sql`.
+const { rows: comUserId } = await db.query(
+  `select table_name from information_schema.columns
+    where table_schema = 'public' and column_name = 'user_id'`,
+);
+const { rows: inserts } = await db.query(
+  `select tablename as tabela, with_check from pg_policies
+    where schemaname = 'public' and cmd = 'INSERT'`,
+);
+for (const { table_name: tabela } of comUserId) {
+  const doTabela = inserts.filter(p => p.tabela === tabela);
+  if (doTabela.length === 0) {
+    falhas.push(
+      `${tabela} tem coluna user_id mas nenhuma política de INSERT — ` +
+        'toda escrita do app leva 42501 e o relatório nunca chega ao sítio',
+    );
+    continue;
+  }
+  for (const p of doTabela) {
+    if (/auth\.uid\(\)/.test(p.with_check ?? '')) {
+      ok.push(`${tabela}: só se escreve por conta própria (INSERT com auth.uid())`);
+    } else {
+      falhas.push(
+        `${tabela} tem política de INSERT sem auth.uid(): ` +
+          'quem tiver a app escreve linhas em nome de outra',
+      );
+    }
+  }
+}
+
 for (const linha of ok) console.log(`  ok    ${linha}`);
 for (const linha of falhas) console.log(`  FALHA ${linha}`);
 console.log();
