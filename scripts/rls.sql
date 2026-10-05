@@ -118,17 +118,21 @@ using (user_id::text = auth.uid()::text);
 -- gravacao fica so com service_role (bypassa RLS).
 -- =====...=============================================================
 -- Pode nao existir ainda (o workflow usa PATCH com service_role).
+-- `version_name` e `update_url` NOT NULL: e' assim que a nuvem esta, e este
+-- ficheiro descreve o schema que ja existe. Ver a nota em app_version.sql --
+-- o `insert` de seeding abaixo falhava com 23502 quando o CI passou a aplicar
+-- os ficheiros sozinho, porque o NOT NULL e' conferido antes do `on conflict`.
 create table if not exists public.app_version (
   id integer not null,
   version_code integer not null,
-  version_name text,
-  update_url text,
+  version_name text not null,
+  update_url text not null,
   message text,
   required boolean not null default false,
   constraint app_version_pkey primary key (id)
 );
-insert into public.app_version (id, version_code)
-values (1, 0)
+insert into public.app_version (id, version_code, version_name, update_url)
+values (1, 0, 'v0', '')
 on conflict (id) do nothing;
 
 alter table app_version enable row level security;
