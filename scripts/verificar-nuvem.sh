@@ -96,7 +96,7 @@ echo "Nuvem: $SUPABASE_URL"
 echo "Tabelas (o app le/escreve com a anon key, via RLS por utilizador):"
 # limit=1 e nao count: o que interessa e a tabela existir e o anon poder
 # selectar, nao o conteudo.
-for t in app_version live_shares live_points virgin_memory tracks notes; do
+for t in app_version live_shares live_points virgin_memory tracks notes crashes; do
   probe "$t" GET "$t?select=*&limit=1" || true
 done
 

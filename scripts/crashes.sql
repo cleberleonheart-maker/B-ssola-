@@ -24,7 +24,7 @@
 --           (hash da mensagem) que é o que permite contar "isto happenceu 400
 --           vezes" sem guardar 400 linhas;
 --   não se guarda o device id, nem o nome, nem email, nem coordenadas, nem
---           nada que identifique quem 安装ou. Um relatório de crash não precisa
+--           nada que identifique quem instalou. Um relatório de crash não precisa
 --           de saber quem é a pessoa para dizer o que é que o erro é — e uma
 --           tabela de erros que também é uma lista de utilizadores é uma tabela
 --           que um dia vaza.

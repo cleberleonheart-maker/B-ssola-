@@ -16,7 +16,7 @@ name: Schema do Supabase
 #      em falta, com a informacao em `::warning::`: um X vermelho em todos os
 #      pushes ate alguem mexer treina o olho a ignora-lo.
 #
-#   2. APLICAR — so se o secret SUPABASE_ACCESS_TOKEN existir. Aplica os cinco
+#   2. APLICAR — so se o secret SUPABASE_ACCESS_TOKEN existir. Aplica os seis
 #      ficheiros pela Management API e volta a verificar. Sem esse secret o
 #      passo e' ignorado com um aviso, e o ficheiro continua a ter de ser
 #      colado no SQL Editor -- que e' o que se fazia antes.
@@ -38,7 +38,7 @@ name: Schema do Supabase
 #      razoes: um commit so de SQL nao deve gastar sete minutos a compilar o
 #      mesmo APK, e uma falha de rede nao pode partir uma release.
 #
-# Os cinco ficheiros sao aplicados pela ordem do `verificar-sql.mjs`, que os
+# Os seis ficheiros sao aplicados pela ordem do `verificar-sql.mjs`, que os
 # corre duas vezes contra um Postgres a serio em cada `npm test` -- e' por isso
 # que a ordem e' a mesma e' por isso que repetir e' seguro.
 
@@ -102,7 +102,8 @@ jobs:
             scripts/live_rls.sql \
             scripts/live_points.sql \
             scripts/app_version.sql \
-            scripts/app_version_sha.sql
+            scripts/app_version_sha.sql \
+            scripts/crashes.sql
 
       - name: Confirma que a aplicacao chegou a buen fim
         if: ${{ env.SUPABASE_ACCESS_TOKEN != '' }}

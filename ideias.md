@@ -386,8 +386,28 @@ foram encontrados de verdade, não ideias soltas.
       reerguer o serviço e redelregar o Intent; se o link continuar a andar, o
       `onStartCommand` está a fazer o que deve.
 
-- [ ] **56. 💥 Relatório de crash** — hoje um erro em produção é invisível; o usuário
-      simplesmente vê o app fechar. Sentry daria o stack real.
+- [x] **56. 💥 Relatório de crash** — feito, e sem Sentry. A ideia sugeria o Sentry
+      porque dá o stack real, mas o que se pede aqui é mandar o stack e o
+      dispositivo de quem usa uma app de emergência para um serviço de terceiro —
+      isso é uma decisão do dono, não uma conversa de implementação. A
+      infraestrutura para receber já existia, e é o que torna a alternativa
+      pequena: `scripts/crashes.sql` entra pelos seis ficheiros que o CI aplica
+      sozinho, e o verificador passa a exigir que a tabela existe (que é o que
+      impede que o ficheiro fique meses por correr, como aconteceu com o
+      `rls.sql`). O que se guarda chega para fechar o bug — mensagem, stack,
+      versão, quando, e um fingerprint para contar — e não chega para fazer uma
+      lista de quem usa a app: sem device id, sem nome, sem coordenadas.
+      O relatório sai no arranque seguinte, nunca durante o crash: uma app que
+      acabou de partir não tem rede garantida, e um reporter que lança dentro do
+      tratamento do erro é um crash que se reproduz sozinho. Se o Supabase
+      recusar, o relatório fica na fila e desiste ao fim de três tentativas — um
+      crash sem rede não pode ser um relatório perdido, que era o problema que
+      veio resolver. `ErrorUtils` no `index.js` apanha o que o `try/catch` não
+      apanha, e um `CrashBoundary` novo apanha o erro de render, que é o caso mais
+      comum nesta app e não chegava a lado nenhum. Só JavaScript: um crash nativo
+      é outro mecanismo e não é o que mais interessa, porque o bug mais caro e
+      mais silencioso aqui não é uma exceção, é o `Log.w` e o link parado quando
+      o push do serviço falha. Um reporter de crash não apanha isso.
 - [x] **57. 🧪 Testes dos componentes extraídos** — feito. 12 testes para as primitivas de
       `settings/primitives.tsx`, cobrindo a fiação de `onPress` (que é onde a refatoração
       poderia ter quebrado em silêncio), a área clicável de cada linha, `disabled` e as

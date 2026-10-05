@@ -107,7 +107,7 @@ Referência atual (o registro da v125 abaixo é histórico e ficou desatualizado
 5. `./scripts/verificar-nuvem.sh` — se o commit mexeu em `scripts/*.sql`, isto
    diz o que ainda não chegou à nuvem. O `publicar-supabase.sh` só mexe em
    `app_version`, e DDL não passa pelo PostgREST: nem com `service_role`. O
-   workflow "Schema do Supabase" aplica os cinco ficheiros sozinho em cada
+   workflow "Schema do Supabase" aplica os seis ficheiros sozinho em cada
    commit que os toque — **já está configurado** (2026-10-05): existe o secret
    `SUPABASE_ACCESS_TOKEN`, um token *scoped* (`sbp_fc…`) com escopo só neste
    projecto e permissão de escrever na base de dados. Não há nada para colar.
