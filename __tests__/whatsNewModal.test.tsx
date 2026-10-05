@@ -5,7 +5,11 @@ import { ThemeProvider } from '../src/theme/ThemeContext';
 import { LanguageProvider } from '../src/i18n/LanguageContext';
 import WhatsNewModal from '../src/components/WhatsNewModal';
 import { createTranslator } from '../src/i18n/strings';
-import { APP_VERSION } from '../src/version.generated';
+import { APP_VERSION, APP_VERSION_CODE } from '../src/version.generated';
+
+/** O build instalado. Todo o resto é relativo a ele: escrever o número à mão
+ *  parte estes testes a cada release, sem ninguém perceber porquê. */
+const CURRENT = APP_VERSION_CODE;
 
 const t = createTranslator('pt');
 
@@ -44,19 +48,19 @@ describe('WhatsNewModal', () => {
   it('renderiza o Modal quando visible é verdadeiro', async () => {
     const r = await render(null);
     expect(r.root.findAllByType(Modal)).toHaveLength(1);
-    expect(texts(r)).toContain(t('wn_liveheadingfix_title'));
+    expect(texts(r)).toContain(t('wn_apkhash_title'));
   });
 
   it('sem última versão vista, mostra só a atual e sem cabeçalho de build', async () => {
     const shown = texts(await render(null));
-    expect(shown).toContain(t('wn_liveheadingfix_title'));
+    expect(shown).toContain(t('wn_apkhash_title'));
     expect(shown).toContain(t('wn_title', { version: APP_VERSION }));
-    expect(shown).not.toContain(t('wn_build_label', { code: 163 }));
+    expect(shown).not.toContain(t('wn_build_label', { code: CURRENT }));
   });
 
   it('com última versão vista, acumula as versões do intervalo', async () => {
     const shown = texts(await render(151));
-    // Uma entrada de cada build de 152 a 163.
+    // Uma entrada de cada build de 152 ao atual.
     expect(shown).toContain(t('wn_livesrumo_title'));
     expect(shown).toContain(t('wn_updatefix_title'));
     expect(shown).toContain(t('wn_tidy_title'));
@@ -73,20 +77,23 @@ describe('WhatsNewModal', () => {
 
   it('no acumulado, cada build aparece com seu número', async () => {
     const shown = texts(await render(151));
-    for (const code of [163, 162, 161, 160, 159, 158, 157, 156, 155, 154, 153, 152]) {
+    for (const code of Array.from(
+      { length: CURRENT - 151 },
+      (_, i) => CURRENT - i,
+    )) {
       expect(shown).toContain(t('wn_build_label', { code }));
     }
   });
 
   it('o grupo mais novo é o da versão instalada', async () => {
     const labels = texts(await render(151)).filter(s => s.includes('Build '));
-    expect(labels[0]).toBe(t('wn_build_label', { code: 163 }));
+    expect(labels[0]).toBe(t('wn_build_label', { code: CURRENT }));
   });
 
   it('a mesma versão vista não abre o modal com nada de novo', async () => {
-    const shown = texts(await render(163));
-    expect(shown).toContain(t('wn_liveheadingfix_title'));
-    expect(shown).not.toContain(t('wn_title_since', { code: 163 }));
+    const shown = texts(await render(CURRENT));
+    expect(shown).toContain(t('wn_apkhash_title'));
+    expect(shown).not.toContain(t('wn_title_since', { code: CURRENT }));
   });
 
   it('uma entrada repetida em vários builds não vira linha duplicada', async () => {
