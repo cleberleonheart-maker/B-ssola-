@@ -62,11 +62,18 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Confere tabelas, funcoes e colunas
+        # `bash -e` (o default do GitHub) + `pipefail` faziam deste passo o
+        # inverso do que se queria: o grep abaixo devolve 1 quando NAO ha
+        # nada para avisar, e o -e matava o passo -- vermelho com a nuvem
+        # perfeitamente em dia, verde com objectos em falta. Em 2026-10-05
+        # apanhou-se quando a get_live_status deixou de faltar. O `|| true`
+        # desarma a armadilha; quem tem de fechar o run a vermelho e' o passo
+        # --strict do fim, nao este.
         run: |
           set -uo pipefail
           ./scripts/verificar-nuvem.sh 2>&1 | tee /tmp/nuvem.txt
           echo "---"
-          grep -E '^  (FALTA|REDE|ERRO)' /tmp/nuvem.txt \
+          { grep -E '^  (FALTA|REDE|ERRO)' /tmp/nuvem.txt || true; } \
             | sed 's/^ *//' \
             | while IFS= read -r linha; do
                 echo "::warning::$linha"
