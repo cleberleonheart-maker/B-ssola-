@@ -726,10 +726,44 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       De passagem, o login anónimo está ligado (o passo de painel que o #95
       deixou escrito): o `--auth` do verificador confirma, e cada chamada cria
       um utilizador anónimo novo, por isso é opt-in.
-- [ ] **88. 🧪 Testes do serviço nativo** — o `compileDebugKotlin` garante que
-      compila, não que `pushLivePosition` faz o upsert certo nem que o
-      `START_REDELIVER_INTENT` traz o Intent de volta. Nenhum dos dois é testável
-      em JVM sem extrair o parsing e o payload, que já são funções fora da classe.
+- [x] **88. 🧪 Testes do serviço nativo** — o `compileDebugKotlin` garante que
+      compila, não que `pushLivePosition` faz o upsert certo nem que
+      `START_REDELIVER_INTENT` traz o Intent de volta.
+      **Fechado em 2026-10-05** com `__tests__/liveNativeContract.test.ts`
+      (15 testes). Não são testes do `Service` — isso exigiria um emulador, e o
+      dono trabalha num celular — mas dos contratos de que o `Service` depende,
+      que é onde a falha é silenciosa: `pushLivePosition` e `pushLivePoint`
+      devolvem só um booleano e não lançam, portanto um payload com uma coluna
+      errada dá 400 do PostgREST, o `post()` escreve um `Log.w` e o link congela
+      a meio de uma emergência. O que se compara, extraindo as duas pontas dos
+      ficheiros reais (nada reescrito à mão, que seria uma terceira cópia a
+      divergir em silêncio, como o #89 descreve):
+
+      - as chaves do `payload`/`pointPayload` têm de existir como colunas de
+        `live_shares`/`live_points`, e tudo o que é `not null` sem `default` tem
+        de ser mandado — `latitude`/`longitude` à força, por terem `default 0`;
+      - as seis credenciais que `writeTo` grava no Intent são as mesmas seis
+        que `readLiveSession` busca, o prazo é lido com `getLongExtra` (e não
+        `getStringExtra`, que daria `null` e um serviço que não sobe), e o
+        serviço devolve `START_REDELIVER_INTENT` e não `START_STICKY`;
+      - as chaves que `liveTracking.ts` manda no `config` são as mesmas que
+        `liveSessionConfig` lê do `ReadableMap`, e o `NativeTrackingConfig` que
+        as documenta diz as mesmas que o objecto monta.
+
+      Cada passo da extracção falha com uma mensagem a dizer que já não
+      acompanha o ficheiro, em vez de devolver vazio e passar a testar o nada.
+
+      **Dez mutações aplicadas ao fonte de propósito, dez derrubaram a suíte** —
+      coluna renomeada no payload, `expires_at` removido do `pointPayload`,
+      `anonKey` deixado de ler, `getLongExtra` trocado, `expires_at` tornado
+      nullable no SQL, `expiresAt` fora do config, `accessToken: null`,
+      `url: null`, guarda-corpo movido para depois do objecto, e `accessToken`
+      passado a chamar `getCloudAccessToken()` sem o `.catch`. A sétima
+      mutação — `accessToken: null` — é a que interessou: **não caía**, porque o
+      teste comparava só nomes de chaves. É o modo de falha mais caro dos dois
+      (`getString` → `?: ""` → `isUsable()` falso → `stopSelf`, e o link
+      parado sem mensagem), pelo que o teste passou a comparar também os
+      valores e de onde vêm.
 - [x] **89. 🧭 Dois rumos para a mesma linha** — `resolveLiveHeading` do JS e o do
       Kotlin concordam por construção agora, mas nada impede que o próximo que
       mexer num mexa só num. Vale um teste de paridade sobre os dois.
