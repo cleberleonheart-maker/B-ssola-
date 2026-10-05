@@ -164,3 +164,22 @@ Um relatório só chega aqui se a app **tiver arrancado** depois do crash: o
 reporter não tenta enviar durante o erro, porque uma app que acabou de partir não
 tem rede garantida. Por isso a tabela fica vazia nos testes de um utilizador que
 instala a app, abre, fecha, e não volta a abrir — e isso não é um bug.
+
+### `./scripts/verificar-crashes.mjs` — o caminho inteiro, sem aparelho
+
+O `verificar-nuvem.sh` confirma que a tabela existe e que o `anon` a consegue
+ler. **Não diz nada sobre escrever**, que é o que o reporter faz. E essa parte é
+a que falha em silêncio: uma tabela sem política de INSERT dá 42501, o
+`pushCrashReport` devolve falso sem lançar, o reporter guarda o relatório e
+desiste ao fim de três tentativas. Um erro de política de RLS transforma-se em
+silêncio, e a app continua a funcionar toda.
+
+Este script é a prova de que essa parte funciona. Corre-se à mão, e **escreve
+uma linha em `crashes` e apaga-a a seguir** — por isso não entra no `pretest`
+(não é um teste: precisa de rede e escreve na tabela de produção). Corre-o
+depois de mexer em `crashes.sql`, em `cloud.ts`, ou nas políticas.
+
+O que ele apanha: uma coluna que o `cloud.ts` envia e o SQL não tem (42703), uma
+coluna NOT NULL que o `cloud.ts` esquece (23502), falta de política de INSERT,
+linha que entra mas não se consegue ler, linha que fica depois de um DELETE, e
+uma sessão alheia a conseguir ler o crash de outra pessoa.
