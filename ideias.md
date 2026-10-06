@@ -942,7 +942,7 @@ feito por engano por marcar. Não repetem as 46 linhas que continuam abertas —
 a nota de cada uma diz o que a distingue da ideia vizinha.
 
 ### Risco / processo
-- [ ] **97. 🔄 Verificador de produção agendado** — o `verificar-crashes.mjs` já
+- [x] **97. 🔄 Verificador de produção agendado** — o `verificar-crashes.mjs` já
       apanhou coisas, mas corre "quando se mexe em `crashes.sql` ou `cloud.ts`",
       ou seja, corre quando alguém se lembra. Um workflow semanal (cron) com o
       mesmo caminho — sessão anónima, insert, leitura, delete, limpeza do prazo,
@@ -952,6 +952,19 @@ a nota de cada uma diz o que a distingue da ideia vizinha.
       formato funciona; a diferença é que este escreve, portanto tem de garantir
       que não deixa lixo (já garante: o último passo conta os tokens
       `verificacao-%` e falha se sobrar algum).
+
+      **Fechado em 06/10/2026** com `.github/workflows/verificar-crashes.yml`:
+      `schedule` (segunda, `17 4 * * 1` — a mesma hora da purga comentada no
+      `crashes.sql`), `push` pelos caminhos do crash (`crashes.sql`,
+      `live_points.sql`, o script, o `cloud.ts` e o próprio workflow) e
+      `workflow_dispatch`. Sem segredo nenhum — a URL e a anon key são do
+      `cloud.ts`. Três decisões: **fala a vermelho**, ao contrário do schema,
+      que avisa com `::warning::` (lá um X persistente treinava o olho;
+      aqui uma falha é acção); o `-e` do shell default do GitHub matava o
+      passo no primeiro exit 1 e levava o resumo do run consigo, portanto o
+      código sai por `|| status=$?` e volta a sair no fim; e o `npm ci` com
+      cache, porque o script só precisa do `@supabase/supabase-js`, mas o
+      `postinstall` do `patch-package` quer os devDependencies.
 - [ ] **98. 🧹 Linhas sem dono** — a "limpeza do prazo" deixa o órfão para
       fora de propósito: linhas de uma conta apagada ou de uma sessão que
       acabou e não voltou têm `expires_at` vencido mas já não têm ninguém com

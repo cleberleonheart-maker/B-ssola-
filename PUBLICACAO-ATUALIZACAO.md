@@ -202,10 +202,31 @@ a que falha em silêncio: uma tabela sem política de INSERT dá 42501, o
 desiste ao fim de três tentativas. Um erro de política de RLS transforma-se em
 silêncio, e a app continua a funcionar toda.
 
-Este script é a prova de que essa parte funciona. Corre-se à mão, e **escreve
-uma linha em `crashes` e apaga-a a seguir** — por isso não entra no `pretest`
-(não é um teste: precisa de rede e escreve na tabela de produção). Corre-o
-depois de mexer em `crashes.sql`, em `cloud.ts`, ou nas políticas.
+Este script é a prova de que essa parte funciona. **Escreve uma linha em
+`crashes` e apaga-a a seguir** — por isso não entra no `pretest` (não é um
+teste: precisa de rede e escreve na tabela de produção).
+
+Corre em três sítios, todos no `.github/workflows/verificar-crashes.yml`:
+
+- **de semana em semana** — segunda-feira às 4h17, a mesma hora da purga que
+  está comentada no `crashes.sql`, de propósito;
+- **a cada commit** que toque no caminho do crash (`crashes.sql`,
+  `live_points.sql`, o próprio script, o `cloud.ts` e o workflow);
+- **à mão** — `workflow_dispatch`, ou `node scripts/verificar-crashes.mjs`
+  a partir de qualquer sítio com rede.
+
+Enquanto só corria à mão, a instrução era "corre-o depois de mexer em
+`crashes.sql`, em `cloud.ts` ou nas políticas" — e isso depende de alguém se
+lembrar. Uma regressão de RLS não anuncia que é uma regressão de RLS: anuncia
+quando um utilizador der por ela. Daí o schedule, e daí falhar a vermelho —
+ao contrário do workflow do schema, que avisa com `::warning::`, porque lá um
+X persistente em cada push até alguém aplicar o SQL treinava o olho a
+ignorá-lo. Aqui uma falha é acção.
+
+Não precisa de segredo nenhum: o script lê a URL e a anon key do próprio
+`cloud.ts`, que são públicas. Cada execução cria duas contas anónimas (a nossa
+e a de "outra pessoa"), escreve três pontos de `live_points` e apaga tudo no
+fim — o último passo conta os tokens `verificacao-%` e falha se sobrar algum.
 
 O que ele apanha: uma coluna que o `cloud.ts` envia e o SQL não tem (42703), uma
 coluna NOT NULL que o `cloud.ts` esquece (23502), falta de política de INSERT,

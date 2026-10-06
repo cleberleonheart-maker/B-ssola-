@@ -1,0 +1,87 @@
+name: Caminho do crash (producao)
+
+# O `verificar-nuvem.sh` prova que os objectos existem e que o `anon` os pode
+# ler. Isto prova o resto: que um crash consegue entrar na tabela, que se le de
+# volta, que o dono o apaga, que outra sessao nao o le, e que a limpeza do
+# prazo (deleteExpired*) apanha so as nossas linhas e so as que passaram do
+# `expires_at` -- levando o caducado, deixando a sessao a decorrer e nao
+# tocando no ponto de outra pessoa, mesmo caducado.
+#
+# Ideia #97. Enquanto so corria "quando alguem se lembrava", ou seja, quando se
+# mexia em `crashes.sql` ou em `cloud.ts` -- e uma regressio de RLS ou uma
+# coluna renomeada descobre-se e' quando o utilizador der por ela, nao quando se
+# mexe no ficheiro. Passa a correr:
+#
+#   - de semana em semana (segunda, 4:17 da manha UTC -- a mesma hora da purga
+#     comentada no `crashes.sql`, de proposito);
+#   - a cada commit que toque no caminho do crash;
+#   - a mao, quando se quiser (workflow_dispatch).
+#
+# Nao precisa de segredo nenhum: o script le a URL e a anon key do proprio
+# `cloud.ts`, que sao publicas. Cada execucao cria duas contas anonimas (a
+# nossa e a de "outra pessoa"), escreve tres linhas de `live_points` e apaga
+# tudo no fim -- o ultimo passo conta os tokens `verificacao-%` e falha se
+# sobrar algum, porque isto aponta para a base de producao e um teste que deixa
+# lixo e' pior do que um teste que nao existe.
+#
+# Falha a vermelho, ao contrario do workflow do schema, que avisa com
+# `::warning::`: la o vermelho persistente seria um X em cada push ate alguem
+# aplicar o SQL (que treina o olho a ignora-lo), aqui uma falha e' accao --
+# a escrita que deixou de funcionar.
+#
+# Fica num workflow a parte do build do APK pelas mesmas razoes do `#87`: um
+# commit so de SQL nao deve gastar sete minutos a compilar o APK, e uma falha
+# de rede nao pode partir uma release.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 4 * * 1'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/verificar-crashes.mjs'
+      - 'scripts/crashes.sql'
+      - 'scripts/live_points.sql'
+      - 'src/services/cloud.ts'
+      - '.github/workflows/verificar-crashes.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  crashes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Escreve, le, apaga e limpa o prazo em producao
+        # O `-e` do shell default do GitHub mataria o passo no primeiro exit 1
+        # e o resumo do run ficava sem o que falhou -- que e' a unica coisa que
+        # se quer ler de madrugada. Da-se a volta com `|| status=$?` (um
+        # comando precedido de `||` fica de fora do `-e`) e volta-se a sair
+        # com o codigo verdadeiro no fim.
+        run: |
+          set -uo pipefail
+          status=0
+          node scripts/verificar-crashes.mjs 2>&1 | tee /tmp/crashes.txt || status=$?
+          {
+            grep -E '^  FALHA' /tmp/crashes.txt || true
+          } | sed 's/^ *//' | while IFS= read -r linha; do
+            echo "::error::$linha"
+          done
+          {
+            echo '## Caminho do crash (producao)'
+            echo
+            echo '```'
+            cat /tmp/crashes.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"

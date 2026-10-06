@@ -13,9 +13,12 @@
  *
  * Por isso este script escreve. Uma linha, e apaga-a a seguir.
  *
- * Não entra no `pretest`: precisa de rede e escreve em produção. Corre-se à mão
- * quando se mexe em `crashes.sql`, em `cloud.ts`, ou depois de mexer nas
- * políticas. É a mesma ideia do `verificar-nuvem.sh`, com o corpo.
+ * Não entra no `pretest`: precisa de rede e escreve em produção. Corre de
+ * semana em semana, a cada commit que toque no caminho do crash e à mão — o
+ * `.github/workflows/verificar-crashes.yml` (ideia #97) é quem faz os dois
+ * primeiros, para uma regressão de RLS não ficar à espera de alguém se
+ * lembrar de correr isto. Sem segredo nenhum: a URL e a anon key vêm do
+ * próprio `cloud.ts`, que são públicas.
  */
 import { readFileSync } from 'fs';
 import { createClient } from '@supabase/supabase-js';
