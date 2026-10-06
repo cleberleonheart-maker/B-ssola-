@@ -1,6 +1,6 @@
 # Ideias — Próximos recursos da Bússola
 
-> Atualizado em 27/09/2026. Backlog antigo **concluído** (v7.3). Novas ideias (v7.4+)
+> Atualizado em 06/10/2026. Backlog antigo **concluído** (v7.3). Novas ideias (v7.4+)
 > listadas abaixo —**GPX** e **retorno pela trilha** já implementados em v7.4.
 
 ## ✅ Feitos (v7.4)
@@ -115,14 +115,22 @@
 - [ ] **18. Backup e sincronização de notas/waypoints** — revisar o `cloud.ts`
       (`Supabase`): garantir que caderneta e pontos realmente sincronizam por usuário,
       com tratamento de conflito e aviso de offline.
+      **Estado a 06/10/2026 — só metade existe.** O que há: `pushNotes` (chamado pelo
+      `FieldNotesSheet` ao gravar) e `pushTracks` (chamado pelo `TrackView` ao guardar).
+      O que falta: `fetchCloudNotes` e `fetchCloudTracks` existem **sem nenhum chamador**
+      — ou seja, a escrita para a nuvem acontece e a leitura nunca; `waypointsService` não
+      fala com a nuvem nenhuma; não há detenção de conflito nem aviso de offline. Trocar
+      de telemóvel continua a perder os waypoints, e as notas de uma sessão anterior só
+      existem onde foram escritas.
 - [ ] **19. Nível em graus** — além do nível de bolha, mostrar inclinação exata
       (pitch/roll em °) e cruzar com o teodolito para leituras mais precisas.
 - [ ] **20. Widget do rumo — publicar/validar** — o `widgetService` existe; confirmar se
       o widget está publicado na Play e polir (rumo, pressão, temperatura).
-- [ ] **21. FOV calibrado por aparelho** — o campo de visão da Visão está fixo em 110°;
-      permitir ajuste fino por aparelho para os marcadores casarem com a lente real.
-- [ ] **22. Cadência GPS econômica** — pausar/alongar o intervalo do GPS quando o
-      usuário está parado para economizar bateria (ver também a ideia nova abaixo).
+- [x] **21. FOV calibrado por aparelho** — ✅ feito em v7.9: botões −/+ (60°–140°, passo
+      10) que gravam por aparelho (`fovService`). A linha ficou por marcar desde 23/09.
+- [x] **22. Cadência GPS econômica** — ✅ feito em v7.9: parado (4 leituras sem
+      movimento) o watch relaxa para intervalo 20–40 s e filtro 20–50 m, e volta ao fino
+      a andar. A linha ficou por marcar desde 23/09.
 
 ## ✅ Feitos (v7.9 e v7.10)
 1. **AR sem giroscópio (v7.9)** — removido o bloqueio pelo sensor de orientação; o AR
@@ -446,6 +454,10 @@ foram encontrados de verdade, não ideias soltas.
 ## Ideias novas (23/09/2026, 4ª leva)
 - [ ] **31. 🔐 PIN/biometria no app** — trancar o app (privacidade, útil ao compartilhar
       o telefone). Configurável em Configurações.
+      **PIN feito na v7.17** (`LOCK_PIN_KEY` em `preferencesService`): criar, trocar,
+      remover. **Falta a biometria** — não há `BiometricPrompt` nem dependência nenhuma
+      em `src`, portanto quem já destravou o telemóvel com o dedo tem de escrever o PIN
+      à mesma. A linha fica aberta pelo que falta, como a #41.
 - [x] **32. 🧭 Leitura em mil (militar)** — alternar azimute entre graus e **milésimos**
       (mrad/"mils", 6400/6000). Bom pra quem usa bússola tática.
       **Fechado na v7.23 (code 153)**: `MILS_PER_DEG` em `utils/compass.ts` e a
@@ -463,8 +475,11 @@ foram encontrados de verdade, não ideias soltas.
       mapa de calor do dia/semana (junta GPS + trilhas salvas).
 - [ ] **37. 🔗 GPX por link** — além do arquivo, gerar link curto da trilha salva na
       nuvem para compartilhar (email/WhatsApp).
-- [ ] **38. 💾 Backup completo** — exportar tudo (notas, waypoints, trilhas, calibrações,
+- [x] **38. 💾 Backup completo** — exportar tudo (notas, waypoints, trilhas, calibrações,
       declinação, FOV) como um JSON/PDF para restaurar/transferir.
+      **Feito na v7.17** (JSON, com validação de `fileVersion` reforçada no commit
+      `2d8b204`). O **PDF** é o que continua por fazer, e já está coberto pela #44
+      (relatório da caderneta) — esta linha fecha pela parte que era exportar/restaurar.
 - [ ] **39. ⚠️ Aviso de bateria do sistema** — alertar se o Android estiver restringindo
       o app em segundo plano (afeta GPS e câmera contínuos).
 - [x] **40. 🧭 Melhoria: rumo inverso sempre visível** — mostrar o rumo de volta em tempo
@@ -919,3 +934,91 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       mils estão na `CompassScreen` desde a v7.23. Uma lista de dívidas em que
       metade já não é dívida é pior do que nenhuma: faz o próximo duvidar das
       que são.
+
+## Ideias novas (06/10/2026, 8ª leva)
+Saem do trabalho da retenção de 90 dias (`deleteExpired*`), da revisão do
+pipeline de crashes e de uma passagem pela lista para apanhar o que já estava
+feito por engano por marcar. Não repetem as 46 linhas que continuam abertas —
+a nota de cada uma diz o que a distingue da ideia vizinha.
+
+### Risco / processo
+- [ ] **97. 🔄 Verificador de produção agendado** — o `verificar-crashes.mjs` já
+      apanhou coisas, mas corre "quando se mexe em `crashes.sql` ou `cloud.ts`",
+      ou seja, corre quando alguém se lembra. Um workflow semanal (cron) com o
+      mesmo caminho — sessão anónima, insert, leitura, delete, limpeza do prazo,
+      e limpeza total no fim — faria uma regressão de RLS ou uma coluna em
+      falta aparecer numa segunda-feira e não quando o utilizador der por ela.
+      É o mesmo argumento do `verificar-nuvem.yml`, que já existe e prova que o
+      formato funciona; a diferença é que este escreve, portanto tem de garantir
+      que não deixa lixo (já garante: o último passo conta os tokens
+      `verificacao-%` e falha se sobrar algum).
+- [ ] **98. 🧹 Linhas sem dono** — a "limpeza do prazo" deixa o órfão para
+      fora de propósito: linhas de uma conta apagada ou de uma sessão que
+      acabou e não voltou têm `expires_at` vencido mas já não têm ninguém com
+      sessão para as apagar, porque apagar exige `auth.uid()` de quem as
+      escreveu. Hoje isso faz-se à mão no Table Editor, como está escrito no
+      `PUBLICACAO-ATUALIZACAO.md`. Automatizar é uma de duas: `pg_cron` quando
+      a extension estiver ligada (o SQL já tem a chamada comentada), ou um
+      passo do `publicar-supabase.yml` com `service_role` — que salta a RLS e
+      portanto pode apagar o que é de ninguém. A segunda não depende de
+      ninguém ligar nada, e é a mesma via por que o schema já chega lá.
+
+### Produto
+- [ ] **99. 🩺 Estado da nuvem em Configurações** — um painel com o que o
+      código já sabe e hoje ninguém lê: se o cliente está ligado e com que
+      razão não está (`clientError`, que o #91 passou a mostrar mas só quando
+      algo rebenta), a última falha gravada pelo `noteCloudError` (que
+      `takeCloudError` entrega e depois limpa — logo, desaparece), a fila de
+      crashes por enviar e a última sincronização. Não é diagnóstico de
+      sensores (a #64 é isso): é a resposta a "está a chegar à nuvem, ou não?".
+      Baseia-se no #91 e no #95, que ambos acabaram por mostrar a causa ao
+      utilizador — mas só no momento do erro.
+- [ ] **100. 🗂️ Histórico de partilhas** — `fetchLiveShareRow` lê uma sessão
+      pelo token, e só a que está viva. Não há ecrã que diga "ontem mandei um
+      link às 21h04 que durou 30 min", nem forma de ver as sessões que expiraram
+      sem serem apagadas (`live_shares` guarda a linha expirada de propósito — é
+      ela que permite ao `get_live_status` responder "expirou" em vez de
+      "encerrado"). Uma lista por `user_id` com início, fim e duração também é
+      a pergunta natural depois de um SOS: foi esta sessão que eu mandei, ou
+      outra?
+- [ ] **101. 🚪 Apagar a minha conta e os dados** — não há sítio nenhum na app
+      para largar dados. Todas as tabelas já têm política de DELETE com
+      `user_id = auth.uid()` (`tracks`, `notes`, `virgin_memory`, `crashes`,
+      `live_points`, `live_shares`), portanto o caminho existe e é só do
+      utilizador — falta o botão e a confirmação que diga o que se perde. É
+      também a resposta a um problema que este repositório tem mesmo: cada
+      execução do `verificar-crashes.mjs` e cada aparelho novo criam uma conta
+      anónima que fica para sempre, e hoje a única forma de a tirar é o Table
+      Editor.
+- [ ] **102. 🔗 Anónimo com conta real** — o `ensureCloudUser` cria uma
+      sessão anónima e é o único caminho: perder o telemóvel é perder a nuvem
+      toda (notas, trilhas, memória da assistente), porque o `auth.uid()` novo
+      não lê as linhas do antigo. Um email com link mágico (o Supabase já
+      traz `signInWithOtp`) ligaria a identidade a algo que sobrevive ao
+      aparelho. **A parte difícil está escrita aqui para não se descobrir a
+      meio**: migrar as linhas do utilizador anónimo para o novo exigiria
+      mudar o `user_id` deles, e a própria RLS que os protege impede o cliente
+      de o fazer — é trabalho para uma função com `security definer` ou para o
+      `service_role`, com o risco que isso traz. Fica a ideia com o travão à
+      vista.
+- [ ] **103. 🔋 Quem vê o link precisa de saber que a bateria vai** — com o
+      rastreio ativo, o telemóvel a morrer de bateria dá o mesmo que um
+      aparelho desligado: `● SEM SINAL` para sempre, sem explicação. As
+      ideias #8 e #29 põem a bateria **no SOS** (quem envia), e a #39 fala do
+      Android a restringir o app; esta é a terceira face: pôr a % no payload
+      que o viewer já lê, para quem recebe o link decidir telefonar em vez de
+      esperar. O `live_shares` já tem colunas de sobra para isto e o push
+      já passa por lá de 10 em 10 segundos.
+- [ ] **104. 🌩️ Alarme de queda rápida da pressão** — o `TrendChart` do
+      barômetro mostra a tendência, mas mostra a quem está a olhar para o
+      ecrã. A regra clássica de campo (queda de ~4 hPa em 3 h, ou mais
+      abrupta) é barata de calcular com o histórico que já existe no
+      aparelho, e o caso de uso é justamente o em que ninguém está a olhar:
+      dentro da tenda, à noite. Não depende de rede nem de API nenhuma.
+- [ ] **105. 🧭 Partilhar a posição a partir do widget** — o widget mostra
+      rumo, pressão e temperatura, e é só leitura. Um botão nele (ou um atalho
+      no `quick settings`, que é a #14 — aqui é o widget da tela inicial) para
+      arrancar/parar o rastreio é o que um SOS pede: o telemóvel está na mão,
+      a app não. A infra já está toda do lado de dentro — `startLiveShare`,
+      o serviço em primeiro plano e a notificação com "Parar" existem; o que
+      falta é o `WidgetBridge` ganhar uma ação em vez de só texto.
