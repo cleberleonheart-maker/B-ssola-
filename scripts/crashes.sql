@@ -112,7 +112,9 @@ using (user_id::text = auth.uid()::text);
 --   );
 --
 -- As 4:17 da manhã são de propósito: um `*/15` às 3h da manhã não tem a
--- ver com a ninguém e bate na mesma nas entradas de exemplo.
+-- ver com a ninguém e bate na mesma nas entradas de exemplo. Contadas em UTC,
+-- que é o que o `cron.schedule` do Postgres usa por omissão — 4:17 UTC são
+-- 1:17 de Brasília, que continua a ser a hora em que ninguém está a olhar.
 -- ============================================================
 
 -- ============================================================

@@ -12,7 +12,8 @@ name: Caminho do crash (producao)
 # coluna renomeada descobre-se e' quando o utilizador der por ela, nao quando se
 # mexe no ficheiro. Passa a correr:
 #
-#   - de semana em semana (segunda, 4:17 da manha UTC -- a mesma hora da purga
+#   - de semana em semana (segunda, 4:17 da manha NO HORARIO DO BRASIL --
+#     7:17 UTC, porque o `cron` do GitHub e' sempre UTC; a mesma hora da purga
 #     comentada no `crashes.sql`, de proposito);
 #   - a cada commit que toque no caminho do crash;
 #   - a mao, quando se quiser (workflow_dispatch).
@@ -36,7 +37,8 @@ name: Caminho do crash (producao)
 on:
   workflow_dispatch:
   schedule:
-    - cron: '17 4 * * 1'
+    - cron: '17 7 * * 1'   # 7:17 UTC = 4:17 de Brasilia. O `cron` do Actions
+                            # nao tem horario de aparelho, so UTC.
   push:
     branches: [main]
     paths:

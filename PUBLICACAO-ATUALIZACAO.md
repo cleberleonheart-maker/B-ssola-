@@ -208,8 +208,9 @@ teste: precisa de rede e escreve na tabela de produção).
 
 Corre em três sítios, todos no `.github/workflows/verificar-crashes.yml`:
 
-- **de semana em semana** — segunda-feira às 4h17, a mesma hora da purga que
-  está comentada no `crashes.sql`, de propósito;
+- **de semana em semana** — segunda-feira às 4h17 **de Brasília** (o `cron` do
+  GitHub Actions é UTC, portanto está escrito como `17 7 * * 1`), a mesma hora
+  da purga que está comentada no `crashes.sql`;
 - **a cada commit** que toque no caminho do crash (`crashes.sql`,
   `live_points.sql`, o próprio script, o `cloud.ts` e o workflow);
 - **à mão** — `workflow_dispatch`, ou `node scripts/verificar-crashes.mjs`

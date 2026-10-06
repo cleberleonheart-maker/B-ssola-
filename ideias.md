@@ -954,7 +954,8 @@ a nota de cada uma diz o que a distingue da ideia vizinha.
       `verificacao-%` e falha se sobrar algum).
 
       **Fechado em 06/10/2026** com `.github/workflows/verificar-crashes.yml`:
-      `schedule` (segunda, `17 4 * * 1` — a mesma hora da purga comentada no
+      `schedule` (segunda às 4h17 **de Brasília** — escrito `17 7 * * 1`,
+      porque o `cron` do Actions é UTC; a mesma hora da purga comentada no
       `crashes.sql`), `push` pelos caminhos do crash (`crashes.sql`,
       `live_points.sql`, o script, o `cloud.ts` e o próprio workflow) e
       `workflow_dispatch`. Sem segredo nenhum — a URL e a anon key são do
