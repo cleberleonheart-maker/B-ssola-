@@ -1,6 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { ensureCloudUser, pushCrashReport, type CrashReport } from './cloud';
+import {
+  deleteExpiredCrashReports,
+  ensureCloudUser,
+  pushCrashReport,
+  type CrashReport,
+} from './cloud';
 import { APP_VERSION, APP_VERSION_CODE } from '../version.generated';
 
 /**
@@ -155,6 +160,14 @@ export const flushCrashes = async (): Promise<number> => {
       else restantes.push({ ...crash, tries: crash.tries + 1 });
     }
     await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(restantes));
+    // Quem acabou de ter sessão é porque houve crash para enviar, e quem tem
+    // crash é quem vai acumulando relatório. Este é o momento natural para lhe
+    // dizer que os de há mais de 90 dias já não interessam — e o `expires_at`
+    // punha-os no índice à espera de uma limpeza que ninguém fazia. Sem await:
+    // isto é higiene e não pode atrasar o arranque nem falhar em cima.
+    // O `catch` não é sobra: `void` cala o linter, não a runtime, e uma
+    // promessa rejeitada sem handler mata o processo em Node.
+    if (enviados > 0) void deleteExpiredCrashReports(userId).catch(() => {});
   } catch {
     // Igual: um arranque não pode morrer por causa de um relatório de crash.
   }

@@ -106,8 +106,8 @@ grant execute on function public.get_live_position(text) to anon, authenticated;
 --
 -- Devolve carimbos de tempo e nada mais: quem tem o link expirado continua
 -- sem acesso a posicao. A linha expirada fica na tabela de proposito (e o
--- indice de `expires_at` existe para uma limpeza eventual), porque e ela que
--- permite essa resposta.
+-- indice de `expires_at` e o que faz as RPCs acima filtrarem barato), porque e
+-- ela que permite essa resposta.
 -- ============================================================
 create or replace function public.get_live_status(p_token text)
 returns table (

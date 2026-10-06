@@ -6,6 +6,7 @@ import {
   pushLivePosition,
   pushLivePoint,
   deleteLiveShareRow,
+  deleteExpiredLivePoints,
   noteCloudError,
   takeCloudError,
 } from './cloud';
@@ -136,6 +137,34 @@ export const resolveLiveHeading = (
 };
 
 
+/**
+ * Apaga, uma vez por sessão da app, os nossos pontos de sessões já acabadas.
+ *
+ * A que fica por apanhar é sempre a mesma: a de uma sessão que morreu sem
+ * `stopLiveShare` — app fechada à força, crash, ou o próprio delete a falhar
+ * sem rede. Essas linhas não têm token com que ir buscá-las, e como ninguém
+ * usava o `expires_at`, ficavam na base para sempre. A RPC já as escondia, o
+ * que resolvia a leitura e não o armazenamento — e não o facto de a pessoa que
+ * parou de partilhar ter o trajecto dela guardado na mesma.
+ *
+ * Uma vez por processo chega: o que se junta durante a sessão atual é pouco e
+ * vai ser apanhado da próxima vez. E uma limpeza que corresse de 10 em 10
+ * segundos seria um pedido por minuto para apanhar o mesmo lixo.
+ */
+let purgaDePontosFeita = false;
+
+const purgeExpiredPointsOnce = async (userId: string): Promise<void> => {
+  if (purgaDePontosFeita) return;
+  // Marca-se antes de correr, e não depois: se a limpeza falhar, repetir a cada
+  // 10 segundos seria pior do que deixar para a próxima vez que a app abrir.
+  purgaDePontosFeita = true;
+  // O `catch` não é sobra. `void` cala o linter, não a runtime: uma promessa
+  // rejeitada sem handler é um unhandled rejection, que em Node mata o
+  // processo inteiro. Foi assim que este teste o apanhou, e o mesmo
+  // aconteceria num arranque real.
+  await deleteExpiredLivePoints(userId).catch(() => {});
+};
+
 export const pushLiveFix = async (
   s: LiveSession,
   fix: LocationFix,
@@ -150,6 +179,11 @@ export const pushLiveFix = async (
   // — a linha ficaria orfa na tabela.
   const userId = await ensureCloudUser();
   if (!userId) return false;
+  // Sem await: é higiene de fundo e não pode atrasar o ponto de 10 em 10
+  // segundos. E antes de gravar, para que uma limpeza lenta não atrase o
+  // primeiro `push` de quem acabou de abrir o link — que é quando a pessoa
+  // está à espera de ver que ele arrancou.
+  void purgeExpiredPointsOnce(userId);
   const heading = resolveLiveHeading(fix.heading, magneticHeading);
   const pushed = await pushLivePosition(
     s.token,

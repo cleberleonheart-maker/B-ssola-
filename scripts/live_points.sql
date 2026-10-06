@@ -127,16 +127,22 @@ grant execute on function public.get_live_track(text, bigint) to anon, authentic
 --
 -- O `live_shares` guarda a linha expirada de proposito (e o `get_live_status`
 -- precisa dela para responder "expirou" em vez de "encerrado"), mas os pontos
--- nao servem para nada depois do prazo. `cron.schedule` precisa da extension
--- pg_cron, que nao vem ligada em todos os projectos — por isso o purge fica
--- opcional e commented: um link de 2 h que termina a escrever pontos sozinho
--- nao enche a tabela, mas convem limpar.
+-- nao servem para nada depois do prazo. Quem os apaga e o dono, na app:
+-- `deleteExpiredLivePoints` em `cloud.ts`, uma vez por processo no primeiro
+-- `pushLiveFix`. Uma sessao que morre sem `stopLiveShare` — app fechada a
+-- forca, crash, um delete que ficou sem rede — e precisamente a linha que
+-- ficava: nao tem token com que ir busca-la, e e por isso que o filtro e o
+-- `expires_at` e nao o token. Uma sessao a decorrer tem `expires_at` no
+-- futuro, o que a torna intocavel.
 --
 --   select cron.schedule(
 --     'purge-live-points',
 --     '*/15 * * * *',
 --     $$delete from public.live_points where expires_at < now()$$
 --   );
+--
+-- O `cron.schedule` la em cima continua opcional, como sempre foi: `pg_cron`
+-- nao vem ligada em todos os projectos, e a app ja faz o trabalho.
 -- ============================================================
 
 -- ============================================================

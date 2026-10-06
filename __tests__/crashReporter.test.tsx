@@ -5,7 +5,12 @@ import TestRenderer, { act } from 'react-test-renderer';
 
 import { CrashBoundary } from '../src/components/CrashBoundary';
 import { fingerprintOf, flushCrashes, recordCrash } from '../src/services/crashReporter';
-import { ensureCloudUser, pushCrashReport, takeCloudError } from '../src/services/cloud';
+import {
+  deleteExpiredCrashReports,
+  ensureCloudUser,
+  pushCrashReport,
+  takeCloudError,
+} from '../src/services/cloud';
 import { APP_VERSION, APP_VERSION_CODE } from '../src/version.generated';
 
 /**
@@ -25,12 +30,18 @@ import { APP_VERSION, APP_VERSION_CODE } from '../src/version.generated';
 jest.mock('../src/services/cloud', () => ({
   ensureCloudUser: jest.fn(),
   pushCrashReport: jest.fn(),
+  // A limpeza dos 90 dias. Entra no mock pelo mesmo motivo do resto: se faltar,
+  // o `flushCrashes` rebenta nela em vez de enviar o relatório.
+  deleteExpiredCrashReports: jest.fn(async () => true),
   noteCloudError: jest.fn(),
   takeCloudError: jest.fn(() => null),
 }));
 
 const mockEnsure = ensureCloudUser as jest.MockedFunction<typeof ensureCloudUser>;
 const mockPush = pushCrashReport as jest.MockedFunction<typeof pushCrashReport>;
+const mockPurga = deleteExpiredCrashReports as jest.MockedFunction<
+  typeof deleteExpiredCrashReports
+>;
 
 const QUEUE_KEY = 'crash:fila';
 type FilaCrash = {
@@ -55,6 +66,7 @@ beforeEach(async () => {
   jest.clearAllMocks();
   mockEnsure.mockResolvedValue('user-abc');
   mockPush.mockResolvedValue(true);
+  mockPurga.mockResolvedValue(true);
 });
 
 describe('o fingerprint', () => {
@@ -203,6 +215,60 @@ describe('mandar no arranque seguinte', () => {
   it('uma fila corrompida não impede o arranque', async () => {
     await AsyncStorage.setItem(QUEUE_KEY, 'isto não é JSON');
     expect(await flushCrashes()).toBe(0);
+  });
+
+  it('limpa os relatórios que já passaram dos 90 dias', async () => {
+    // `expires_at` punha estas linhas no índice à espera de uma limpeza que
+    // ninguém fazia. Quem acabou de enviar um relatório é porque tem sessão, e
+    // é o momento em que vale a pena dizer-lhe que os antigos já não interessam.
+    await recordCrash(new Error('antigo'));
+    await flushCrashes();
+    expect(mockPurga).toHaveBeenCalledWith('user-abc');
+  });
+
+  it('a limpeza a falhar não deixa um unhandled rejection', async () => {
+    // O `catch` não é um gesto de estilo. `void` cala o linter e nada mais: uma
+    // promessa rejeitada sem handler é um unhandled rejection, que em Node mata
+    // o processo inteiro. O teste anterior ("não leva os relatórios atrás")
+    // passava com e sem `catch` — o resultado era o mesmo nos dois casos, e um
+    // teste que passa nos dois não mede nada.
+    const rejeicoes: unknown[] = [];
+    const ouvinte = (motivo: unknown) => rejeicoes.push(motivo);
+    process.on('unhandledRejection', ouvinte);
+    try {
+      mockPurga.mockRejectedValue(new Error('delete recusado'));
+      await recordCrash(new Error('x'));
+      expect(await flushCrashes()).toBe(1);
+      // A rejeição só é entregue quando a fila de microtarefas esgota.
+      await new Promise(resolve => setTimeout(resolve, 20));
+    } finally {
+      process.off('unhandledRejection', ouvinte);
+    }
+    expect(rejeicoes).toEqual([]);
+  });
+
+  it('não limpa quando nada foi enviado', async () => {
+    // Sem relatório novo não há motivo nenhum para pedir um delete: seria um
+    // pedido de rede em cada arranque, a meio caminho, para não fazer nada.
+    mockPush.mockResolvedValue(false);
+    await recordCrash(new Error('sem rede'));
+    await flushCrashes();
+    expect(mockPurga).not.toHaveBeenCalled();
+  });
+
+  it('não limpa quando a fila estava vazia', async () => {
+    await flushCrashes();
+    expect(mockPurga).not.toHaveBeenCalled();
+  });
+
+  it('a limpeza a falhar não leva os relatórios atrás', async () => {
+    // É higiene. Um delete que falha tem de ser indistinguível de um delete que
+    // nunca correu — e `void` sem `catch` é uma promessa rejeitada sem handler,
+    // que em Node mata o processo.
+    mockPurga.mockRejectedValue(new Error('delete recusado'));
+    await recordCrash(new Error('x'));
+    expect(await flushCrashes()).toBe(1);
+    expect(await readQueue()).toEqual([]);
   });
 
   it('não há fila, não há rede chamada nenhuma', async () => {

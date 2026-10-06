@@ -156,14 +156,42 @@ Ordena por `happened_at` descendente. As colunas úteis:
   durante esse tempo.
 - `version_code` / `app_version` — em que build. Um erro que só aparece na 164 e
   não na 163 é regressão, não bug antigo.
-- `expires_at` — 90 dias. A purga está em comentário no SQL porque precisa de
-  `pg_cron`; enquanto lá não estiver, as linhas mais antigas que 90 dias ficam
-  para fora e apagam-se à mão no Table Editor.
+- `expires_at` — 90 dias, e isso é cumprido: ver "A limpeza do prazo" abaixo.
 
 Um relatório só chega aqui se a app **tiver arrancado** depois do crash: o
 reporter não tenta enviar durante o erro, porque uma app que acabou de partir não
 tem rede garantida. Por isso a tabela fica vazia nos testes de um utilizador que
 instala a app, abre, fecha, e não volta a abrir — e isso não é um bug.
+
+### A limpeza do prazo
+
+O prazo só quer dizer alguma coisa se alguém o fizer cumprir. `crashes` e
+`live_points` têm `expires_at`, e durante algum tempo isso não apagava nada: o
+`pg_cron` estava comentado no SQL, porque depender de uma extension que nem
+sempre está instalada é uma maneira fina de uma promessa de retenção não
+acontecer.
+
+A limpeza ficou portanto **do lado de quem tem sessão**, em `cloud.ts`:
+
+- `deleteExpiredCrashReports(userId)` — corre depois de um envio bem-sucedido, ou
+  seja, quando há relatório novo e a app tem rede. Não corre com a fila vazia:
+  seria um pedido inútil em cada arranque.
+- `deleteExpiredLivePoints(userId)` — corre uma vez por processo, no primeiro
+  `pushLiveFix`. `live_points` cresce seis linhas por minuto, e `stopLiveShare`
+  já apaga o trajecto quando a sessão acaba a bem; o que escapava era a sessão
+  que morre sem isso — app fechada à força, crash, ou um `delete` que ficou sem
+  rede.
+
+Ambas apagam só `user_id = <o próprio>` **e** `expires_at` no passado. A RLS
+garante o primeiro filtro mesmo que o código o esqueça — as políticas de DELETE
+comparam `user_id` com `auth.uid()` —, e os testes verificam o segundo por
+conta própria, porque o inverso não dá para recuperar: apagar a linha que ainda
+está no prazo deixa quem está a ver o link sem trajecto a meio.
+
+O que sobra é o que não tem ninguém: linhas de uma conta apagada, ou de uma
+sessão que acabou e não voltou. Apagam-se à mão no Table Editor, e é
+aceitável — são linhas que só ocupam espaço, e não um caminho para apanhar
+outra pessoa.
 
 ### `./scripts/verificar-crashes.mjs` — o caminho inteiro, sem aparelho
 
@@ -183,3 +211,9 @@ O que ele apanha: uma coluna que o `cloud.ts` envia e o SQL não tem (42703), um
 coluna NOT NULL que o `cloud.ts` esquece (23502), falta de política de INSERT,
 linha que entra mas não se consegue ler, linha que fica depois de um DELETE, e
 uma sessão alheia a conseguir ler o crash de outra pessoa.
+
+Acrescentadas à lista estão as da limpeza: cria um ponto caducado, um a decorrer e um de uma
+segunda sessão anónima, apaga os que passaram do prazo e confirma que o
+caducado foi, que o a decorrer ficou — é a sessão que está a vivo — e que o da
+outra pessoa não foi tocado, mesmo estando caducado. No fim confirma que não
+deixou nada para trás, porque este script aponta para a base de produção.

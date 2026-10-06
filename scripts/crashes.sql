@@ -96,10 +96,14 @@ using (user_id::text = auth.uid()::text);
 -- ============================================================
 -- Limpeza dos relatórios antigos.
 --
--- Deixada em comentário, como a purga de `live_points`: `cron.schedule` precisa
--- da extension `pg_cron`, que não vem ligada em todos os projectos. Sem isto a
--- tabela cresce um crash de cada vez que a app parte, e um bug que ninguém
--- conserta durante seis meses já não é um bug: é um hábito.
+-- Corre na app, não aqui: `deleteExpiredCrashReports` em `cloud.ts`, chamada
+-- pelo `flushCrashes` depois de um envio bem-sucedido. Só o dono apaga, e as
+-- políticas de DELETE em cima garantem que é mesmo só o dono — o mesmo filtro
+-- que a escrita. A alternativa era o `cron.schedule` abaixo, que precisa da
+-- extension `pg_cron` e por isso ficou em comentário: uma limpeza que depende
+-- de uma extension que nem todos os projectos têm é uma limpeza que não
+-- acontece em silêncio. Aqui não há nada para ligar, e sem relatório novo não
+-- há sequer pedido: a fila vazia não corre a limpeza.
 --
 --   select cron.schedule(
 --     'purge-crashes',

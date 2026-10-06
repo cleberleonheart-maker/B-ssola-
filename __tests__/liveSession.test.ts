@@ -44,6 +44,10 @@ const loadService = (
       _expiresAt: number,
     ) => true,
   );
+  // A limpeza de pontos expirados (que nasceu com este serviço) entra no mock:
+  // se faltar, o `pushLiveFix` rebenta nela — e rebentar no mock é o aviso de
+  // que o teste ainda cobre a ordem das escritas.
+  const deleteExpiredLivePoints = jest.fn(async (_userId: string) => true);
   const userId = opts?.userId === undefined ? 'user-1' : opts.userId;
   jest.doMock('@react-native-async-storage/async-storage', () => ({ __esModule: true, default: AsyncStorage }));
   jest.doMock('../src/services/cloud', () => ({
@@ -52,13 +56,21 @@ const loadService = (
     pushLivePosition,
     pushLivePoint,
     deleteLiveShareRow,
+    deleteExpiredLivePoints,
   }));
   jest.spyOn(Date, 'now').mockReturnValue(now);
   let service!: typeof import('../src/services/liveShareService');
   jest.isolateModules(() => {
     service = jest.requireActual('../src/services/liveShareService') as typeof import('../src/services/liveShareService');
   });
-  return { service, store, deleteLiveShareRow, pushLivePosition, pushLivePoint };
+  return {
+    service,
+    store,
+    deleteLiveShareRow,
+    deleteExpiredLivePoints,
+    pushLivePosition,
+    pushLivePoint,
+  };
 };
 
 const MS_PER_MIN = 60000;
@@ -109,6 +121,100 @@ describe('sessão de live', () => {
     const older = 'lnv-antiga';
     await service.stopLiveShare(older);
     expect(store.has('bussola:live:active')).toBe(true);
+  });
+
+  it('limpa os pontos expirados uma vez, e so do dono', async () => {
+    // Sem isto, cada sessao que morre sem `stopLiveShare` -- app fechada a
+    // forca, crash, ou um delete que falhou sem rede -- deixa o trajecto na base
+    // para sempre. A RPC escondia-o da leitura; nao o apanhava da tabela.
+    const { service, deleteExpiredLivePoints } = loadService(1000);
+    const s = await service.startLiveShare(30);
+    const fix = {
+      latitude: -15.8,
+      longitude: -47.9,
+      accuracy: 5,
+      altitude: 1100,
+      speed: 1.4,
+      heading: 90,
+      provider: 'gps',
+      updatedAt: 1000,
+    };
+    await service.pushLiveFix(s!, fix);
+    await service.pushLiveFix(s!, fix);
+    await service.pushLiveFix(s!, fix);
+    // Uma vez por processo, nao uma por ponto: a 10 em 10 segundos seriam seis
+    // pedidos por minuto para apanhar sempre o mesmo.
+    expect(deleteExpiredLivePoints).toHaveBeenCalledTimes(1);
+    expect(deleteExpiredLivePoints).toHaveBeenCalledWith('user-1');
+  });
+
+  it('nao repete a limpeza mesmo que ela falhe', async () => {
+    // Marcar antes de correr, e nao depois: se falhar e o proximo push repetir,
+    // uma limpeza a falhar vira um pedido a cada 10 segundos, para sempre.
+    const { service, deleteExpiredLivePoints } = loadService(1000);
+    deleteExpiredLivePoints.mockRejectedValueOnce(new Error('sem rede'));
+    const s = await service.startLiveShare(30);
+    const fix = {
+      latitude: -15.8,
+      longitude: -47.9,
+      accuracy: 5,
+      heading: null,
+      speed: null,
+      altitude: null,
+      provider: 'gps',
+      updatedAt: 1000,
+    };
+    await expect(service.pushLiveFix(s!, fix)).resolves.toBe(true);
+    await service.pushLiveFix(s!, fix);
+    expect(deleteExpiredLivePoints).toHaveBeenCalledTimes(1);
+  });
+
+  it('a limpeza a falhar nao deixa um unhandled rejection', async () => {
+    // Foi este caminho que matou o processo Node na primeira versao: o
+    // `void purgeExpiredPointsOnce(...)` era fire-and-forget, a promessa
+    // rejeitava, e nada a apanhava. `void` cala o linter, nao a runtime.
+    const rejeicoes: unknown[] = [];
+    const ouvinte = (motivo: unknown) => rejeicoes.push(motivo);
+    process.on('unhandledRejection', ouvinte);
+    try {
+      const { service, deleteExpiredLivePoints } = loadService(1000);
+      deleteExpiredLivePoints.mockRejectedValue(new Error('sem rede'));
+      const s = await service.startLiveShare(30);
+      await service.pushLiveFix(s!, {
+        latitude: -15.8,
+        longitude: -47.9,
+        accuracy: 5,
+        provider: 'gps',
+        heading: null,
+        speed: null,
+        altitude: null,
+        updatedAt: 1000,
+      });
+      await new Promise(resolve => setTimeout(resolve, 20));
+    } finally {
+      process.off('unhandledRejection', ouvinte);
+    }
+    expect(rejeicoes).toEqual([]);
+  });
+
+  it('limpa mesmo quando o push do ponto e o da posicao falham', async () => {
+    // A limpeza nao depende do push correr bem: e o que apanha o lixo das
+    // sessoes antigas, e isso vale mesmo numa push falhada.
+    const { service, deleteExpiredLivePoints, pushLivePosition } = loadService(1000);
+    pushLivePosition.mockResolvedValue(false);
+    const s = await service.startLiveShare(30);
+    const sent = await service.pushLiveFix(s!, {
+      latitude: -15.8,
+      longitude: -47.9,
+      accuracy: 5,
+      provider: 'gps',
+      heading: null,
+      speed: null,
+      altitude: null,
+      updatedAt: 1000,
+    });
+    expect(sent).toBe(false);
+    expect(deleteExpiredLivePoints).toHaveBeenCalledWith('user-1');
   });
 
   it('envia o rumo do fix para o push', async () => {

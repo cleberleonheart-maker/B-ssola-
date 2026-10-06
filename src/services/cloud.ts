@@ -572,3 +572,83 @@ export const fetchLiveShareRow = async (
     return null;
   }
 };
+
+// ============================================================
+// Limpeza do que já passou do prazo.
+//
+// As duas tabelas que guardam histórico — os pontos do trajecto e os relatórios
+// de crash — têm `expires_at` indexado desde o início, e nenhuma delas tinha
+// quem o usasse. A RPC esconde o que passou do prazo, o que resolve a leitura
+// e não o armazenamento: as linhas ficavam para sempre.
+//
+// Quem apaga é o próprio dono, e só as suas: as políticas de DELETE comparam
+// `user_id` com `auth.uid()`, o mesmo que a escrita. Não é que o `pg_cron` não
+// servisse — é que depende de uma extension que não vem ligada em todos os
+// projectos, e uma limpeza que depende disso é uma limpeza que nunca acontece
+// em silêncio. Aqui não há nada para ligar: a app já tem sessão nestas alturas.
+//
+// Porquê no cliente e não no servidor: apanhar as linhas velha é trabalho de
+// quem acumula. Quem nunca abre a app não acumula nada novo, e as linhas que
+// ficam são as de sessões que já não podem ser consultedas por ninguém — a RPC
+// devolve-as vazias há meses.
+
+/**
+ * Apaga os relatórios de crash deste utilizador que já passaram dos 90 dias.
+ *
+ * Devolve só se correu. A contagem de linhas apanhadas não interessa a ninguém
+ * — isto é higiene, não funcionalidade, e falhar aqui não pode virar um erro
+ * visível na app.
+ */
+export const deleteExpiredCrashReports = async (
+  userId: string,
+): Promise<boolean> => {
+  if (!client) return false;
+  try {
+    const { error } = await withTimeout(
+      client
+        .from('crashes')
+        .delete()
+        .eq('user_id', userId)
+        .lt('expires_at', new Date().toISOString()),
+    );
+    if (error) {
+      noteCloudError('limpeza de crashes', error.message);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    noteCloudError('limpeza de crashes', error);
+    return false;
+  }
+};
+
+/**
+ * Apaga os pontos do trajecto deste utilizador cujas sessões já acabaram.
+ *
+ * O filtro é `expires_at < agora` e não o token: o que sobra de uma sessão
+ * terminada à pressa não tem token com que ir buscá-la, e é precisamente essa
+ * a linha que nunca é apagada. Uma sessão a decorrer tem `expires_at` no futuro, o
+ * que a torna intocável — que é o que se quer.
+ */
+export const deleteExpiredLivePoints = async (
+  userId: string,
+): Promise<boolean> => {
+  if (!client) return false;
+  try {
+    const { error } = await withTimeout(
+      client
+        .from('live_points')
+        .delete()
+        .eq('user_id', userId)
+        .lt('expires_at', new Date().toISOString()),
+    );
+    if (error) {
+      noteCloudError('limpeza de pontos', error.message);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    noteCloudError('limpeza de pontos', error);
+    return false;
+  }
+};

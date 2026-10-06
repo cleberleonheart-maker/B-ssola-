@@ -174,6 +174,117 @@ if (!erroInsert && inserida?.id) {
   }
 }
 
+// A limpeza do prazo, que é a parte perigosa — e que se verifica em
+// `live_points` e não em `crashes`: os pontos crescem seis linhas por minuto,
+// é lá que um filtro a mais apagaria o trajecto de quem está a ver o link, e o
+// caminho do código é o mesmo (`deleteExpired*` em `cloud.ts`). Duas linhas
+// nossas, uma caducada e outra a decorrer, e uma de outra pessoa.
+//
+// A caducada tem de ir. A outra tem de ficar, porque é a sessão que está a
+// decorrer e apagá-la deixa quem está a ver o link sem trajecto a meio. E a do
+// outro tem de ficar porque não é nossa — para a criar é preciso mesmo outra
+// sessão: a primeira versão tentou inserir com um `user_id` inventado e a RLS
+// respondeu 42501, que é a resposta certa e a razão de o teste ter de usar uma
+// segunda pessoa a sério.
+{
+  const caducada = new Date(Date.now() - 200 * 864e5).toISOString();
+  const aDecorrer = new Date(Date.now() + 60 * 60e3).toISOString();
+
+  const outro = createClient(url, anonKey, { auth: { persistSession: false } });
+  const { data: sessao2, error: erroSessao2 } = await outro.auth.signInAnonymously();
+  if (erroSessao2 || !sessao2?.user?.id) {
+    falhas.push(`não se conseguiu uma segunda sessão (${erroSessao2?.message}): a limpeza não dá para verificar`);
+  } else {
+    const ponto = (userId, expira) => ({
+      token: `verificacao-${userId.slice(0, 6)}`,
+      user_id: userId,
+      latitude: 0,
+      longitude: 0,
+      expires_at: expira,
+    });
+    const { error: erroMeu1 } = await client
+      .from('live_points')
+      .insert(ponto(sessao.user.id, caducada));
+    const { error: erroMeu2 } = await client
+      .from('live_points')
+      .insert(ponto(sessao.user.id, aDecorrer));
+    const { error: erroAlheio } = await outro
+      .from('live_points')
+      .insert(ponto(sessao2.user.id, caducada));
+
+    if (erroMeu1 || erroMeu2 || erroAlheio) {
+      const erro = erroMeu1 ?? erroMeu2 ?? erroAlheio;
+      falhas.push(
+        `não se conseguiram inserir pontos de teste (${erro?.code}): ${erro?.message}`,
+      );
+    } else {
+      ok.push('pontos de teste inseridos (nosso caducado, nosso a decorrer, e o de outra pessoa)');
+
+      const { error: erroLimpeza } = await client
+        .from('live_points')
+        .delete()
+        .eq('user_id', sessao.user.id)
+        .lt('expires_at', new Date().toISOString());
+      if (erroLimpeza) {
+        falhas.push(`a limpeza foi recusada (${erroLimpeza.code}): ${erroLimpeza.message}`);
+      } else {
+        const { data: meus } = await client
+          .from('live_points')
+          .select('expires_at')
+          .eq('token', `verificacao-${sessao.user.id.slice(0, 6)}`);
+        const sobrou = (meus ?? []).length;
+        // Olhar para a linha que ficou, e não só para quantas ficaram. Contar
+        // linhas dá a resposta errada com meia verdade: com a comparação trocada
+        // fica uma linha — a errada — e "ficou uma" parece o resultado certo.
+        const sobrouACaducar =
+          (meus ?? []).length > 0 && (meus ?? []).every(r => Date.parse(r.expires_at) <= Date.now());
+        if (sobrou === 1 && !sobrouACaducar) {
+          ok.push('a limpeza levou o caducado e deixou o que está a decorrer');
+        } else {
+          const quais = (meus ?? [])
+            .map(r => (Date.parse(r.expires_at) <= Date.now() ? 'caducado' : 'a decorrer'))
+            .join(' e ');
+          falhas.push(
+            sobrou === 0
+              ? 'a limpeza levou o caducado e também o que está a decorrer — quem vê o link fica sem trajecto'
+              : `esperava ficar só o ponto a decorrer e ficaram ${sobrou} (${quais || 'sem prazo legível'})`,
+          );
+        }
+
+        const { data: dele } = await outro
+          .from('live_points')
+          .select('id')
+          .eq('token', `verificacao-${sessao2.user.id.slice(0, 6)}`);
+        if ((dele ?? []).length === 1) {
+          ok.push("a limpeza não tocou no ponto de outra pessoa (caducado e tudo)");
+        } else {
+          falhas.push(
+            `a limpeza apanhou o ponto de outra pessoa — a RLS de DELETE está aberta`,
+          );
+        }
+      }
+    }
+    // Apanha tudo o que sobrou, para o teste não deixar pontos na tabela. Isto
+    // corre em cada execução, incluindo nas que acabaram por falhar a meio, e
+    // este script aponta para a base de produção — um teste que deixa lixo é
+    // pior do que um teste que não existe.
+    await client.from('live_points').delete().eq('user_id', sessao.user.id);
+    await outro.from('live_points').delete().eq('user_id', sessao2.user.id);
+    const { data: sobrou } = await client
+      .from('live_points')
+      .select('id, token')
+      .like('token', 'verificacao-%');
+    if ((sobrou ?? []).length > 0) {
+      falhas.push(
+        `o teste deixou ${(sobrou ?? []).length} pontos na tabela (tokens ` +
+          `${(sobrou ?? []).map(r => r.token).join(', ')})`,
+      );
+    } else {
+      ok.push('o teste não deixou nenhum ponto para trás');
+    }
+  }
+}
+
 for (const linhaOk of ok) console.log(`  ok    ${linhaOk}`);
 for (const linhaFalha of falhas) console.log(`  FALHA ${linhaFalha}`);
 console.log();

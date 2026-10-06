@@ -257,3 +257,125 @@ describe('o polyfill de URL chega antes do supabase-js', () => {
     expect(polyfillAt).toBeLessThan(reactNativeAt);
   });
 });
+
+/**
+ * A limpeza do que passou do prazo.
+ *
+ * A pergunta que estes testes fazem é "apanha só as minhas linhas?", e não
+ * "apanha alguma linha?". A RLS já garante que ninguém apaga o que é de outro —
+ * as políticas de DELETE comparam `user_id` com `auth.uid()` — por isso tirar o
+ * `.eq('user_id')` não seria uma falha de segurança, e é precisamente por isso
+ * que passa despercebido. Passaria a ser um delete sobre a tabela toda a
+ * filtrar por data, que em `live_points` é uma tabela que só cresce.
+ *
+ * E o inverso também merece ser verificado: um `lt('expires_at', <data futura>)`
+ * apanharia as linhas da sessão que está a decorrer, e o link vivo deixava de ter
+ * trajecto a meio.
+ */
+const carregarParaPurga = () => {
+  const chamadas: string[] = [];
+  const registar = (nome: string) => (...args: unknown[]) => {
+    chamadas.push(`${nome}(${args.map(a => JSON.stringify(a)).join(', ')})`);
+    return builder;
+  };
+  const builder: Record<string, unknown> = {};
+  const remove = jest.fn(() => {
+    chamadas.push('delete()');
+    return builder;
+  });
+  builder.eq = registar('eq');
+  builder.lt = registar('lt');
+  builder.gt = registar('gt');
+  const from = jest.fn((tabela: string) => {
+    chamadas.push(`from(${JSON.stringify(tabela)})`);
+    return { delete: remove };
+  });
+  jest.doMock('@react-native-async-storage/async-storage', () => ({}));
+  jest.doMock('@supabase/supabase-js', () => ({
+    createClient: jest.fn(() => ({
+      auth: { getSession: jest.fn() },
+      from,
+    })),
+  }));
+  let cloud!: typeof import('../src/services/cloud');
+  jest.isolateModules(() => {
+    cloud = jest.requireActual('../src/services/cloud') as typeof import('../src/services/cloud');
+  });
+  return { cloud, chamadas };
+};
+
+describe('a limpeza apanha só o que é nosso e só o que já passou do prazo', () => {
+  beforeEach(() => jest.resetModules());
+  afterEach(() => {
+    jest.dontMock('@react-native-async-storage/async-storage');
+    jest.dontMock('@supabase/supabase-js');
+    jest.resetModules();
+  });
+
+  it('os relatórios de crash', async () => {
+    const { cloud, chamadas } = carregarParaPurga();
+    await cloud.deleteExpiredCrashReports('user-abc');
+    expect(chamadas[0]).toBe('from("crashes")');
+    expect(chamadas).toContain('eq("user_id", "user-abc")');
+    // `lt` e não `lte`: o prazo e o instante a partir do qual a linha nao
+    // interessa, e uma linha que expire este segundo ainda esta no prazo.
+    expect(chamadas.some(c => c.startsWith('lt("expires_at"'))).toBe(true);
+    // O filtro invertido é o erro que não dói a ver: `gt('expires_at', <agora>)`
+    // apaga exactamente as linhas que ainda estão no prazo, e o teste de cima
+    // continuava a ver um filtro de data qualquer. Aqui fica dito: nenhum `gt`.
+    expect(chamadas.some(c => c.startsWith('gt('))).toBe(false);
+  });
+
+  it('os pontos do trajecto', async () => {
+    const { cloud, chamadas } = carregarParaPurga();
+    await cloud.deleteExpiredLivePoints('user-abc');
+    expect(chamadas[0]).toBe('from("live_points")');
+    expect(chamadas).toContain('eq("user_id", "user-abc")');
+    expect(chamadas.some(c => c.startsWith('lt("expires_at"'))).toBe(true);
+  });
+
+  it('a data que apaga é o agora, não uma constante em código', async () => {
+    const { cloud, chamadas } = carregarParaPurga();
+    const antes = Date.now();
+    await cloud.deleteExpiredLivePoints('user-abc');
+    const limite = chamadas.find(c => c.startsWith('lt("expires_at"'))!;
+    const valor = JSON.parse(limite.slice(limite.indexOf(',') + 1, -1)) as string;
+    // Se isto for uma data escrita à mão, o teste passa durante uma semana e
+    // depois começa a apagar as linhas da sessão que está a decorrer.
+    expect(Date.parse(valor)).toBeGreaterThanOrEqual(antes - 2000);
+    expect(Date.parse(valor)).toBeLessThanOrEqual(Date.now() + 2000);
+  });
+
+  it('não apaga nada quando o Supabase está desligado', async () => {
+    // O `client` fica null quando o `createClient` atira — é o mesmo caminho que
+    // o polyfill de URL em falta tomava, e a razão de o `index.js` carregar
+    // aquele import antes de tudo. Apagar sem cliente tem de ser `false` e não um
+    // erro: é higiene, e ninguém tem de ver um aviso por uma limpeza de rotina.
+    const avisos: unknown[][] = [];
+    const spy = jest.spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
+      avisos.push(args);
+    });
+    jest.doMock('@react-native-async-storage/async-storage', () => ({}));
+    jest.doMock('@supabase/supabase-js', () => ({
+      createClient: jest.fn(() => {
+        throw new Error('Invalid supabaseUrl');
+      }),
+    }));
+    let cloud!: typeof import('../src/services/cloud');
+    jest.isolateModules(() => {
+      cloud = jest.requireActual('../src/services/cloud') as typeof import('../src/services/cloud');
+    });
+    try {
+      await expect(cloud.deleteExpiredCrashReports('user-abc')).resolves.toBe(false);
+      await expect(cloud.deleteExpiredLivePoints('user-abc')).resolves.toBe(false);
+      // Sem cliente não há `from` a que se pudesse chamar — o mock do supabase
+      // nem chega a criar um — por isso o que se mede é o resultado (`false`) e
+      // que a limpeza não deixou rasto: nem `noteCloudError`, que é o que
+      // `takeCloudError` devolve, nem um aviso de limpeza no console.
+      expect(cloud.takeCloudError()).toBeNull();
+      expect(avisos.filter(a => String(a[0]).includes('limpeza'))).toEqual([]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
