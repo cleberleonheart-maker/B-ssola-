@@ -1,4 +1,5 @@
 import {
+  distanceToTrackPath,
   niceScaleBar,
   polylinePath,
   polylineSegments,
@@ -301,5 +302,50 @@ describe('determinismo', () => {
     const shape = [offset(LISBOA, 0, 0), offset(LISBOA, 300, 120)];
 
     expect(projectTrack(shape, box)).toEqual(projectTrack(shape, box));
+  });
+});
+
+describe('distanceToTrackPath', () => {
+  const trail = [
+    offset(LISBOA, 0, 0),
+    offset(LISBOA, 0, 100),
+    offset(LISBOA, 100, 100),
+  ];
+
+  it('devolve null sem pontos', () => {
+    expect(distanceToTrackPath(LISBOA.lat, LISBOA.lon, [])).toBeNull();
+  });
+
+  it('quem está sobre o traço fica a ~0 m', () => {
+    const hint = distanceToTrackPath(trail[1].lat, trail[1].lon, trail);
+    expect(hint?.meters).toBeLessThan(0.5);
+  });
+
+  it('mede a distância ao segmento, não só aos vértices', () => {
+    // Traçado a 20 m de lado (meio do segmento horizontal de 40 m).
+    const beside = offset(trail[1], 20, 20);
+    const hint = distanceToTrackPath(beside.lat, beside.lon, trail);
+    expect(hint!.meters).toBeCloseTo(20, 0);
+  });
+
+  it('devolve o rumo de volta ao ponto mais próximo', () => {
+    const atStart = trail[0];
+    const hint = distanceToTrackPath(
+      offset(atStart, -50, 0).lat,
+      offset(atStart, -50, 0).lon,
+      trail,
+    );
+    // o mais próximo é o início, que está a norte: voltar significa rumo norte (~0°)
+    expect(hint!.meters).toBeCloseTo(50, 0);
+    expect(hint!.bearing).toBeLessThan(15);
+  });
+
+  it('com um só ponto, a distância é ao vértice', () => {
+    const hint = distanceToTrackPath(
+      offset(trail[0], -30, 0).lat,
+      offset(trail[0], -30, 0).lon,
+      [trail[0]],
+    );
+    expect(hint!.meters).toBeCloseTo(30, 0);
   });
 });

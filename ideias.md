@@ -473,8 +473,11 @@ foram encontrados de verdade, não ideias soltas.
       fórmula de altura (sem digitar) + média de N leituras para estabilizar o ângulo.
 - [ ] **29. SOS com contexto** — incluir % de bateria e operadora/rede no alerta
       (adianta a ideia #8).
-- [ ] **30. Aviso de desvio de rota** — durante o retorno pela trilha, se sair X metros
-      do trajeto, avisar com o rumo para voltar.
+- [x] **30. Aviso de desvio de rota** — ✅ feito na v7.37: no retorno pela trilha,
+      a distância ao traço (polilinha, não só vértices) é medida sempre; a mais
+      de 30 m entra um banner "⚠️ Fora da rota" com o rumo e a distância até o
+      trajeto, mais uma vibração na transição
+      (`distanceToTrackPath` em `trackProjection.ts`).
 
 ## Ideias novas (23/09/2026, 4ª leva)
 - [ ] **31. 🔐 PIN/biometria no app** — trancar o app (privacidade, útil ao compartilhar

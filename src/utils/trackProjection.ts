@@ -1,4 +1,4 @@
-import { toRad } from './geo';
+import { initialBearing, toRad } from './geo';
 
 /**
  * Projeção partilhada entre a pré-visualização de trilhos do app e o mini
@@ -203,4 +203,78 @@ export const polylinePath = (points: readonly ProjectedPoint[]): string => {
   return points
     .map((p, i) => `${i === 0 ? 'M' : 'L'} ${round(p.x)} ${round(p.y)}`)
     .join(' ');
+};
+
+export type TrackPathHint = {
+  /** Distância ao ponto mais próximo do traço, em metros. */
+  meters: number;
+  /** Rumo da posição atual para o ponto mais próximo, em graus (0–360). */
+  bearing: number;
+  /** O ponto mais próximo do traço (segmento ou vértice). */
+  nearest: GeoPoint;
+};
+
+/**
+ * Distância de um ponto (lat/lon) ao traço de uma trilha — a polilinha inteira,
+ * e não só aos vértices: com pontos simplificados separados por dezenas de
+ * metros, medir só aos vértices sobrestimaria a saída do trajeto.
+ *
+ * Projeta tudo para o plano equirrectangular centrado no ponto (mesmo truque do
+ * resto do ficheiro), calcula a distância ponto-a-segmento em cada segmento e
+ * guarda o menor; o rumo devolvido serve para quem se perdeu saber para onde
+ * voltar. NULL quando não há pontos.
+ */
+export const distanceToTrackPath = (
+  lat: number,
+  lon: number,
+  points: readonly GeoPoint[],
+): TrackPathHint | null => {
+  if (points.length === 0) return null;
+  const cosLat = Math.cos(toRad(lat));
+  const toPlanar = (p: GeoPoint) => ({
+    x: (p.lon - lon) * 111000 * cosLat,
+    y: (p.lat - lat) * 111000,
+  });
+
+  const nearest = (x: number, y: number): GeoPoint => ({
+    lat: lat + y / 111000,
+    lon: lon + x / (111000 * cosLat),
+  });
+
+  const first = toPlanar(points[0]);
+  let bestMeters = Math.hypot(first.x, first.y);
+  let bestPoint = points[0];
+
+  if (points.length === 1) {
+    return {
+      meters: bestMeters,
+      bearing: initialBearing(lat, lon, points[0].lat, points[0].lon),
+      nearest: points[0],
+    };
+  }
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = toPlanar(points[i]);
+    const b = toPlanar(points[i + 1]);
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    let t = 0;
+    if (len2 > 0) {
+      t = Math.max(0, Math.min(1, -(a.x * dx + a.y * dy) / len2));
+    }
+    const cx = a.x + t * dx;
+    const cy = a.y + t * dy;
+    const meters = Math.hypot(cx, cy);
+    if (meters < bestMeters) {
+      bestMeters = meters;
+      bestPoint = nearest(cx, cy);
+    }
+  }
+
+  return {
+    meters: bestMeters,
+    bearing: initialBearing(lat, lon, bestPoint.lat, bestPoint.lon),
+    nearest: bestPoint,
+  };
 };

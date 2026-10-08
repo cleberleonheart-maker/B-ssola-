@@ -5,12 +5,17 @@ import {
   Pressable,
   StyleSheet,
   ScrollView,
+  Vibration,
 } from 'react-native';
 import { useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import { formatDistance, haversine, initialBearing, normalizeAzimuth } from '../utils/geo';
-import { polylineSegments, projectTrack } from '../utils/trackProjection';
+import {
+  distanceToTrackPath,
+  polylineSegments,
+  projectTrack,
+} from '../utils/trackProjection';
 import { cardinalOf, formatAzimuth } from '../utils/compass';
 import { serializeTrackToGpx } from '../utils/gpx';
 import { shareTrackGpx } from '../services/trackShare';
@@ -33,6 +38,8 @@ import { flushOdometer } from '../services/odometerService';
 const MIN_SEGMENT_M = 3;
 const MIN_GAP_MS = 1000;
 const ARRIVE_BACK_METERS = 15;
+// distância ao traço que conta como "sair da rota" no retorno pela trilha
+const OFF_ROUTE_METERS = 30;
 
 // A caixa da pré-visualização. A projeção usa estes números e não os seus
 // próprios: quando os dois viviam separados, o desenho saía 2x mais largo que
@@ -311,6 +318,25 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
     };
   }, [navTrack, navPath, location.latitude, location.longitude, heading, hasFix]);
 
+  // Fora da rota: distância ao traço (polilinha, não só vértices) durante o
+  // retorno. O rumo devolvido diz para onde voltar.
+  const offRoute = useMemo(() => {
+    if (!navActive || !hasFix || navPath.length === 0) {
+      return null;
+    }
+    return distanceToTrackPath(location.latitude, location.longitude, navPath);
+  }, [navActive, navPath, hasFix, location.latitude, location.longitude]);
+
+  const offRouteNow = offRoute != null && offRoute.meters > OFF_ROUTE_METERS;
+  const wasOffRouteRef = useRef(false);
+
+  useEffect(() => {
+    if (offRouteNow && !wasOffRouteRef.current) {
+      Vibration.vibrate(300);
+    }
+    wasOffRouteRef.current = offRouteNow;
+  }, [offRouteNow]);
+
   const startNav = useCallback((target: string | 'live') => {
     setNavId(prev => (prev === target ? null : target));
   }, []);
@@ -422,6 +448,21 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
           <View style={styles.navWrap}>
             {navTarget && (
               <>
+                {offRoute && offRouteNow && (
+                  <View
+                    style={[styles.offRouteCard, { borderColor: colors.danger }]}>
+                    <Text style={[styles.offRouteTitle, { color: colors.danger }]}>
+                      {t('track_offroute')}
+                    </Text>
+                    <Text style={[styles.offRouteText, { color: colors.text }]}>
+                      {t('track_offroute_hint', {
+                        bearing: formatAzimuth(offRoute.bearing, mils),
+                        cardinal: cardinalOf(offRoute.bearing).short,
+                        distance: formatDistance(offRoute.meters),
+                      })}
+                    </Text>
+                  </View>
+                )}
                 <TargetNavBar
                   name={`🏠 ${navTrack === 'live' ? t('track_back_live') : navTrack ? navTrack.name : ''}`}
                   distance={navTarget.distance}
@@ -698,6 +739,25 @@ const createStyles = (colors: {
     },
     navWrap: {
       marginTop: spacing.md,
+    },
+    offRouteCard: {
+      borderWidth: 2,
+      borderRadius: radius.md,
+      backgroundColor: colors.surfaceAlt,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      marginBottom: spacing.sm,
+      alignItems: 'center',
+    },
+    offRouteTitle: {
+      fontSize: 15,
+      fontWeight: '900',
+    },
+    offRouteText: {
+      fontSize: 14,
+      fontWeight: '700',
+      marginTop: 2,
+      textAlign: 'center',
     },
     navHint: {
       fontSize: 12,
