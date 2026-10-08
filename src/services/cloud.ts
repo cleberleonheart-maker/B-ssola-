@@ -62,6 +62,23 @@ export type CloudMemoryRow = CloudMemoryDoc & {
   updated_at: string;
 };
 
+/**
+ * Última resposta sem erro vinda da nuvem (ideia #99).
+ *
+ * Conta qualquer chamada que chegou e respondeu sem erro — sessão, leitura ou
+ * escrita — porque a pergunta do painel de Configurações é "a app ainda fala
+ * com o Supabase?", não "qual destas tabelas foi tocada". Uma timeout ou uma
+ * rejeição não conta: não houve resposta, logo não houve sincronização.
+ */
+let lastSyncAt: number | null = null;
+
+/** O supabase-js devolve sempre objectos com `error`; `null` quer dizer sucesso. */
+const respostaComErro = (value: unknown): boolean =>
+  typeof value === 'object' &&
+  value !== null &&
+  'error' in value &&
+  (value as { error: unknown }).error != null;
+
 const withTimeout = <T,>(
   promise: PromiseLike<T>,
   ms = 6000,
@@ -71,6 +88,7 @@ const withTimeout = <T,>(
     Promise.resolve(promise).then(
       value => {
         clearTimeout(id);
+        if (!respostaComErro(value)) lastSyncAt = Date.now();
         resolve(value);
       },
       error => {
@@ -117,6 +135,33 @@ export const noteCloudError = (scope: string, error: unknown): void => {
   lastCloudError = `${scope}: ${message}`;
   console.warn(`[cloud] ${lastCloudError}`);
 };
+
+export type CloudStatus = {
+  /** As credenciais no código estão preenchidas. */
+  enabled: boolean;
+  /** O cliente foi criado sem exceção. */
+  connected: boolean;
+  clientError: string | null;
+  /**
+   * Última falha gravada por `noteCloudError`, sem ser limpa.
+   *
+   * Diferente de `takeCloudError`: o rastreio ao vivo consome o erro para o
+   * Alert e apaga-o, e o painel de Configurações não pode ser quem o roube —
+   * aqui lê-se sem alterar, para o alerta continuar a mostrar a mesma coisa.
+   */
+  lastError: string | null;
+  /** `Date.now()` da última resposta sem erro, ou `null` se nunca houve. */
+  lastSyncAt: number | null;
+};
+
+/** Estado da nuvem para o painel de Configurações (ideia #99). */
+export const cloudStatus = (): CloudStatus => ({
+  enabled: isCloudEnabled(),
+  connected: client !== null,
+  clientError,
+  lastError: lastCloudError,
+  lastSyncAt,
+});
 
 export const ensureCloudUser = async (): Promise<string | null> => {
   if (!client) {

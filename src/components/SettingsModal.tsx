@@ -23,6 +23,7 @@ import { loadSoundPref, saveSoundPref } from '../services/sound';
 import UpdateAvailableModal from './UpdateAvailableModal';
 import WhatsNewModal from './WhatsNewModal';
 import CompassSection from './settings/CompassSection';
+import CloudSection from './settings/CloudSection';
 import DataSection from './settings/DataSection';
 import ImportDialog from './settings/ImportDialog';
 import PinDialog from './settings/PinDialog';
@@ -413,6 +414,8 @@ const SettingsModal = ({
               onExport={handleExport}
               onOpenImport={() => setImportVisible(true)}
             />
+
+            <CloudSection />
           </ScrollView>
         </Pressable>
       </Pressable>

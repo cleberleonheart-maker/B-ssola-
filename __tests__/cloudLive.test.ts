@@ -379,3 +379,88 @@ describe('a limpeza apanha só o que é nosso e só o que já passou do prazo', 
     }
   });
 });
+
+/**
+ * O painel de Configurações (#99). Não testa pixel: testa o que ele diz.
+ *
+ * A pergunta que ele responde no próprio aparelho é "isto está a falar com o
+ * Supabase ou não?" — por isso o que interessa é a razão (a exceção do
+ * `createClient`, não um genérico "desligado"), a última falha sem ser
+ * consumida (o Alert do rastreio é que a limpa) e a última sincronização
+ * medida por resposta, não por tentativa.
+ */
+describe('o estado da nuvem em Configurações (#99)', () => {
+  beforeEach(() => jest.resetModules());
+  afterEach(() => {
+    jest.dontMock('@react-native-async-storage/async-storage');
+    jest.dontMock('@supabase/supabase-js');
+    jest.resetModules();
+  });
+
+  it('cliente criado, sem nada para dizer', () => {
+    const { cloud } = loadCloud({ error: null });
+    expect(cloud.cloudStatus()).toEqual({
+      enabled: true,
+      connected: true,
+      clientError: null,
+      lastError: null,
+      lastSyncAt: null,
+    });
+  });
+
+  it('quando não está ligado, diz a razão da exceção', () => {
+    jest.doMock('@react-native-async-storage/async-storage', () => ({}));
+    jest.doMock('@supabase/supabase-js', () => ({
+      createClient: jest.fn(() => {
+        throw new Error('Invalid supabaseUrl: Provided URL is malformed.');
+      }),
+    }));
+    let cloud!: typeof import('../src/services/cloud');
+    jest.isolateModules(() => {
+      cloud = jest.requireActual('../src/services/cloud') as typeof import('../src/services/cloud');
+    });
+
+    const status = cloud.cloudStatus();
+    expect(status.enabled).toBe(true);
+    expect(status.connected).toBe(false);
+    expect(status.clientError).toBe(
+      'Invalid supabaseUrl: Provided URL is malformed.',
+    );
+  });
+
+  it('uma resposta sem erro conta como última sincronização', async () => {
+    const { cloud } = loadCloud({ error: null });
+    const antes = Date.now();
+    await expect(
+      cloud.pushLivePosition('lnv9', 'user-1', -15.8, -47.9, 5, 90, Date.now() + 60_000),
+    ).resolves.toBe(true);
+
+    const at = cloud.cloudStatus().lastSyncAt;
+    expect(at).not.toBeNull();
+    expect(at!).toBeGreaterThanOrEqual(antes);
+  });
+
+  it('uma recusa do Supabase não conta como sincronização', async () => {
+    const { cloud } = loadCloud({
+      error: { message: 'new row violates row-level security policy' },
+    });
+    await expect(
+      cloud.pushLivePosition('lnv9', 'user-1', -15.8, -47.9, 5, 90, Date.now() + 60_000),
+    ).resolves.toBe(false);
+
+    expect(cloud.cloudStatus().lastSyncAt).toBeNull();
+  });
+
+  it('a última falha é lida sem ser consumida', () => {
+    const { cloud } = loadCloud({ error: null });
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      cloud.noteCloudError('live push', 'sem rede');
+      expect(cloud.cloudStatus().lastError).toBe('live push: sem rede');
+      expect(cloud.takeCloudError()).toBe('live push: sem rede');
+      expect(cloud.cloudStatus().lastError).toBeNull();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});

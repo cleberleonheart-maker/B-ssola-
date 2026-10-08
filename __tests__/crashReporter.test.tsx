@@ -4,7 +4,12 @@ import { Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import { CrashBoundary } from '../src/components/CrashBoundary';
-import { fingerprintOf, flushCrashes, recordCrash } from '../src/services/crashReporter';
+import {
+  fingerprintOf,
+  flushCrashes,
+  pendingCrashes,
+  recordCrash,
+} from '../src/services/crashReporter';
 import {
   deleteExpiredCrashReports,
   ensureCloudUser,
@@ -67,6 +72,41 @@ beforeEach(async () => {
   mockEnsure.mockResolvedValue('user-abc');
   mockPush.mockResolvedValue(true);
   mockPurga.mockResolvedValue(true);
+});
+
+/**
+ * A fila como a vê o painel de Configurações (#99): só de leitura, e sem
+ * contar como "por enviar" aquilo que `flushCrashes` já vai apagar.
+ */
+describe('a fila vista de fora', () => {
+  it('vazia, diz zero', async () => {
+    expect(await pendingCrashes()).toBe(0);
+  });
+
+  it('conta o que ainda pode sair', async () => {
+    await recordCrash(new Error('primeiro'));
+    await recordCrash(new Error('segundo'));
+    expect(await pendingCrashes()).toBe(2);
+
+    mockPush.mockResolvedValue(false);
+    await flushCrashes();
+    expect(await pendingCrashes()).toBe(2);
+  });
+
+  it('não conta quem já desistiu ao fim de três tentativas', async () => {
+    // Um relatório com `tries >= 3` some na primeira passagem seguinte:
+    // mostrá-lo como "por enviar" era mentira no ecrã.
+    await AsyncStorage.setItem(
+      QUEUE_KEY,
+      JSON.stringify([{ tries: 0 }, { tries: 2 }, { tries: 3 }]),
+    );
+    expect(await pendingCrashes()).toBe(2);
+  });
+
+  it('uma fila corrompida devolve zero em vez de lançar', async () => {
+    await AsyncStorage.setItem(QUEUE_KEY, 'isto não é JSON');
+    expect(await pendingCrashes()).toBe(0);
+  });
 });
 
 describe('o fingerprint', () => {

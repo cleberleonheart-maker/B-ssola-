@@ -137,6 +137,22 @@ const readQueue = async (): Promise<QueuedCrash[]> => {
 };
 
 /**
+ * Quantos relatórios estão mesmo à espera de rede (ideia #99).
+ *
+ * Os que já levaram 3 tentativas não contam: `flushCrashes` apaga-os na
+ * primeira passagem seguinte, e mostrá-los como "por enviar" era mentira no
+ * painel de Configurações. Só lê a fila, não a mexe.
+ */
+export const pendingCrashes = async (): Promise<number> => {
+  try {
+    const fila = await readQueue();
+    return fila.filter(c => c.tries < 3).length;
+  } catch {
+    return 0;
+  }
+};
+
+/**
  * Manda o que está na fila, e limpa o que foi aceite.
  *
  * Corre no arranque, e volta a correr na próxima vez se falhar: o relatório de
