@@ -24,6 +24,7 @@ create table if not exists public.live_shares (
   heading double precision,
   speed double precision,
   altitude double precision,
+  battery_level integer,
   started_at timestamptz not null default now(),
   expires_at timestamptz not null,
   updated_at timestamptz not null default now(),
@@ -42,6 +43,14 @@ create index if not exists live_shares_expires_idx on public.live_shares (expire
 -- O `if not exists` e' porque a tabela ja existe na nuvem; sem ele, republicar
 -- este ficheiro rebentaria em cada release.
 alter table public.live_shares add column if not exists stopped_at timestamptz;
+
+-- battery_level (ideia #103): o percentual de bateria do telemovel, gravado pelo
+-- servico nativo a cada push e devolvido ao viewer pelo get_live_position. E o
+-- que permite a quem recebe o link decidir telefonar em vez de esperar: com a
+-- bateria a morrer o aparelho da o mesmo que um desligado — SEM SINAL para sempre.
+-- O `if not exists` e' pela mesma razao do `stopped_at`: a tabela ja existe na
+-- nuvem, e sem ele republicar este ficheiro rebentaria em cada release.
+alter table public.live_shares add column if not exists battery_level integer;
 
 alter table live_shares enable row level security;
 
@@ -73,7 +82,14 @@ using (user_id::text = auth.uid()::text);
 -- Funcao publica de leitura: valida token + expiracao, devolve
 -- apenas a posicao. O viewer (web) chama com o token do link.
 -- SECURITY DEFINER: quem chama NAO precisa enxergar a tabela.
+--
+-- O `drop` antes do `create` e' obrigatorio: o Postgres nao deixa mudar o tipo
+-- de retorno de uma funcao que ja existe, e acrescentar a coluna
+-- `battery_level` ao `returns table` e mudar o tipo — a mesma razao pela qual a
+-- `get_live_status` ja o faz.
 -- ============================================================
+drop function if exists public.get_live_position(text);
+
 create or replace function public.get_live_position(p_token text)
 returns table (
   latitude double precision,
@@ -82,6 +98,7 @@ returns table (
   heading double precision,
   speed double precision,
   altitude double precision,
+  battery_level integer,
   started_at timestamptz,
   expires_at timestamptz,
   updated_at timestamptz
@@ -93,7 +110,7 @@ as $$
 begin
   return query
     select s.latitude, s.longitude, s.accuracy, s.heading, s.speed,
-           s.altitude, s.started_at, s.expires_at, s.updated_at
+           s.altitude, s.battery_level, s.started_at, s.expires_at, s.updated_at
     from public.live_shares s
     where s.token = p_token
       and s.expires_at > now()

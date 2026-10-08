@@ -106,6 +106,12 @@ done
 # -- so faz o update ficar mais fraco do que parece.
 probe "app_version.apk_sha256" GET "app_version?select=version_code,apk_sha256&limit=1" || true
 
+# A bateria do rastreio (ideia #103): o Kotlin grava-a no push e o viewer le-a
+# da get_live_position. Um select com `battery_level` em falta responde PGRST204,
+# e e isso que o probe apanha antes de uma release.
+probe "live_shares.battery_level" GET "live_shares?select=battery_level&limit=1" || true
+probe "live_points.battery_level" GET "live_points?select=battery_level&limit=1" || true
+
 echo "Funcoes (a pagina web do rastreio ao vivo chama-as sem login):"
 # Com o nome do argumento e nao um valor solto: o PostgREST casa por nome, e um
 # 404 aqui significa "esta funcao nao existe na nuvem" ou "o argumento mudou de

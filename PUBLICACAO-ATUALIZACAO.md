@@ -278,6 +278,32 @@ opcional: vazia, volta-se a entrar pelo link/OTP do email; preenchida (6+), o
 `updateUser({ email, password })` grava também as credenciais de
 `signInWithPassword` — sempre no mesmo `auth.uid()`, sem segunda conta.
 
+### Bateria no rastreio ao vivo (#103)
+
+Desde a v7.43, quem abre o link ao vivo vê a % de bateria do aparelho. A % nasce
+no `LiveTrackingService`, que lê o `BatteryManager.BATTERY_PROPERTY_CAPACITY`
+em cada fix (sem receiver: o `getIntProperty` devolve 0–100 na hora) e manda
+`battery_level` nos dois payloads do push — o `upsert` em `live_shares` e o
+`insert` em `live_points`. Foi acrescentada ao schema uma coluna
+`battery_level integer` (nula) às duas tabelas (`alter table ... add column if
+not exists`, como o `stopped_at`), e a `get_live_position` passou a devolvê-la.
+
+Atenção ao aplicar: a `get_live_position` mudou o `returns table` (ganhou a
+coluna), e o Postgres **não deixa o `create or replace` mudar o tipo de
+retorno** — por isso o ficheiro `live_rls.sql` passou a fazer `drop function if
+exists` antes do `create`, a mesma saída que a `get_live_status` já usava. O
+`verificar-sql.mjs` corre o ficheiro duas vezes em PGlite e confirma a coluna
+nas duas tabelas; o `verificar-nuvem.sh` ganhou sondas
+`live_shares.battery_level` e `live_points.battery_level`.
+
+No viewer (`web/live.html`), a % aparece numa linha `🔋 64%` sob os metadados e
+fica a laranja abaixo de 20% (`LOW_BATTERY_PCT`). É o que responde ao
+"`● SEM SINAL` para sempre, sem explicação": com a bateria perto de morrer, o
+aviso de sinal perdido passa a dizer "pode ser a bateria a morrer — liga para a
+pessoa". O primeiro fix da sessão ainda é enviado pelo JS (sem leitura de
+bateria) e chega com o campo vazio; o serviço assume do segundo em diante. No
+iOS não há serviço nativo e a linha simplesmente fica escondida.
+
 ### `./scripts/verificar-crashes.mjs` — o caminho inteiro, sem aparelho
 
 O `verificar-nuvem.sh` confirma que a tabela existe e que o `anon` a consegue

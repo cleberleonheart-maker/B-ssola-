@@ -137,6 +137,19 @@ const { rows: colunas } = await db.query(
 if (colunas.some(c => c.column_name === 'apk_sha256')) ok.push('coluna app_version.apk_sha256');
 else falhas.push('app_version.apk_sha256 não existe — o CI publicaria o update sem a segunda fonte do hash');
 
+// A bateria (ideia #103) viaja do Kotlin para o viewer: serve de pouco se a
+// coluna existir num lado e noutro não — o payload do serviço daria 400 num
+// POST em silêncio. As duas tabelas têm de ter a coluna, ou o teste do
+// `liveNativeContract` que lê os `create table` passa sem a nuvem ter nada.
+const { rows: bateria } = await db.query(
+  `select table_name from information_schema.columns
+    where table_schema = 'public' and column_name = 'battery_level'`,
+);
+for (const tabela of ['live_shares', 'live_points']) {
+  if (bateria.some(c => c.table_name === tabela)) ok.push(`coluna ${tabela}.battery_level`);
+  else falhas.push(`a coluna ${tabela}.battery_level não existe — o Kotlin envia e a tabela não tem`);
+}
+
 // O `anon` lê `app_version` (é público de propósito: é o que faz o app saber que
 // há update). Nas outras, uma política de leitura para o `anon` ou para todos
 // que não mencione `auth.uid()` seria a mesma coisa que publicar a tabela — e

@@ -182,6 +182,42 @@ describe('viewer do rastreio ao vivo', () => {
     expect(nodes.meta.textContent).toBe('');
   });
 
+  // A bateria (ideia #103) e o que responde ao "telemovel a morrer da o mesmo
+  // que desligado": a % so chega ao payload com o servico nativo a gravar, e o
+  // viewer so a mostra quando o servidor a devolve. Sem o numero, o espaco da
+  // bateria desaparece em vez de dizer "--".
+  it('mostra a bateria quando o servidor a envia', async () => {
+    const { nodes } = boot('#tkn=abc', reply([fix({ battery_level: 64 })]));
+    await wait(30);
+    expect(nodes.batt.textContent).toMatch(/🔋 64%/);
+    expect(nodes.batt.classList.contains('hidden')).toBe(false);
+    expect(nodes.batt.classList.contains('warn')).toBe(false);
+    expect(nodes.liveTag.textContent).toMatch(/AO VIVO/);
+  });
+
+  it('sem bateria no payload, o espaço da bateria fica escondido', async () => {
+    const { nodes } = boot('#tkn=abc', reply([fix()]));
+    await wait(30);
+    expect(nodes.batt.classList.contains('hidden')).toBe(true);
+  });
+
+  it('com bateria baixa avisa que o aparelho pode morrer', async () => {
+    const { nodes } = boot('#tkn=abc', reply([fix({ battery_level: 12 })]));
+    await wait(30);
+    expect(nodes.batt.textContent).toMatch(/🔋 12%/);
+    expect(nodes.batt.classList.contains('warn')).toBe(true);
+    expect(nodes.note.textContent).toMatch(/liga/i);
+  });
+
+  it('sem sinal com bateria baixa explica a causa em vez de só dizer isso', async () => {
+    const old = new Date(Date.now() - 90000).toISOString();
+    const { nodes } = boot('#tkn=abc', reply([fix({ battery_level: 8, updated_at: old })]));
+    await wait(30);
+    expect(nodes.liveTag.textContent).toMatch(/SEM SINAL/);
+    expect(nodes.note.textContent).toMatch(/bateria/i);
+    expect(nodes.note.textContent).toMatch(/liga/i);
+  });
+
   it('marca SEM SINAL quando a posição envelope velha', async () => {
     const old = new Date(Date.now() - 90000).toISOString();
     const { nodes } = boot('#tkn=abc', reply([fix({ updated_at: old })]));

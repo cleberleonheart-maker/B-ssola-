@@ -10,7 +10,14 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-/** Uma posicao pronta para a tabela `live_shares`. */
+/**
+ * Uma posicao pronta para a tabela `live_shares`.
+ *
+ * O `batteryLevel` (0-100, ideia #103) e o que permite a quem recebe o link
+ * decidir telefonar em vez de esperar: um telemovel a morrer da o mesmo que um
+ * desligado — `SEM SINAL` para sempre. Vem daqui e nao do JS porque o
+ * `BatteryManager` so existe nativo.
+ */
 data class LiveFix(
   val latitude: Double,
   val longitude: Double,
@@ -18,6 +25,7 @@ data class LiveFix(
   val altitude: Double?,
   val speed: Double?,
   val heading: Double?,
+  val batteryLevel: Int?,
 )
 
 /**
@@ -74,6 +82,7 @@ data class LiveSessionConfig(
       .put("heading", fix.heading ?: JSONObject.NULL)
       .put("speed", fix.speed ?: JSONObject.NULL)
       .put("altitude", fix.altitude ?: JSONObject.NULL)
+      .put("battery_level", fix.batteryLevel ?: JSONObject.NULL)
       .put("expires_at", isoUtc(expiresAt))
       .put("updated_at", isoUtc(at))
       .toString()
@@ -101,6 +110,7 @@ data class LiveSessionConfig(
       .put("heading", fix.heading ?: JSONObject.NULL)
       .put("speed", fix.speed ?: JSONObject.NULL)
       .put("altitude", fix.altitude ?: JSONObject.NULL)
+      .put("battery_level", fix.batteryLevel ?: JSONObject.NULL)
       .put("expires_at", isoUtc(expiresAt))
       .toString()
 }

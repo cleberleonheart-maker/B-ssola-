@@ -1113,14 +1113,23 @@ a nota de cada uma diz o que a distingue da ideia vizinha.
       ou `PATCH /v1/projects/{ref}/config/auth` pela Management API); com ele
       desligado, o GoTrue responde "manual linking is disabled" e o motivo chega
       ao ecrã.
-- [ ] **103. 🔋 Quem vê o link precisa de saber que a bateria vai** — com o
-      rastreio ativo, o telemóvel a morrer de bateria dá o mesmo que um
-      aparelho desligado: `● SEM SINAL` para sempre, sem explicação. As
-      ideias #8 e #29 põem a bateria **no SOS** (quem envia), e a #39 fala do
-      Android a restringir o app; esta é a terceira face: pôr a % no payload
-      que o viewer já lê, para quem recebe o link decidir telefonar em vez de
-      esperar. O `live_shares` já tem colunas de sobra para isto e o push
-      já passa por lá de 10 em 10 segundos.
+- [x] **103. 🔋 Quem vê o link precisa de saber que a bateria vai** — feito
+      (v7.43). O percentual nasce no lado que já faz o push: o `LiveFix` do
+      Kotlin ganhou `batteryLevel`, lido a cada fix do
+      `BatteryManager.BATTERY_PROPERTY_CAPACITY` (sem receiver: o `getIntProperty`
+      devolve a % batendo em 0-100 na hora), e os dois payloads —
+      `live_shares` e `live_points` — passam a mandar `battery_level`. Nas
+      tabelas, a coluna `integer` nula (criada por `alter table if not exists`,
+      como o `stopped_at`) e a `get_live_position` devolve-a ao viewer. No
+      `web/live.html`, uma linha `🔋 64%` aparece por baixo dos metadados, a
+      laranja (`--warn`) abaixo de 20% — e é aí que a ideia responde ao
+      "`SEM SINAL` para sempre, sem explicação": com a bateria perto de morrer,
+      o aviso de sinal perdido passa a dizer "pode ser a bateria a morrer —
+      liga para a pessoa", em vez de culpar o sinal ou a tela. O primeiro fix
+      da sessão ainda é enviado pelo JS (que não tem leitura de bateria) e
+      chega com o campo vazio; o serviço assume do segundo em diante e a % em
+      `live_shares` sobe num push. No iOS não há serviço nativo, o push fica
+      no JS e o viewer simplesmente esconde a linha.
 - [ ] **104. 🌩️ Alarme de queda rápida da pressão** — o `TrendChart` do
       barômetro mostra a tendência, mas mostra a quem está a olhar para o
       ecrã. A regra clássica de campo (queda de ~4 hPa em 3 h, ou mais

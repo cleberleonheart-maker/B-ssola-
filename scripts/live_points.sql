@@ -39,9 +39,17 @@ create table if not exists public.live_points (
   heading double precision,
   speed double precision,
   altitude double precision,
+  battery_level integer,
   recorded_at timestamptz not null default now(),
   expires_at timestamptz not null
 );
+
+-- battery_level (ideia #103): o mesmo percentual que vai em `live_shares`,
+-- gravado por linha para o historico nao perder o contexto de cada fix. O
+-- viewer nao le (a posicao actual e a `get_live_position`), mas a coluna
+-- existe dos dois lados para o mesmo payload nao dar 400 num ou noutro.
+-- O `if not exists` e' porque a tabela ja existe na nuvem.
+alter table public.live_points add column if not exists battery_level integer;
 
 -- O viewer le por token e em ordem de id; o dono apaga por token+user_id.
 create index if not exists live_points_token_id_idx

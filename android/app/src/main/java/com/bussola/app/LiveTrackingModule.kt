@@ -17,6 +17,7 @@ import android.hardware.SensorManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -287,6 +288,20 @@ class LiveTrackingService : Service(), SensorEventListener {
 
   override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
+  /**
+   * Nivel de bateria 0-100 no momento do fix (ideia #103).
+   *
+   * `getIntProperty` devolve o percentual sem precisar de um receiver registado:
+   * a leitura e barata e por isso corre em cada fix, do main looper. Devolve um
+   * valor fora de 0-100 (ou -1) quando o sistema nao consegue calcula-lo, e ai
+   * prefere-se `null` a mandar um numero que o viewer ia mostrar a mais.
+   */
+  private fun readBatteryPercent(): Int? {
+    val bm = getSystemService(Context.BATTERY_SERVICE) as? BatteryManager ?: return null
+    val pct = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+    return if (pct in 0..100) pct else null
+  }
+
   private fun onFix(location: Location) {
     val cfg = config ?: return
     val at = System.currentTimeMillis()
@@ -312,6 +327,7 @@ class LiveTrackingService : Service(), SensorEventListener {
         altitude = altitude,
         speed = speed,
         heading = heading,
+        batteryLevel = readBatteryPercent(),
       )
 
     // `locationListener` roda na main looper: a rede nunca pode entrar aqui.

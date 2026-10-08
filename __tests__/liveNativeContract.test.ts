@@ -198,6 +198,19 @@ describe('o payload que o serviço nativo envia', () => {
     expect(chavesDoPayload('pointPayload')).not.toContain('recorded_at');
   });
 
+  it('a bateria do serviço vai nos dois payloads e existe nas duas tabelas', () => {
+    // A bateria (ideia #103) só nasce no Kotlin, e um payload com uma coluna que
+    // a tabela não tem dá 400 do PostgREST em silêncio — a falha é um link que
+    // congela. O caminho oposto, uma coluna que ninguém envia, também passa
+    // despercebido: o viewer fica sem a % para sempre.
+    const chavesPosicao = chavesDoPayload('payload');
+    const chavesPonto = chavesDoPayload('pointPayload');
+    expect(chavesPosicao).toContain('battery_level');
+    expect(chavesPonto).toContain('battery_level');
+    expect(liveShares.map(c => c.nome)).toContain('battery_level');
+    expect(livePoints.map(c => c.nome)).toContain('battery_level');
+  });
+
   it('as duas tabelas proíbem coordenadas nulas', () => {
     // O único dado que o app não pode perder. Um `null` aqui sai como
     // `JSONObject.NULL` e o Postgres rejeita com 23502 — a mesma classe de erro
