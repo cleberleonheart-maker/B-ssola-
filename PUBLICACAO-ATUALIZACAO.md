@@ -189,9 +189,17 @@ conta própria, porque o inverso não dá para recuperar: apagar a linha que ain
 está no prazo deixa quem está a ver o link sem trajecto a meio.
 
 O que sobra é o que não tem ninguém: linhas de uma conta apagada, ou de uma
-sessão que acabou e não voltou. Apagam-se à mão no Table Editor, e é
-aceitável — são linhas que só ocupam espaço, e não um caminho para apanhar
-outra pessoa.
+sessão que acabou e não voltou. Durante algum tempo apagavam-se à mão no Table
+Editor; desde a ideia **#98** faz o `scripts/limpar-orfaos.mjs`, que corre de
+madrugada pelo `.github/workflows/limpar-orfaos.yml` com a `service_role` — a
+única coisa que alcança linhas de quem já não existe, porque o `auth.uid()` do
+DELETE de quem escreveu já não é o dele. O filtro é o mesmo das limpezas de
+cima: `expires_at` no passado. A exceção é `live_shares`, que guarda o prazo
+vencido de propósito (é o que permite ao viewer dizer "expirou" em vez de
+"encerrado") e por isso só apaga o que passou do prazo **há mais de 90 dias**.
+Cada commit que toque no script corre-o em modo `--apenas-contar` — conta sem
+escrever, para provar que a chave serve sem apagar produção por haver um
+commit.
 
 ### `./scripts/verificar-crashes.mjs` — o caminho inteiro, sem aparelho
 

@@ -143,6 +143,10 @@ grant execute on function public.get_live_track(text, bigint) to anon, authentic
 --
 -- O `cron.schedule` la em cima continua opcional, como sempre foi: `pg_cron`
 -- nao vem ligada em todos os projectos, e a app ja faz o trabalho.
+--
+-- O que a app nao apaga sao as linhas de uma sessao cujo dono ja nao tem
+-- sessao nenhuma (conta apagada, ou quem nunca mais abriu a app): isso e' o
+-- `scripts/limpar-orfaos.mjs` (ideia #98), de madrugada, com a `service_role`.
 -- ============================================================
 
 -- ============================================================

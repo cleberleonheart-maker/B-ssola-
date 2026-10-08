@@ -1027,16 +1027,19 @@ a nota de cada uma diz o que a distingue da ideia vizinha.
       código sai por `|| status=$?` e volta a sair no fim; e o `npm ci` com
       cache, porque o script só precisa do `@supabase/supabase-js`, mas o
       `postinstall` do `patch-package` quer os devDependencies.
-- [ ] **98. 🧹 Linhas sem dono** — a "limpeza do prazo" deixa o órfão para
-      fora de propósito: linhas de uma conta apagada ou de uma sessão que
-      acabou e não voltou têm `expires_at` vencido mas já não têm ninguém com
-      sessão para as apagar, porque apagar exige `auth.uid()` de quem as
-      escreveu. Hoje isso faz-se à mão no Table Editor, como está escrito no
-      `PUBLICACAO-ATUALIZACAO.md`. Automatizar é uma de duas: `pg_cron` quando
-      a extension estiver ligada (o SQL já tem a chamada comentada), ou um
-      passo do `publicar-supabase.yml` com `service_role` — que salta a RLS e
-      portanto pode apagar o que é de ninguém. A segunda não depende de
-      ninguém ligar nada, e é a mesma via por que o schema já chega lá.
+- [x] **98. 🧹 Linhas sem dono** — feito. O `scripts/limpar-orfaos.mjs` apaga, com a
+      `service_role`, as linhas com `expires_at` vencido de quem já não tem sessão
+      nenhuma (conta apagada, sessão que morreu sem nunca mais abrir a app) — o
+      caso que a limpeza do lado do utilizador (`deleteExpired*`) não alcança,
+      porque o `auth.uid()` do DELETE já não é o dela. Lista branca de três
+      tabelas (`crashes`, `live_points`, `live_shares`), cada uma com o seu corte
+      escrito à mão; `live_shares` fica 90 dias além do prazo, que é o que
+      permite ao viewer dizer "expirou" em vez de "encerrado". Corre de madrugada
+      pelo `.github/workflows/limpar-orfaos.yml` (4h17 de Brasília, a mesma hora
+      da purga comentada no `crashes.sql`) e, a cada commit que toque no script,
+      corre em modo `--apenas-contar` — conta sem escrever. As `notes`, `tracks`
+      e `virgin_memory` continuam fora: não expiram, e o órfão delas é a conta
+      apagada sem apagar dados, que é a #101.
 
 ### Produto
 - [ ] **99. 🩺 Estado da nuvem em Configurações** — um painel com o que o

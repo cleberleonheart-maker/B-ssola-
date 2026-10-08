@@ -1,0 +1,88 @@
+name: Linhas sem dono (producao)
+
+# A limpeza do prazo ja e cumprida do lado de quem tem sessao
+# (`deleteExpired*` no `cloud.ts`, com a RLS a garantir que so apaga as suas
+# linhas). Isto e' o que ficava por fazer na ideia #98: as linhas de quem ja
+# nao tem sessao nenhuma — conta apagada, sessao que acabou sem nunca mais
+# abrir a app — ficavam para sempre, e limpavam-se a mao no Table Editor.
+#
+# O `scripts/limpar-orfaos.mjs` apaga por `expires_at` no passado, com a
+# `service_role`, que e' a unica coisa que alcanca linhas de alguem que ja nao
+# existe. `live_shares` guarda o prazo vencido de proposito (e' o que permite
+# ao viewer dizer "expirou" em vez de "encerrado") e por isso fica 90 dias alem
+# do prazo.
+#
+# Passa a correr:
+#
+#   - de dia em dia, 4:17 da manha NO HORARIO DO BRASIL (7:17 UTC, porque o
+#     `cron` do GitHub e' sempre UTC — a mesma hora da purga que esta comentada
+#     no `crashes.sql` e a mesma da verificacao semanal do crash, de proposito);
+#   - a cada commit que toque no proprio script ou no workflow, e nesse caso
+#     SO CONTA (`--apenas-contar`): provar que a chave serve e que as tabelas
+#     respondem, sem apagar production so por ter havido um commit;
+#   - a mao, quando se quiser (workflow_dispatch), ai com apagamento.
+#
+# Precisa de dois segredos que ja existem para o `publicar-supabase.yml`:
+# `SUPABASE_PROJECT_URL` e `SUPABASE_SERVICE_ROLE_KEY`. Sem eles o passo aborta
+# a vermelho — uma limpeza que nao corre tem de doer, e nao passar em silencio.
+#
+# Fica num workflow a parte pelas mesmas razoes do #87: um commit so de
+# limpeza nao deve gastar sete minutos a compilar o APK.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 7 * * *'   # 7:17 UTC = 4:17 de Brasilia. O `cron` do Actions
+                            # nao tem horario de aparelho, so UTC.
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/limpar-orfaos.mjs'
+      - '.github/workflows/limpar-orfaos.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  limpa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Apaga as linhas caducadas de quem nao voltou
+        # O `-e` do shell default do GitHub mataria o passo no primeiro exit 1
+        # e o resumo do run ficava sem o que falhou — da-se a volta com
+        # `|| status=$?` e volta-se a sair com o codigo verdadeiro no fim,
+        # como no workflow do caminho do crash.
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -uo pipefail
+          status=0
+          if [ "${{ github.event_name }}" = "push" ]; then
+            MODO="--apenas-contar"
+          else
+            MODO=""
+          fi
+          node scripts/limpar-orfaos.mjs $MODO 2>&1 | tee /tmp/orfaos.txt || status=$?
+          {
+            grep -E '^  FALHA' /tmp/orfaos.txt || true
+          } | sed 's/^ *//' | while IFS= read -r linha; do
+            echo "::error::$linha"
+          done
+          {
+            echo '## Linhas sem dono (producao)'
+            echo
+            echo '```'
+            cat /tmp/orfaos.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"

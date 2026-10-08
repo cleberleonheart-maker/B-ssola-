@@ -105,6 +105,11 @@ using (user_id::text = auth.uid()::text);
 -- acontece em silêncio. Aqui não há nada para ligar, e sem relatório novo não
 -- há sequer pedido: a fila vazia não corre a limpeza.
 --
+-- O que a app não apaga são as linhas de quem já não tem sessão nenhuma —
+-- conta apagada, ou quem nunca mais abriu a app depois do crash. Isso é o
+-- `scripts/limpar-orfaos.mjs` (ideia #98), corre de madrugada com a
+-- `service_role` e o mesmo filtro `expires_at < now()`.
+--
 --   select cron.schedule(
 --     'purge-crashes',
 --     '17 4 * * *',
