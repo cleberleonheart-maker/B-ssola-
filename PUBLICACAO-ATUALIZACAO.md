@@ -222,6 +222,28 @@ No ecrã, `ShareHistorySection` (Configurações) lê só os carimbos de tempo d
 entrar no aparelho. As linhas paradas continuam a ser apanhadas pela limpeza de
 #98 ao fim de 90 dias do prazo — o mesmo prazo que já valia às expiradas.
 
+### Apagar a minha conta e os dados (#101)
+
+Um botão na secção "Conta" de Configurações, com confirmação. O grosso está na
+base: `scripts/account_delete.sql` cria a RPC `delete_my_account()` —
+`SECURITY DEFINER` — que apaga as linhas do `auth.uid()` da sessão nas seis
+tabelas (`tracks`, `notes`, `virgin_memory`, `crashes`, `live_points`,
+`live_shares`) e depois o utilizador em `auth.users`, numa transação. Precisou
+da `SECURITY DEFINER` porque apagar o utilizador não é REST e o cliente do
+Supabase não se elimina a si próprio; a função corrige os poderes de quem a
+criou (o postgres, via SQL Editor ou Management API) e limita-se ao `auth.uid()`
+do JWT — sem sessão (a anon key sozinha) devolve `false` sem tocar em nada.
+
+O ficheiro entra na lista de seis do `publicar-sql.sh` do workflow (e na de
+`verificar-sql.mjs`); aplica-se sozinho no próximo push. No cliente, o
+`deleteMyAccount` chama a RPC, faz `signOut` e limpa o id em memória — um
+pedido com o id de uma conta apagada é um 400 de PostgREST que ninguém percebe,
+por isso é o `signOut` que fecha o ciclo, e não o botão.
+
+O `verificar-nuvem.sh --strict` passou a sondar a própria RPC (sem header de
+sessão, devolve `false` sem efeitos) para a ausência dela falhar o workflow no
+push e não quando um utilizador quiser sair.
+
 ### `./scripts/verificar-crashes.mjs` — o caminho inteiro, sem aparelho
 
 O `verificar-nuvem.sh` confirma que a tabela existe e que o `anon` a consegue

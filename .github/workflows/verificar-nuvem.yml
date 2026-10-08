@@ -103,7 +103,8 @@ jobs:
             scripts/live_points.sql \
             scripts/app_version.sql \
             scripts/app_version_sha.sql \
-            scripts/crashes.sql
+            scripts/crashes.sql \
+            scripts/account_delete.sql
 
       - name: Confirma que a aplicacao chegou a buen fim
         if: ${{ env.SUPABASE_ACCESS_TOKEN != '' }}

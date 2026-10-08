@@ -240,6 +240,40 @@ export const getCloudAccessToken = async (): Promise<string | null> => {
   }
 };
 
+/**
+ * Apaga a conta e os dados na nuvem (ideia #101).
+ *
+ * O servidor recebe o pedido pela RPC `delete_my_account` (SCRIPT SQL, não a
+ * anon key): apaga as linhas das seis tabelas e depois o utilizador em
+ * `auth.users`. A RLS por si só não chegava — apagar o utilizador não é REST,
+ * e o cliente do Supabase não tem forma de se remover a si próprio.
+ *
+ * O `signOut` a seguir limpa a sessão local: o id de baixo já não existe, e
+ * qualquer pedido futuro com ele é um 400 que ninguém percebe. As variáveis de
+ * estado do módulo voltam a zero para um `ensureCloudUser` mais tarde criar uma
+ * conta nova em vez de continuar a usar a apagada.
+ */
+export const deleteMyAccount = async (): Promise<boolean> => {
+  if (!client) {
+    noteCloudError('conta', clientError ?? 'Supabase nao configurado');
+    return false;
+  }
+  try {
+    const { data, error } = await withTimeout(client.rpc('delete_my_account'), 30000);
+    if (error) {
+      noteCloudError('conta', error.message);
+      return false;
+    }
+    currentUserId = null;
+    ensurePromise = null;
+    await client.auth.signOut();
+    return data === true;
+  } catch (error) {
+    noteCloudError('conta', error);
+    return false;
+  }
+};
+
 export const fetchCloudMemory = async (
   userId: string,
 ): Promise<CloudMemoryRow | null> => {

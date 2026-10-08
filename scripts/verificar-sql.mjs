@@ -41,6 +41,7 @@ const FICHEIROS = [
   'app_version.sql',
   'app_version_sha.sql',
   'crashes.sql',
+  'account_delete.sql',
 ];
 
 /** O que o `cloud.ts` toca, e o que o `web/live.html` chama sem login.
@@ -61,6 +62,7 @@ const FUNCOES = [
   'get_live_position(p_token text)',
   'get_live_status(p_token text)',
   'get_live_track(p_token text, p_after bigint)',
+  'delete_my_account()',
 ];
 
 const falhas = [];

@@ -1069,15 +1069,23 @@ a nota de cada uma diz o que a distingue da ideia vizinha.
       lógica de estado fica em puro em `src/utils/shareHistory.ts` (parada
       ganha a expirada: dizer "expirou" a uma sessão que a pessoa parou seria
       mentir sobre a decisão dela).
-- [ ] **101. 🚪 Apagar a minha conta e os dados** — não há sítio nenhum na app
-      para largar dados. Todas as tabelas já têm política de DELETE com
-      `user_id = auth.uid()` (`tracks`, `notes`, `virgin_memory`, `crashes`,
-      `live_points`, `live_shares`), portanto o caminho existe e é só do
-      utilizador — falta o botão e a confirmação que diga o que se perde. É
-      também a resposta a um problema que este repositório tem mesmo: cada
-      execução do `verificar-crashes.mjs` e cada aparelho novo criam uma conta
-      anónima que fica para sempre, e hoje a única forma de a tirar é o Table
-      Editor.
+- [x] **101. 🚪 Apagar a minha conta e os dados** — feito (v7.41). Um botão
+      em Configurações (secção "Conta") com confirmação a dizer o que se perde,
+      porque as tabelas já tinham política de DELETE com `user_id = auth.uid()`
+      (`tracks`, `notes`, `virgin_memory`, `crashes`, `live_points`,
+      `live_shares`) — o caminho existia e era só do utilizador; faltava o
+      botão. Duas metades: **na base** (`scripts/account_delete.sql`), a RPC
+      `delete_my_account()` com `SECURITY DEFINER` apaga as linhas das seis
+      tabelas e a conta em `auth.users` numa transação; apagar o utilizador não
+      é REST, o cliente do Supabase não se remove a si próprio, e a RLS por si
+      só não alcançava `auth` — por isso a função corre com os poderes de quem
+      a criou e confia só no `auth.uid()` do JWT (sem sessão, a anon key
+      sozinha devolve `false` e não toca em nada). **no cliente**
+      (`deleteMyAccount`) chama a RPC e faz `signOut` a seguir, e limpa o id em
+      memória para a sincronização seguinte começar com conta nova. É também a
+      resposta ao problema que o repositório tem mesmo: cada execução do
+      `verificar-crashes.mjs` e cada aparelho novo criam uma conta anónima, e a
+      única forma de a tirar era o Table Editor.
 - [ ] **102. 🔗 Anónimo com conta real** — o `ensureCloudUser` cria uma
       sessão anónima e é o único caminho: perder o telemóvel é perder a nuvem
       toda (notas, trilhas, memória da assistente), porque o `auth.uid()` novo

@@ -633,3 +633,85 @@ describe('o histórico lê só os carimbos, do próprio, do mais recente para tr
     expect(cloud.takeCloudError()).toContain('live history');
   });
 });
+
+/**
+ * Apagar a minha conta e os dados (ideia #101).
+ *
+ * O que se verifica aqui é a divisão de poderes: o apagar fica na função da
+ * base de dados (`delete_my_account`, SECURITY DEFINER), e o cliente só pede,
+ * e o `signOut` a seguir à resposta — onde o id já não existe, e um pedido
+ * futuro com ele é um 400 que ninguém percebe.
+ */
+const carregarParaConta = (resultado: {
+  data: unknown;
+  error: { message: string } | null;
+}) => {
+  const rpc = jest.fn().mockResolvedValue(resultado);
+  const signOut = jest.fn().mockResolvedValue({ error: null });
+  jest.doMock('@react-native-async-storage/async-storage', () => ({}));
+  jest.doMock('@supabase/supabase-js', () => ({
+    createClient: jest.fn(() => ({
+      auth: { getSession: jest.fn(), signOut },
+      rpc,
+    })),
+  }));
+  let cloud!: typeof import('../src/services/cloud');
+  jest.isolateModules(() => {
+    cloud = jest.requireActual('../src/services/cloud') as typeof import('../src/services/cloud');
+  });
+  return { cloud, rpc, signOut };
+};
+
+describe('apagar a conta pede a RPC e desliga a sessão (#101)', () => {
+  beforeEach(() => jest.resetModules());
+  afterEach(() => {
+    jest.dontMock('@react-native-async-storage/async-storage');
+    jest.dontMock('@supabase/supabase-js');
+    jest.resetModules();
+  });
+
+  it('chama a RPC e sai da sessão quando o servidor apagou', async () => {
+    const { cloud, rpc, signOut } = carregarParaConta({ data: true, error: null });
+
+    await expect(cloud.deleteMyAccount()).resolves.toBe(true);
+
+    expect(rpc).toHaveBeenCalledWith('delete_my_account');
+    expect(signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('a RPC devolve false e o cliente não finge ter apagado', async () => {
+    const { cloud, signOut } = carregarParaConta({ data: false, error: null });
+
+    await expect(cloud.deleteMyAccount()).resolves.toBe(false);
+    // Saiu da sessão na mesma: o id já não é o desta conta, e continuar a usá-lo
+    // em pedidos futuros seria um 400 de PostgREST que ninguém entende.
+    expect(signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('recusado pelo Supabase não apaga nem desliga', async () => {
+    const { cloud, signOut } = carregarParaConta({
+      data: null,
+      error: { message: 'permission denied' },
+    });
+
+    await expect(cloud.deleteMyAccount()).resolves.toBe(false);
+    expect(signOut).not.toHaveBeenCalled();
+    expect(cloud.takeCloudError()).toContain('conta');
+  });
+
+  it('sem cliente, devolve false sem atirar', async () => {
+    jest.doMock('@react-native-async-storage/async-storage', () => ({}));
+    jest.doMock('@supabase/supabase-js', () => ({
+      createClient: jest.fn(() => {
+        throw new Error('Invalid supabaseUrl');
+      }),
+    }));
+    let cloud!: typeof import('../src/services/cloud');
+    jest.isolateModules(() => {
+      cloud = jest.requireActual('../src/services/cloud') as typeof import('../src/services/cloud');
+    });
+
+    await expect(cloud.deleteMyAccount()).resolves.toBe(false);
+    expect(cloud.takeCloudError()).toContain('conta');
+  });
+});

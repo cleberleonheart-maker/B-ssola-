@@ -113,6 +113,9 @@ echo "Funcoes (a pagina web do rastreio ao vivo chama-as sem login):"
 probe "get_live_position(p_token)" POST "rpc/get_live_position" '{"p_token":"verificar-nuvem"}' || true
 probe "get_live_status(p_token)"   POST "rpc/get_live_status"   '{"p_token":"verificar-nuvem"}' || true
 probe "get_live_track(p_token,p_after)" POST "rpc/get_live_track" '{"p_token":"verificar-nuvem","p_after":0}' || true
+# Sem header de sessao o auth.uid() e null e a funcao devolve false sem tocar em
+# nada -- o probe confirma que existe sem criar um utilizador de teste.
+probe "delete_my_account()" POST "rpc/delete_my_account" '{}' || true
 
 # O login anonimo e o que faz a RLS por utilizador funcionar: as politicas
 # comparam user_id com auth.uid(), e sem sessao o rastreio ao vivo nao tem
