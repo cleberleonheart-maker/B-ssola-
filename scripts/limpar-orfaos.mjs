@@ -44,20 +44,28 @@ const NOVENTA_DIAS = 90 * 24 * 60 * 60 * 1000;
  * Lista branca: só estas três tabelas têm `expires_at`, e é por isso que
  * estão aqui. As restantes (`notes`, `tracks`, `virgin_memory`) não expiram —
  * o órfão delas é a conta apagada sem apagar dados, que é a #101 e não esta.
+ *
+ * `coluna` é a chave de cada tabela, usada no `select` do DELETE e da
+ * contagem. Não é a mesma nas três: `live_shares` não tem `id` — a chave é o
+ * `token` —, e um `select('id')` dali volta 42703, que é a mesma coluna em
+ * falta que matava relatórios de crash em silêncio.
  */
 const TABELAS = [
   {
     tabela: 'crashes',
+    coluna: 'id',
     porquê: 'os 90 dias de retenção já vêm no próprio expires_at',
     corte: agora => new Date(agora),
   },
   {
     tabela: 'live_points',
+    coluna: 'id',
     porquê: 'depois do prazo o trajecto não serve para nada',
     corte: agora => new Date(agora),
   },
   {
     tabela: 'live_shares',
+    coluna: 'token',
     porquê: 'a linha expirada responde "expirou" no viewer — fica 90 dias além do prazo',
     corte: agora => new Date(agora - NOVENTA_DIAS),
   },
@@ -96,35 +104,57 @@ const ok = [];
 const falhas = [];
 const agora = Date.now();
 
-// O PostgREST às vezes devolve erro sem `code` nem `message` (resposta que não
-// é JSON, por exemplo). Imprimir `error.message` só daria uma linha vazia a
-// apontar para nada, e é precisamente numa falha de limpeza que se quer saber
-// o que falhou.
+// O fetch pode falhar por rede — um `ConnectTimeoutError` do undici dá um
+// `error` sem `code` e com a mensagem quase vazia. Imprimir `error.message`
+// só daria uma linha a apontar para nada, e é precisamente numa falha de
+// limpeza que se quer saber o que falhou.
 const descrever = erro => {
   const texto = [erro?.code, erro?.message].filter(Boolean).join(' — ');
   const resto = JSON.stringify(erro ?? null);
   return texto || resto;
 };
 
-for (const { tabela, corte, porquê } of TABELAS) {
+// Uma limpeza que falha por um timeout de rede não é uma limpeza que tenha
+// falhado: é uma limpeza que teve azar. Três tentativas com espera crescente,
+// o mesmo trato que o reporter de crashes dá ao envio — e o DELETE é seguro de
+// repetir, porque o filtro continua a apontar para as linhas que faltam.
+const TENTATIVAS = 3;
+const esperar = ms => new Promise(res => setTimeout(res, ms));
+
+const tentar = async (operação, oQue) => {
+  let ultimo;
+  for (let n = 1; n <= TENTATIVAS; n++) {
+    const r = await operação();
+    if (!r.error) return r;
+    ultimo = r;
+    console.log(`  ...${oQue}: tentativa ${n}/${TENTATIVAS} falhou (${descrever(r.error)})`);
+    if (n < TENTATIVAS) await esperar(1000 * n);
+  }
+  return ultimo;
+};
+
+for (const { tabela, coluna, corte, porquê } of TABELAS) {
   const limite = corte(agora).toISOString();
 
   if (sóContar) {
-    const { count, error } = await client
-      .from(tabela)
-      .select('id', { count: 'exact', head: true })
-      .lt('expires_at', limite);
+    const { count, error } = await tentar(
+      () => client.from(tabela).select(coluna, { count: 'exact', head: true }).lt('expires_at', limite),
+      `contagem de ${tabela}`,
+    );
     if (error) {
-      falhas.push(`${tabela}: a contagem falhou (${descrever(error)})`);
+      falhas.push(`${tabela}: a contagem falhou depois de ${TENTATIVAS} tentativas (${descrever(error)})`);
     } else {
       ok.push(`${tabela}: ${count ?? 0} linhas caducadas por apagar (${porquê})`);
     }
     continue;
   }
 
-  const { data, error } = await client.from(tabela).delete().lt('expires_at', limite).select('id');
+  const { data, error } = await tentar(
+    () => client.from(tabela).delete().lt('expires_at', limite).select(coluna),
+    `DELETE de ${tabela}`,
+  );
   if (error) {
-    falhas.push(`${tabela}: o DELETE foi recusado (${descrever(error)})`);
+    falhas.push(`${tabela}: o DELETE foi recusado depois de ${TENTATIVAS} tentativas (${descrever(error)})`);
   } else {
     const apagadas = (data ?? []).length;
     ok.push(`${tabela}: ${apagadas} linhas apagadas (${porquê})`);
