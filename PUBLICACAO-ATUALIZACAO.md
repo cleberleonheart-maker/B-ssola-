@@ -263,7 +263,9 @@ que lê `config/auth` pela Management API e, se o campo vier desligado, faz um
 `PATCH` para o ligar (idempotente, sem efeitos em cada push seguinte). Se o
 token do CI não tiver escopo para `config/auth`, o script avisa com
 `::warning::` e sai a zero — e então liga-se à mão no Dashboard do Supabase
-(Authentication). Com ele desligado, o `linkEmail` devolve falso e o motivo
+(Authentication). Em 2026-10-08 ligou-se sozinho pelo CI: o token
+`SUPABASE_ACCESS_TOKEN` tinha o escopo, o campo estava `null` e passou a
+`true` — os pushes seguintes confirmam apenas "já ligado". Com ele desligado, o `linkEmail` devolve falso e o motivo
 ("manual linking is disabled") aparece no próprio pedido — não há sonda no CI
 para isto porque testá-lo mandaria um email de confirmação real a cada execução.
 
