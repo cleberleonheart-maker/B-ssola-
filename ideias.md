@@ -114,7 +114,11 @@
       visível.
 - [ ] **14. Tiles Android** — quick-settings tile para abrir direto num modo.
 - [ ] **15. Tema automático** — seguir horário (dia/noite) com transição suave.
-- [ ] **16. Brilho/keep-awake outdoor** — opção para não dormir durante Bússola/AR/trilha.
+- [x] **16. Brilho/keep-awake outdoor** — ✅ feito na v7.36: toggle "Tela sempre
+      acesa" em Configurações. Aplica `FLAG_KEEP_SCREEN_ON` na janela da Activity
+      (`KeepAwakeModule`, módulo nativo) enquanto o app está aberto — ideal para
+      Bússola/Visão/trilha — e relembra a preferência no arranque
+      (`@bussola/keepAwake`).
 
 ## Ideias novas (23/09/2026)
 - [ ] **17. AR sobre a câmera real** — marcar sol/lua/destino com o fundo da câmera

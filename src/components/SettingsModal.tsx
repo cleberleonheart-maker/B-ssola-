@@ -55,6 +55,8 @@ type Props = {
   onToggleVoiceGuide: () => void;
   mils: boolean;
   onToggleMils: () => void;
+  keepAwake: boolean;
+  onToggleKeepAwake: () => void;
   onVerifyPin: (pin: string) => Promise<boolean>;
   onSetPin: (pin: string | null) => Promise<void>;
   onExportBackup: () => Promise<void>;
@@ -109,6 +111,8 @@ const SettingsModal = ({
   onToggleVoiceGuide,
   mils,
   onToggleMils,
+  keepAwake,
+  onToggleKeepAwake,
   onVerifyPin,
   onSetPin,
   onExportBackup,
@@ -399,6 +403,8 @@ const SettingsModal = ({
               onToggleSound={toggleSound}
               mils={mils}
               onToggleMils={onToggleMils}
+              keepAwake={keepAwake}
+              onToggleKeepAwake={onToggleKeepAwake}
               onOpenWaypoints={onOpenWaypoints}
               onShareLocation={onShareLocation}
               arStatus={arStatus}

@@ -30,6 +30,7 @@ class MainApplication : Application(), ReactApplication {
           add(GeofencePackage())
           add(TrackSharePackage())
           add(LiveTrackingPackage())
+          add(KeepAwakePackage())
         },
     )
   }

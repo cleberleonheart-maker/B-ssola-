@@ -79,9 +79,12 @@ import {
   loadLockPin,
   saveLockPin,
   clearLockPin,
+  loadKeepAwake,
+  saveKeepAwake,
   type AppMode,
   type DisplayMode,
 } from '../services/preferencesService';
+import { setKeepScreenOn } from '../services/keepAwake';
 import { buildBackup, applyBackup } from '../services/backupService';
 import {
   addDistance,
@@ -257,6 +260,7 @@ const CompassScreen = () => {
   const [activeWpId, setActiveWpId] = useState<string | null>(null);
   const [virtualWpId, setVirtualWpId] = useState<string | null>(null);
   const [voiceGuide, setVoiceGuide] = useState(false);
+  const [keepAwake, setKeepAwake] = useState(false);
   const [arrived, setArrived] = useState(false);
   const arrivedWpRef = useRef<string | null>(null);
   const lastSpokeRef = useRef(0);
@@ -290,7 +294,14 @@ const CompassScreen = () => {
       setVirtualWpId(id);
     });
     loadUseMils().then(setUseMils);
+    loadKeepAwake().then(setKeepAwake);
   }, []);
+
+  // tela sempre acesa: aplica na janela da Activity sempre que o toggle (ou a
+  // preferência carregada no arranque) mudar
+  useEffect(() => {
+    setKeepScreenOn(keepAwake);
+  }, [keepAwake]);
 
   useEffect(() => {
     const refresh = () => {
@@ -342,6 +353,14 @@ const CompassScreen = () => {
     setUseMils(prev => {
       const next = !prev;
       saveUseMils(next).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const toggleKeepAwake = useCallback(() => {
+    setKeepAwake(prev => {
+      const next = !prev;
+      saveKeepAwake(next).catch(() => {});
       return next;
     });
   }, []);
@@ -1376,6 +1395,8 @@ const CompassScreen = () => {
         onToggleVoiceGuide={toggleVoiceGuide}
         mils={useMils}
         onToggleMils={toggleMils}
+        keepAwake={keepAwake}
+        onToggleKeepAwake={toggleKeepAwake}
         onVerifyPin={handleVerifyPin}
         onSetPin={handleSetPin}
         onExportBackup={handleExportBackup}

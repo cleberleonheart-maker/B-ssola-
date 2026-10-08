@@ -32,6 +32,8 @@ type Props = {
   onToggleSound: () => void;
   mils: boolean;
   onToggleMils: () => void;
+  keepAwake: boolean;
+  onToggleKeepAwake: () => void;
   onOpenWaypoints: () => void;
   onShareLocation: () => void;
   arStatus: { supported: boolean; label: string };
@@ -57,6 +59,8 @@ const CompassSection = (props: Props) => {
     onToggleSound,
     mils,
     onToggleMils,
+    keepAwake,
+    onToggleKeepAwake,
     onOpenWaypoints,
     onShareLocation,
     arStatus,
@@ -163,6 +167,15 @@ const CompassSection = (props: Props) => {
           sub={t('set_mils_sub')}
           on={mils}
           onPress={onToggleMils}
+        />
+
+        <SwitchRow
+          divider
+          icon="💡"
+          label={t('set_keep_awake_title')}
+          sub={keepAwake ? t('set_keep_awake_on') : t('set_keep_awake_sub')}
+          on={keepAwake}
+          onPress={onToggleKeepAwake}
         />
 
         <ChevronRow

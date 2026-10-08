@@ -33,6 +33,7 @@ const VIRTUAL_WP_KEY = '@bussola/virtualWp';
 const USE_MILS_KEY = '@bussola/useMils';
 const CADENCE_BPM_KEY = '@bussola/cadenceBpm';
 const CADENCE_MODE_KEY = '@bussola/cadenceMode';
+const KEEP_AWAKE_KEY = '@bussola/keepAwake';
 
 export const CADENCE_BPM = { min: 90, max: 160, step: 5, fallback: 120 } as const;
 
@@ -196,6 +197,18 @@ export const loadUseMils = async (): Promise<boolean> => {
 
 export const saveUseMils = async (enabled: boolean) => {
   await AsyncStorage.setItem(USE_MILS_KEY, enabled ? '1' : '0');
+};
+
+export const loadKeepAwake = async (): Promise<boolean> => {
+  try {
+    return (await AsyncStorage.getItem(KEEP_AWAKE_KEY)) === '1';
+  } catch {
+    return false;
+  }
+};
+
+export const saveKeepAwake = async (enabled: boolean) => {
+  await AsyncStorage.setItem(KEEP_AWAKE_KEY, enabled ? '1' : '0');
 };
 
 const LIVE_DURATION_KEY = '@bussola/liveDuration';
