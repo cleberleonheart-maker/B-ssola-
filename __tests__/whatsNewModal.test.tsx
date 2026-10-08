@@ -80,17 +80,12 @@ describe('WhatsNewModal', () => {
     const r = await render(null);
     expect(r.root.findAllByType(Modal)).toHaveLength(1);
     // As novidades do build atual aparecem todas.
-    expect(texts(r)).toContain(t('wn_leveldeg_title'));
-    expect(texts(r)).toContain(t('wn_solartheme_title'));
-    expect(texts(r)).toContain(t('wn_cadence_title'));
-    expect(texts(r)).toContain(t('wn_arelev_title'));
-    expect(texts(r)).toContain(t('wn_emfdir_title'));
-    expect(texts(r)).toContain(t('wn_emffreeze_title'));
+    expect(texts(r)).toContain(t('wn_cadencestep_title'));
   });
 
   it('sem última versão vista, mostra só a atual e sem cabeçalho de build', async () => {
     const shown = texts(await render(null));
-    expect(shown).toContain(t('wn_leveldeg_title'));
+    expect(shown).toContain(t('wn_cadencestep_title'));
     expect(shown).toContain(t('wn_title', { version: APP_VERSION }));
     expect(shown).not.toContain(t('wn_build_label', { code: CURRENT }));
   });
@@ -129,7 +124,7 @@ describe('WhatsNewModal', () => {
 
   it('a mesma versão vista não abre o modal com nada de novo', async () => {
     const shown = texts(await render(CURRENT));
-    expect(shown).toContain(t('wn_leveldeg_title'));
+    expect(shown).toContain(t('wn_cadencestep_title'));
     expect(shown).not.toContain(t('wn_title_since', { code: CURRENT }));
   });
 

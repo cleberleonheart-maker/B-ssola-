@@ -32,8 +32,13 @@ const WIND_CAL_KEY = '@bussola/windCal';
 const VIRTUAL_WP_KEY = '@bussola/virtualWp';
 const USE_MILS_KEY = '@bussola/useMils';
 const CADENCE_BPM_KEY = '@bussola/cadenceBpm';
+const CADENCE_MODE_KEY = '@bussola/cadenceMode';
 
 export const CADENCE_BPM = { min: 90, max: 160, step: 5, fallback: 120 } as const;
+
+export type CadenceMode = 'timer' | 'step';
+
+export const CADENCE_MODE = { fallback: 'timer' } as const;
 
 export const clampBpm = (value: number) =>
   Math.min(
@@ -119,6 +124,19 @@ export const loadCadenceBpm = async (): Promise<number> => {
 
 export const saveCadenceBpm = async (bpm: number) => {
   await AsyncStorage.setItem(CADENCE_BPM_KEY, String(clampBpm(bpm)));
+};
+
+export const loadCadenceMode = async (): Promise<CadenceMode> => {
+  try {
+    const raw = await AsyncStorage.getItem(CADENCE_MODE_KEY);
+    return raw === 'step' || raw === 'timer' ? raw : CADENCE_MODE.fallback;
+  } catch {
+    return CADENCE_MODE.fallback;
+  }
+};
+
+export const saveCadenceMode = async (mode: CadenceMode) => {
+  await AsyncStorage.setItem(CADENCE_MODE_KEY, mode);
 };
 
 export const loadVoiceGuide = async (): Promise<boolean> => {

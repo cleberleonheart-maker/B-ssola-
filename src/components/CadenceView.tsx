@@ -1,5 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Vibration } from 'react-native';
+import {
+  accelerometer,
+  setUpdateIntervalForType,
+  SensorTypes,
+} from 'react-native-sensors';
 import { useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
@@ -10,7 +15,11 @@ import {
   clampBpm,
   loadCadenceBpm,
   saveCadenceBpm,
+  loadCadenceMode,
+  saveCadenceMode,
+  type CadenceMode,
 } from '../services/preferencesService';
+import { createStepDetector } from '../utils/stepDetector';
 
 const BPM_MIN = CADENCE_BPM.min;
 const BPM_MAX = CADENCE_BPM.max;
@@ -22,16 +31,25 @@ const TICK_FREQ = 1200;
 const TICK_MS = 40;
 const VIBRATE_MS = 20;
 const FLASH_MS = 130;
+// amostras a 50 Hz para apanhar a passada; volta ao ritmo habitual ao sair
+const STEP_SAMPLE_MS = 20;
+const SENSOR_DEFAULT_RATE = 200;
 
-const CadenceView = () => {
+type Props = {
+  active?: boolean;
+};
+
+const CadenceView = ({ active = false }: Props) => {
   const colors = useThemeColors();
   const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [bpm, setBpm] = useState<number>(BPM_DEFAULT);
+  const [mode, setMode] = useState<CadenceMode>('timer');
   const [running, setRunning] = useState(false);
   const [count, setCount] = useState(0);
   const [flash, setFlash] = useState(false);
+  const [error, setError] = useState(false);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -39,6 +57,18 @@ const CadenceView = () => {
     loadCadenceBpm()
       .then(saved => {
         if (mounted) setBpm(saved);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    loadCadenceMode()
+      .then(saved => {
+        if (mounted) setMode(saved);
       })
       .catch(() => {});
     return () => {
@@ -59,14 +89,35 @@ const CadenceView = () => {
 
   useEffect(() => {
     if (!running) return;
-    tick();
-  }, [running, tick]);
+    if (mode === 'timer') tick();
+  }, [running, mode, tick]);
 
   useEffect(() => {
-    if (!running) return;
-    const id = setInterval(tick, Math.round(60000 / bpm));
-    return () => clearInterval(id);
-  }, [running, bpm, tick]);
+    if (mode === 'timer' && running) {
+      const id = setInterval(tick, Math.round(60000 / bpm));
+      return () => clearInterval(id);
+    }
+  }, [running, bpm, mode, tick]);
+
+  // modo "no seu passo": o bipe segue a passada real, lida pelo acelerómetro
+  useEffect(() => {
+    if (!active || !running || mode !== 'step') return;
+    setUpdateIntervalForType(SensorTypes.accelerometer, STEP_SAMPLE_MS);
+    const detector = createStepDetector();
+    const sub = accelerometer.subscribe({
+      next: ({ x, y, z }) => {
+        if (detector.push(Date.now(), x, y, z)) tick();
+      },
+      error: () => {
+        setError(true);
+        setRunning(false);
+      },
+    });
+    return () => {
+      sub.unsubscribe();
+      setUpdateIntervalForType(SensorTypes.accelerometer, SENSOR_DEFAULT_RATE);
+    };
+  }, [active, running, mode, tick]);
 
   useEffect(
     () => () => {
@@ -81,10 +132,20 @@ const CadenceView = () => {
     saveCadenceBpm(value).catch(() => {});
   }, []);
 
+  const changeMode = useCallback((next: CadenceMode) => {
+    setMode(next);
+    setRunning(false);
+    setError(false);
+    saveCadenceMode(next).catch(() => {});
+  }, []);
+
   const toggle = useCallback(() => {
     // a contagem acumula: parar e voltar a andar não perde o que já foi
     // caminhado (só sair do modo dá sessão nova)
-    setRunning(prev => !prev);
+    setRunning(prev => {
+      if (!prev) setError(false);
+      return !prev;
+    });
   }, []);
 
   return (
@@ -112,52 +173,97 @@ const CadenceView = () => {
         />
       </View>
 
-      <View style={styles.bpmRow}>
+      <View style={styles.modeRow}>
         <Pressable
-          onPress={() => changeBpm(bpm - BPM_STEP)}
-          disabled={bpm <= BPM_MIN}
-          hitSlop={8}
+          onPress={() => changeMode('timer')}
           style={[
-            styles.stepButton,
+            styles.modeChip,
             {
-              borderColor: bpm <= BPM_MIN ? colors.border : colors.primary,
+              borderColor: mode === 'timer' ? colors.primary : colors.border,
+              backgroundColor:
+                mode === 'timer' ? colors.surfaceAlt : 'transparent',
             },
           ]}>
           <Text
             style={[
-              styles.stepButtonText,
-              { color: bpm <= BPM_MIN ? colors.textMuted : colors.primary },
+              styles.modeText,
+              {
+                color: mode === 'timer' ? colors.primary : colors.textMuted,
+              },
             ]}>
-            −
+            {t('cad_mode_timer')}
           </Text>
         </Pressable>
-
-        <View style={styles.bpmBlock}>
-          <Text style={[styles.bpmValue, { color: colors.text }]}>{bpm}</Text>
-          <Text style={[styles.bpmUnit, { color: colors.textMuted }]}>
-            {t('cad_unit')}
-          </Text>
-        </View>
-
         <Pressable
-          onPress={() => changeBpm(bpm + BPM_STEP)}
-          disabled={bpm >= BPM_MAX}
-          hitSlop={8}
+          onPress={() => changeMode('step')}
           style={[
-            styles.stepButton,
+            styles.modeChip,
             {
-              borderColor: bpm >= BPM_MAX ? colors.border : colors.primary,
+              borderColor: mode === 'step' ? colors.primary : colors.border,
+              backgroundColor:
+                mode === 'step' ? colors.surfaceAlt : 'transparent',
             },
           ]}>
           <Text
             style={[
-              styles.stepButtonText,
-              { color: bpm >= BPM_MAX ? colors.textMuted : colors.primary },
+              styles.modeText,
+              {
+                color: mode === 'step' ? colors.primary : colors.textMuted,
+              },
             ]}>
-            +
+            {t('cad_mode_step')}
           </Text>
         </Pressable>
       </View>
+
+      {mode === 'timer' ? (
+        <View style={styles.bpmRow}>
+          <Pressable
+            onPress={() => changeBpm(bpm - BPM_STEP)}
+            disabled={bpm <= BPM_MIN}
+            hitSlop={8}
+            style={[
+              styles.stepButton,
+              {
+                borderColor: bpm <= BPM_MIN ? colors.border : colors.primary,
+              },
+            ]}>
+            <Text
+              style={[
+                styles.stepButtonText,
+                { color: bpm <= BPM_MIN ? colors.textMuted : colors.primary },
+              ]}>
+              −
+            </Text>
+          </Pressable>
+
+          <View style={styles.bpmBlock}>
+            <Text style={[styles.bpmValue, { color: colors.text }]}>{bpm}</Text>
+            <Text style={[styles.bpmUnit, { color: colors.textMuted }]}>
+              {t('cad_unit')}
+            </Text>
+          </View>
+
+          <Pressable
+            onPress={() => changeBpm(bpm + BPM_STEP)}
+            disabled={bpm >= BPM_MAX}
+            hitSlop={8}
+            style={[
+              styles.stepButton,
+              {
+                borderColor: bpm >= BPM_MAX ? colors.border : colors.primary,
+              },
+            ]}>
+            <Text
+              style={[
+                styles.stepButtonText,
+                { color: bpm >= BPM_MAX ? colors.textMuted : colors.primary },
+              ]}>
+              +
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <Pressable
         onPress={toggle}
@@ -180,9 +286,15 @@ const CadenceView = () => {
       <Text style={[styles.count, { color: colors.text }]}>
         {t('cad_count', { n: String(count) })}
       </Text>
-      <Text style={[styles.hint, { color: colors.textMuted }]}>
-        {t('cad_hint')}
-      </Text>
+      {error ? (
+        <Text style={[styles.error, { color: colors.danger }]}>
+          {t('cad_sensor_error')}
+        </Text>
+      ) : (
+        <Text style={[styles.hint, { color: colors.textMuted }]}>
+          {mode === 'timer' ? t('cad_hint') : t('cad_hint_step')}
+        </Text>
+      )}
     </View>
   );
 };
@@ -200,27 +312,43 @@ const createStyles = (_colors: ColorScheme) =>
       fontWeight: '800',
       textTransform: 'uppercase',
       letterSpacing: 1,
-      marginBottom: spacing.lg,
+      marginBottom: spacing.md,
       textAlign: 'center',
     },
     pulseWrap: {
-      width: 120,
-      height: 120,
-      borderRadius: 60,
+      width: 90,
+      height: 90,
+      borderRadius: 45,
       borderWidth: 3,
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: spacing.lg,
     },
     pulse: {
-      width: 74,
-      height: 74,
-      borderRadius: 37,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+    },
+    modeRow: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginBottom: spacing.lg,
+    },
+    modeChip: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      borderRadius: radius.full,
+      borderWidth: 2,
+    },
+    modeText: {
+      fontSize: 14,
+      fontWeight: '800',
     },
     bpmRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.lg,
+      marginBottom: spacing.lg,
     },
     stepButton: {
       width: 46,
@@ -252,7 +380,6 @@ const createStyles = (_colors: ColorScheme) =>
       letterSpacing: 1,
     },
     startButton: {
-      marginTop: spacing.lg,
       paddingHorizontal: spacing.xl,
       paddingVertical: spacing.md,
       borderRadius: radius.full,
@@ -270,7 +397,14 @@ const createStyles = (_colors: ColorScheme) =>
       fontVariant: ['tabular-nums'],
     },
     hint: {
-      marginTop: spacing.lg,
+      marginTop: spacing.md,
+      fontSize: 12,
+      textAlign: 'center',
+      lineHeight: 18,
+      maxWidth: 320,
+    },
+    error: {
+      marginTop: spacing.md,
       fontSize: 12,
       textAlign: 'center',
       lineHeight: 18,

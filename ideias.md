@@ -163,11 +163,16 @@
 - [x] **24. Rastreio ao vivo por link** — ✅ feito na v7.19 (30 min, expira sozinho).
 - [ ] **25. Foto com rumo** — na caderneta, guardar junto da foto a direção da bússola
       apontada no momento.
-- [x] **26. Metrônomo de passo** — ✅ feito: novo modo 👣 Cadência. Bipe agudo
-      (1,2 kHz) + vibração por pulso, com BPM ajustável em −/+ de 5 entre 90 e
-      160 (default 120, persistido em `@bussola/cadenceBpm`), contagem de
-      passos e pulso visual sincronizado. Pausar não perde a contagem; sair do
-      modo reinicia. "Kefera, abre o metrônomo" reconhece o modo.
+- [x] **26. Metrônomo de passo** — ✅ feito nos modos 👣 Cadência. Bipe agudo
+      (1,2 kHz) + vibração por pulso. Dois gatilhos:
+      - ⏱️ **No tempo**: BPM ajustável em −/+ de 5 entre 90 e 160 (default 120,
+        persistido em `@bussola/cadenceBpm`), contagem de passos e pulso visual
+        sincronizado.
+      - 🦶 **No seu passo** (v7.35): o acelerômetro sente o impacto real do pé
+        no chão e o bipe acompanha a caminhada; contagem de passos reais
+        (modo persistido em `@bussola/cadenceMode`).
+      Pausar não perde a contagem; sair do modo reinicia. "Kefera, abre o
+      metrônomo" reconhece o modo.
 - [ ] **27. Triangulação offline por rumos** — estimar a posição mirando 2 marcos
       conhecidos, sem GPS.
 

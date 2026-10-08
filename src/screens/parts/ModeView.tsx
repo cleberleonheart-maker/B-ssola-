@@ -263,7 +263,7 @@ const ModeView = (props: Props) => {
         </View>
       ) : displayMode === 'cadence' ? (
         <View style={styles.arArea}>
-          <CadenceView />
+          <CadenceView active />
         </View>
       ) : displayMode === 'selftest' ? (
         <SensorSelfTestView
