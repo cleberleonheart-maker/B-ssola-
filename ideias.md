@@ -1086,7 +1086,7 @@ a nota de cada uma diz o que a distingue da ideia vizinha.
       resposta ao problema que o repositório tem mesmo: cada execução do
       `verificar-crashes.mjs` e cada aparelho novo criam uma conta anónima, e a
       única forma de a tirar era o Table Editor.
-- [ ] **102. 🔗 Anónimo com conta real** — o `ensureCloudUser` cria uma
+- [x] **102. 🔗 Anónimo com conta real** — feito (v7.42). O `ensureCloudUser` cria uma
       sessão anónima e é o único caminho: perder o telemóvel é perder a nuvem
       toda (notas, trilhas, memória da assistente), porque o `auth.uid()` novo
       não lê as linhas do antigo. Um email com link mágico (o Supabase já
@@ -1097,6 +1097,22 @@ a nota de cada uma diz o que a distingue da ideia vizinha.
       de o fazer — é trabalho para uma função com `security definer` ou para o
       `service_role`, com o risco que isso traz. Fica a ideia com o travão à
       vista.
+      **A metade difícil caiu sozinha**: o Supabase converte o anónimo com o
+      `updateUser({ email })` sobre a sessão anónima — o GoTrue manda um link de
+      confirmação e, ao ser clicado, associa a identidade do email **ao mesmo
+      `auth.uid()`**. As linhas não mudam de dono, a RLS não é contornada, e não
+      há `security definer` nem `service_role` para migrar nada. No ecrã
+      (Configurações → Conta), uma linha mostra o que a conta é agora — anónima,
+      ou o email confirmado — e "Ligar a um email" abre o pedido que chama o
+      `linkEmail` (sessão assegurada, endereço limpo e em minúsculas, e o motivo
+      do GoTrue quando recusa). O campo de senha é opcional: vazio, volta-se a
+      entrar pelo link/OTP do email; preenchido, o `updateUser({ email, password })`
+      grava também `signInWithPassword` para entrar de qualquer aparelho — sempre
+      no mesmo `auth.uid()`. **Exige uma vez**, fora do SQL, que o projecto
+      tenha `enable_manual_linking` ligado (Dashboard do Supabase → Authentication,
+      ou `PATCH /v1/projects/{ref}/config/auth` pela Management API); com ele
+      desligado, o GoTrue responde "manual linking is disabled" e o motivo chega
+      ao ecrã.
 - [ ] **103. 🔋 Quem vê o link precisa de saber que a bateria vai** — com o
       rastreio ativo, o telemóvel a morrer de bateria dá o mesmo que um
       aparelho desligado: `● SEM SINAL` para sempre, sem explicação. As

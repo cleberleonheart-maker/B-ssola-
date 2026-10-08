@@ -715,3 +715,162 @@ describe('apagar a conta pede a RPC e desliga a sessão (#101)', () => {
     expect(cloud.takeCloudError()).toContain('conta');
   });
 });
+
+/**
+ * Ligar a conta anónima a um email (ideia #102).
+ *
+ * O Supabase converte o utilizador anónimo em permanente com `updateUser` e
+ * MANTER o mesmo id — não há migração de linhas a fazer. O que se verifica
+ * aqui é que o `linkEmail` garante uma sessão, limpa e normaliza o email antes
+ * de o pedir, envia a senha com o email quando ela existe (e recusa-a se vier
+ * curta demais), e que só um pedido aceite conta como sucesso; e que o
+ * `currentAccountStatus` lê a identidade do `getUser` sem mexer na sessão.
+ */
+const carregarParaLigacao = (utilizador: {
+  email?: string | null;
+  email_confirmed_at?: string | null;
+  is_anonymous?: boolean;
+} = {}) => {
+  const updateUser = jest.fn().mockResolvedValue({ data: null, error: null });
+  const getUser = jest.fn().mockResolvedValue({
+    data: {
+      user: {
+        id: 'user-1',
+        email: utilizador.email ?? null,
+        email_confirmed_at: utilizador.email_confirmed_at ?? null,
+        is_anonymous: utilizador.is_anonymous,
+      },
+    },
+    error: null,
+  });
+  const getSession = jest.fn().mockResolvedValue({ data: { session: null }, error: null });
+  const signInAnonymously = jest
+    .fn()
+    .mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
+  jest.doMock('@react-native-async-storage/async-storage', () => ({}));
+  jest.doMock('@supabase/supabase-js', () => ({
+    createClient: jest.fn(() => ({
+      auth: { getSession, signInAnonymously, getUser, updateUser },
+    })),
+  }));
+  let cloud!: typeof import('../src/services/cloud');
+  jest.isolateModules(() => {
+    cloud = jest.requireActual('../src/services/cloud') as typeof import('../src/services/cloud');
+  });
+  const pôrResultado = (error: { message: string } | null) => {
+    updateUser.mockResolvedValue({ data: null, error });
+  };
+  return { cloud, updateUser, getSession, signInAnonymously, getUser, pôrResultado };
+};
+
+describe('ligar a conta a um email (#102)', () => {
+  beforeEach(() => jest.resetModules());
+  afterEach(() => {
+    jest.dontMock('@react-native-async-storage/async-storage');
+    jest.dontMock('@supabase/supabase-js');
+    jest.resetModules();
+  });
+
+  it('liga, com sessão anónima assegurada e o email limpo', async () => {
+    const { cloud, updateUser, signInAnonymously } = carregarParaLigacao();
+
+    await expect(cloud.linkEmail('  Pessoa@Exemplo.com  ')).resolves.toBe(true);
+
+    // O utilizador vinha sem sessão: o `updateUser` só faz sentido ao pé de uma.
+    expect(signInAnonymously).toHaveBeenCalledTimes(1);
+    expect(updateUser).toHaveBeenCalledWith({ email: 'pessoa@exemplo.com' });
+  });
+
+  it('com senha, liga o email e grava o login na mesma chamada', async () => {
+    const { cloud, updateUser } = carregarParaLigacao();
+
+    await expect(
+      cloud.linkEmail('pessoa@exemplo.com', 'minha-senha-segura'),
+    ).resolves.toBe(true);
+
+    expect(updateUser).toHaveBeenCalledWith({
+      email: 'pessoa@exemplo.com',
+      password: 'minha-senha-segura',
+    });
+  });
+
+  it('senha curta demais não é enviada', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { cloud, updateUser } = carregarParaLigacao();
+
+      await expect(cloud.linkEmail('pessoa@exemplo.com', '123')).resolves.toBe(false);
+      expect(updateUser).not.toHaveBeenCalled();
+      expect(cloud.takeCloudError()).toContain('senha muito curta');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('recusado pelo Supabase não liga e o motivo chega ao ecrã', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { cloud, updateUser, pôrResultado } = carregarParaLigacao();
+      pôrResultado({ message: 'Manual linking is disabled' });
+
+      await expect(cloud.linkEmail('pessoa@exemplo.com')).resolves.toBe(false);
+      expect(updateUser).toHaveBeenCalledWith({ email: 'pessoa@exemplo.com' });
+      expect(cloud.takeCloudError()).toContain('Manual linking is disabled');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('email mal formado não é enviado', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { cloud, updateUser } = carregarParaLigacao();
+
+      await expect(cloud.linkEmail('nao-e-um-email')).resolves.toBe(false);
+      expect(updateUser).not.toHaveBeenCalled();
+      expect(cloud.takeCloudError()).toContain('email invalido');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('o estado diz anónimo enquanto não há email', async () => {
+    const { cloud } = carregarParaLigacao({ is_anonymous: true });
+
+    await expect(cloud.currentAccountStatus()).resolves.toEqual({
+      email: null,
+      confirmed: false,
+      anonymous: true,
+    });
+  });
+
+  it('o estado diz o email confirmado quando já não é anónimo', async () => {
+    const { cloud } = carregarParaLigacao({
+      email: 'pessoa@exemplo.com',
+      email_confirmed_at: '2026-10-08T12:00:00.000Z',
+      is_anonymous: false,
+    });
+
+    await expect(cloud.currentAccountStatus()).resolves.toEqual({
+      email: 'pessoa@exemplo.com',
+      confirmed: true,
+      anonymous: false,
+    });
+  });
+
+  it('sem cliente, ligar devolve false e o estado devolve null', async () => {
+    jest.doMock('@react-native-async-storage/async-storage', () => ({}));
+    jest.doMock('@supabase/supabase-js', () => ({
+      createClient: jest.fn(() => {
+        throw new Error('Invalid supabaseUrl');
+      }),
+    }));
+    let cloud!: typeof import('../src/services/cloud');
+    jest.isolateModules(() => {
+      cloud = jest.requireActual('../src/services/cloud') as typeof import('../src/services/cloud');
+    });
+
+    await expect(cloud.linkEmail('pessoa@exemplo.com')).resolves.toBe(false);
+    await expect(cloud.currentAccountStatus()).resolves.toBeNull();
+  });
+});

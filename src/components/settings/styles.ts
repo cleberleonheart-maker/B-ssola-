@@ -306,6 +306,21 @@ importActions: {
   justifyContent: 'flex-end',
   marginTop: spacing.sm,
 },
+linkInput: {
+  width: '100%',
+  height: 48,
+  borderWidth: 1,
+  borderRadius: radius.md,
+  paddingHorizontal: spacing.md,
+  fontSize: 15,
+  marginTop: spacing.sm,
+},
+linkFieldLabel: {
+  fontSize: 12,
+  fontWeight: '700',
+  marginTop: spacing.md,
+  marginBottom: spacing.xs,
+},
 restoreButton: {
   paddingHorizontal: spacing.lg,
   paddingVertical: spacing.sm,

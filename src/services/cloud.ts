@@ -274,6 +274,89 @@ export const deleteMyAccount = async (): Promise<boolean> => {
   }
 };
 
+export type AccountStatus = {
+  email: string | null;
+  confirmed: boolean;
+  anonymous: boolean;
+};
+
+/**
+ * O estado identidade da conta actual (ideia #102).
+ *
+ * O `ensureCloudUser` devolve o id e nada mais, e para a secção "Conta" isto
+ * não basta — quer saber se a conta ainda é anónima (presa ao aparelho) ou se
+ * já tem email confirmado (sobrevive ao aparelho). Lê-se do `getUser` e não da
+ * sessão, para quem entrou sem `ensureCloudUser` ver a mesma coisa.
+ */
+export const currentAccountStatus = async (): Promise<AccountStatus | null> => {
+  if (!client) return null;
+  try {
+    const { data, error } = await withTimeout(client.auth.getUser(), 15000);
+    if (error || !data.user) return null;
+    const user = data.user;
+    return {
+      email: user.email ?? null,
+      confirmed: Boolean(user.email_confirmed_at),
+      anonymous: user.is_anonymous === true,
+    };
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Liga a conta anónima a um email (ideia #102).
+ *
+ * O caminho é o `updateUser({ email })` do Supabase com a sessão anónima
+ * activa: o GoTrue envia um link de confirmação e, ao ser clicado, associa a
+ * identidade do email **ao mesmo utilizador** — o `auth.uid()` não muda, e por
+ * isso as linhas de notas, trilhas, memória e partilhas continuam a ser as
+ * mesmas. Não há migração de dados a fazer nem `security definer` a temer: é
+ * exactamente o contrário da ideia #102 escrita antes de o Supabase converter
+ * anónimos sem trocar o id.
+ *
+ * `password` é opcional e decide como se volta a entrar depois. Sem senha,
+ * entra-se pelo link/OTP do email; com senha, `updateUser` grava também as
+ * credenciais `signInWithPassword` para entrar de qualquer aparelho — sempre no
+ * mesmo `auth.uid()`.
+ *
+ * Requer "manual linking" ligado no projecto (uma vez, no dashboard). Se
+ * estiver desligado, o erro do GoTrue diz exactamente isso e chega ao ecrã.
+ */
+export const linkEmail = async (email: string, password?: string): Promise<boolean> => {
+  if (!client) {
+    noteCloudError('conta', clientError ?? 'Supabase nao configurado');
+    return false;
+  }
+  const emailLimpo = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailLimpo)) {
+    noteCloudError('conta', 'email invalido');
+    return false;
+  }
+  if (password !== undefined && password.length < 6) {
+    noteCloudError('conta', 'senha muito curta');
+    return false;
+  }
+  try {
+    const userId = await ensureCloudUser();
+    if (!userId) return false;
+    const { error } = await withTimeout(
+      client.auth.updateUser(
+        password ? { email: emailLimpo, password } : { email: emailLimpo },
+      ),
+      15000,
+    );
+    if (error) {
+      noteCloudError('conta', error.message);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    noteCloudError('conta', error);
+    return false;
+  }
+};
+
 export const fetchCloudMemory = async (
   userId: string,
 ): Promise<CloudMemoryRow | null> => {

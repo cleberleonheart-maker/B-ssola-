@@ -1,3 +1,3 @@
 // gerado automaticamente a cada build
-export const APP_VERSION_CODE = 172;
-export const APP_VERSION = 'v7.41';
+export const APP_VERSION_CODE = 173;
+export const APP_VERSION = 'v7.42';

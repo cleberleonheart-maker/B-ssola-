@@ -244,6 +244,35 @@ O `verificar-nuvem.sh --strict` passou a sondar a própria RPC (sem header de
 sessão, devolve `false` sem efeitos) para a ausência dela falhar o workflow no
 push e não quando um utilizador quiser sair.
 
+### Ligar a conta anónima a um email (#102)
+
+Desde a v7.42, a secção "Conta" de Configurações permite ligar a conta anónima
+a um email. O caminho é o `updateUser({ email })` do Supabase com a sessão
+anónima activa: o GoTrue envia um link de confirmação e, ao ser clicado,
+associa a identidade do email **ao mesmo `auth.uid()`**. O id não muda, e por
+isso as linhas de `tracks`, `notes`, `virgin_memory`, `crashes`, `live_points`
+e `live_shares` continuam a ser as mesmas — a migração de `user_id` que o texto
+da ideia temia (e o `security definer` que isso pedia) não chegou a ser
+preciso.
+
+**Requisto único, uma vez, fora do SQL**: o projecto precisa de ter
+`enable_manual_linking` ligado. Não é possível aplicar por `publicar-sql.sh`
+(é configuração do GoTrue, não schema). Liga-se no Dashboard do Supabase
+(Authentication) ou pela Management API com
+`PATCH /v1/projects/{ref}/config/auth` e `enable_manual_linking: true`. Com ele
+desligado, o `linkEmail` devolve falso e o motivo ("manual linking is
+disabled") aparece no próprio pedido — não há sonda no CI para isto porque
+testá-lo mandaria um email de confirmação real a cada execução.
+
+No ecrã, `AccountSection` mostra o `currentAccountStatus` (lido do `getUser`,
+sem mexer na sessão): anónima ou `Ligada a {email}`, com a confirmação pendente
+visível enquanto o link da caixa de entrada não for tocado. O `linkEmail`
+garante a sessão antes de pedir, normaliza o endereço (minúsculas e sem
+espaços) e rejeita email mal formado sem tocar no GoTrue. A senha do pedido é
+opcional: vazia, volta-se a entrar pelo link/OTP do email; preenchida (6+), o
+`updateUser({ email, password })` grava também as credenciais de
+`signInWithPassword` — sempre no mesmo `auth.uid()`, sem segunda conta.
+
 ### `./scripts/verificar-crashes.mjs` — o caminho inteiro, sem aparelho
 
 O `verificar-nuvem.sh` confirma que a tabela existe e que o `anon` a consegue
