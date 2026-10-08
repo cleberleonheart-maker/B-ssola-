@@ -257,12 +257,15 @@ preciso.
 
 **Requisto único, uma vez, fora do SQL**: o projecto precisa de ter
 `enable_manual_linking` ligado. Não é possível aplicar por `publicar-sql.sh`
-(é configuração do GoTrue, não schema). Liga-se no Dashboard do Supabase
-(Authentication) ou pela Management API com
-`PATCH /v1/projects/{ref}/config/auth` e `enable_manual_linking: true`. Com ele
-desligado, o `linkEmail` devolve falso e o motivo ("manual linking is
-disabled") aparece no próprio pedido — não há sonda no CI para isto porque
-testá-lo mandaria um email de confirmação real a cada execução.
+(é configuração do GoTrue, não schema). Tenta-se sozinho: desde o commit do
+workflow, o `verificar-nuvem.yml` corre `scripts/garantir-manual-linking.sh`,
+que lê `config/auth` pela Management API e, se o campo vier desligado, faz um
+`PATCH` para o ligar (idempotente, sem efeitos em cada push seguinte). Se o
+token do CI não tiver escopo para `config/auth`, o script avisa com
+`::warning::` e sai a zero — e então liga-se à mão no Dashboard do Supabase
+(Authentication). Com ele desligado, o `linkEmail` devolve falso e o motivo
+("manual linking is disabled") aparece no próprio pedido — não há sonda no CI
+para isto porque testá-lo mandaria um email de confirmação real a cada execução.
 
 No ecrã, `AccountSection` mostra o `currentAccountStatus` (lido do `getUser`,
 sem mexer na sessão): anónima ou `Ligada a {email}`, com a confirmação pendente

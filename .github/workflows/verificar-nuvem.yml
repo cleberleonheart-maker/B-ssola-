@@ -106,6 +106,17 @@ jobs:
             scripts/crashes.sql \
             scripts/account_delete.sql
 
+      - name: Liga o manual linking no projecto (#102)
+        # Nao e schema e nao passa pelo publicar-sql.sh: e configuracao do
+        # GoTrue (enable_manual_linking), lema e liga pela Management API. O
+        # script sai sempre a zero -- avisa (::warning::) se o token nao tiver
+        # escopo para config/auth, porque sem ele isto fica um passo do painel.
+        if: ${{ env.SUPABASE_ACCESS_TOKEN != '' }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+        run: ./scripts/garantir-manual-linking.sh
+
       - name: Confirma que a aplicacao chegou a buen fim
         if: ${{ env.SUPABASE_ACCESS_TOKEN != '' }}
         run: ./scripts/verificar-nuvem.sh --strict
