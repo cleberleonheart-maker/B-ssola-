@@ -60,7 +60,8 @@ describe('POIs de trilha', () => {
   });
 
   it('aceita trilhas antigas sem o campo pois (nil → lista vazia)', async () => {
-    const { pois: _legacyPois, ...legacy } = makeTrack();
+    const legacy: Partial<RecordedTrack> = { ...makeTrack() };
+    delete legacy.pois;
     await saveTrack(legacy as RecordedTrack);
     const all = await loadTracks();
     expect((all[0].pois ?? []).length).toBe(0);
