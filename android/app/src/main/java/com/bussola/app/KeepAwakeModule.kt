@@ -15,11 +15,12 @@ class KeepAwakeModule(private val reactContext: ReactApplicationContext) :
     // Se a activity ainda não existir (app a arrancar), a decisão volta a ser
     // tomada quando o CompassScreen terminar de criar a tela.
     val activity = reactContext.currentActivity ?: return
-    val window = activity.window
-    if (enabled) {
-      window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-    } else {
-      window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    activity.runOnUiThread {
+      if (enabled) {
+        activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+      } else {
+        activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+      }
     }
   }
 }

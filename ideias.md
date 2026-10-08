@@ -122,6 +122,11 @@
       (`KeepAwakeModule`, módulo nativo) enquanto o app está aberto — ideal para
       Bússola/Visão/trilha — e relembra a preferência no arranque
       (`@bussola/keepAwake`).
+      **Corrigido na v7.39 (code 170)**: ligar/desligar chamava `Window.setFlags`
+      na thread do JavaScript, e o Android mata a app com
+      `ViewRootImpl$CalledFromWrongThreadException` (`KeepAwakeModule.setEnabled`).
+      Passou a correr em `activity.runOnUiThread`, que é a única thread com
+      permissão para mexer na janela.
 
 ## Ideias novas (23/09/2026)
 - [ ] **17. AR sobre a câmera real** — marcar sol/lua/destino com o fundo da câmera
