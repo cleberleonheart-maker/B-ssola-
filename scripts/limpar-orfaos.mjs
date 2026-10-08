@@ -96,6 +96,16 @@ const ok = [];
 const falhas = [];
 const agora = Date.now();
 
+// O PostgREST às vezes devolve erro sem `code` nem `message` (resposta que não
+// é JSON, por exemplo). Imprimir `error.message` só daria uma linha vazia a
+// apontar para nada, e é precisamente numa falha de limpeza que se quer saber
+// o que falhou.
+const descrever = erro => {
+  const texto = [erro?.code, erro?.message].filter(Boolean).join(' — ');
+  const resto = JSON.stringify(erro ?? null);
+  return texto || resto;
+};
+
 for (const { tabela, corte, porquê } of TABELAS) {
   const limite = corte(agora).toISOString();
 
@@ -105,7 +115,7 @@ for (const { tabela, corte, porquê } of TABELAS) {
       .select('id', { count: 'exact', head: true })
       .lt('expires_at', limite);
     if (error) {
-      falhas.push(`${tabela}: a contagem falhou (${error.code ?? error.message})`);
+      falhas.push(`${tabela}: a contagem falhou (${descrever(error)})`);
     } else {
       ok.push(`${tabela}: ${count ?? 0} linhas caducadas por apagar (${porquê})`);
     }
@@ -114,7 +124,7 @@ for (const { tabela, corte, porquê } of TABELAS) {
 
   const { data, error } = await client.from(tabela).delete().lt('expires_at', limite).select('id');
   if (error) {
-    falhas.push(`${tabela}: o DELETE foi recusado (${error.code ?? error.message})`);
+    falhas.push(`${tabela}: o DELETE foi recusado (${descrever(error)})`);
   } else {
     const apagadas = (data ?? []).length;
     ok.push(`${tabela}: ${apagadas} linhas apagadas (${porquê})`);
