@@ -168,9 +168,37 @@ export const projectTrack = (
 };
 
 /**
+ * Um ponto (lat/lon) qualquer numa projeção já calculada. É o que permite
+ * desenhar coisas que não fazem parte da polilinha — POIs — no mesmo mapa e
+ * com a mesma matemática: quem usa isto recebe sempre a mesma coordenada que o
+ * ponto correspondente de um `projectTrack` feito com o mesmo viewport.
+ */
+export const toPixel = (
+  projection: Pick<
+    TrackProjection,
+    'scale' | 'center' | 'metersPerDegreeLat' | 'metersPerDegreeLon'
+  >,
+  viewport: Viewport,
+  lat: number,
+  lon: number,
+): ProjectedPoint | null => {
+  if (projection.center === null || projection.scale <= 0) return null;
+  const originX = viewport.width / 2;
+  const originY = viewport.height / 2;
+  return {
+    x:
+      originX +
+      (lon - projection.center.lon) * projection.metersPerDegreeLon * projection.scale,
+    y:
+      originY -
+      (lat - projection.center.lat) * projection.metersPerDegreeLat * projection.scale,
+  };
+};
+
+/**
  * O mesmo traço, pronto a desenhar com `View` + `transform: rotate`, que é o
  * que o app tem sem dependências nativas. Cada barra é centrada no meio do
- * segmento para o `left`/`top` não sair dois vezes deslocado.
+ * segmento para o `left`/`top` não sair duas vezes deslocado.
  */
 export type Segment = { x: number; y: number; w: number; a: number };
 

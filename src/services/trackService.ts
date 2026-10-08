@@ -8,6 +8,22 @@ export type TrackPoint = {
   ts: number;
 };
 
+/**
+ * Ponto de interesse marcado durante a gravação (no clássico "marcar POI",
+ * com foto e nota). Vive dentro da trilha que o gerou, e quanto às fotos usa a
+ * mesma convenção da caderneta: a câmera do sistema escreve em
+ * `cache/photos/...` e o caminho é o que fica guardado.
+ */
+export type TrackPoi = {
+  id: string;
+  lat: number;
+  lon: number;
+  alt: number | null;
+  ts: number;
+  note: string;
+  photoPath: string | null;
+};
+
 export type TrackStats = {
   distance: number;
   eleGain: number;
@@ -23,6 +39,7 @@ export type RecordedTrack = {
   startedAt: number;
   endedAt: number;
   points: TrackPoint[];
+  pois: TrackPoi[];
 } & TrackStats;
 
 const STORAGE_KEY = '@bussola/tracks';
@@ -76,6 +93,9 @@ export const computeTrackStats = (
 
 export const createTrackId = () =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+export const createPoiId = () =>
+  `poi-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 export const loadTracks = async (): Promise<RecordedTrack[]> => {
   try {

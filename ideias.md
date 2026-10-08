@@ -87,8 +87,11 @@
 ## Ideias novas (por avaliar)
 - ✅ **1. Exportar trilhas em GPX** — ✅ feito em v7.4.
 - ✅ **2. Retorno pela trilha** — ✅ feito em v7.4.
-- [ ] **3. POIs na trilha** — marcar pontos de interesse durante a gravação (foto + nota)
-      que aparecem desenhados sobre o trajeto.
+- [x] **3. POIs na trilha** — ✅ feito na v7.38: durante a gravação, o botão 📍
+      marca o ponto atual com foto (câmera do sistema, mesma da caderneta) e
+      nota opcional; os POIs aparecem desenhados sobre o trajeto na
+      pré-visualização e na trilha salva, e o contador fica gravado no registro
+      (`pois` em `RecordedTrack`, `toPixel` em `trackProjection.ts`).
 - [x] **4. Waypoint por voz** — ✅ feito na v7.17: "marca este ponto como X" salva a
       posição atual sem tirar as mãos do caminho.
 - [x] **5. Odômetro histórico** — ✅ feito na v7.17 (hoje/semana/últimos 7 dias).

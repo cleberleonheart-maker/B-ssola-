@@ -15,21 +15,25 @@ import {
   distanceToTrackPath,
   polylineSegments,
   projectTrack,
+  toPixel,
 } from '../utils/trackProjection';
 import { cardinalOf, formatAzimuth } from '../utils/compass';
 import { serializeTrackToGpx } from '../utils/gpx';
 import { shareTrackGpx } from '../services/trackShare';
 import TargetNavBar from './TargetNavBar';
+import TrackPoiModal from './TrackPoiModal';
 import type { LocationFix } from '../services/locationService';
 import {
   loadTracks,
   saveTrack,
   deleteTrack,
   createTrackId,
+  createPoiId,
   computeTrackStats,
   simplifyPath,
   formatDuration,
   type TrackPoint,
+  type TrackPoi,
   type RecordedTrack,
 } from '../services/trackService';
 import { ensureCloudUser, pushTracks } from '../services/cloud';
@@ -73,8 +77,11 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
   const [saved, setSaved] = useState<RecordedTrack[]>([]);
   const [cloudMsg, setCloudMsg] = useState<string | null>(null);
   const [navId, setNavId] = useState<string | 'live' | null>(null);
+  const [pois, setPois] = useState<TrackPoi[]>([]);
+  const [poiModal, setPoiModal] = useState(false);
 
   const pointsRef = useRef<TrackPoint[]>([]);
+  const poisRef = useRef<TrackPoi[]>([]);
   const lastPtRef = useRef<TrackPoint | null>(null);
   const startedAtRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -106,12 +113,34 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
     pointsRef.current = [first];
     lastPtRef.current = first;
     startedAtRef.current = Date.now();
+    poisRef.current = [];
+    setPois([]);
     setPoints([first]);
     setRecording(true);
     timerRef.current = setInterval(() => {
       setElapsed(Date.now() - startedAtRef.current);
     }, 1000);
   }, [location]);
+
+  const hasFix = location.latitude !== 0 || location.longitude !== 0;
+
+  const addPoi = useCallback(
+    (note: string, photoPath: string | null) => {
+      if (!location || !hasFix) return;
+      const poi: TrackPoi = {
+        id: createPoiId(),
+        lat: location.latitude,
+        lon: location.longitude,
+        alt: location.altitude,
+        ts: Date.now(),
+        note,
+        photoPath,
+      };
+      poisRef.current = [...poisRef.current, poi];
+      setPois(poisRef.current);
+    },
+    [location, hasFix],
+  );
 
   const stop = useCallback(() => {
     if (timerRef.current) {
@@ -136,11 +165,15 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
       startedAt: pts[0].ts,
       endedAt: pts[pts.length - 1].ts,
       points: pts,
+      pois: poisRef.current,
       ...stats,
     };
     saveTrack(track).then(setSaved);
     pointsRef.current = [];
+    poisRef.current = [];
     lastPtRef.current = null;
+    setPoints([]);
+    setPois([]);
     setRecording(false);
     setElapsed(0);
     flushOdometer().catch(() => {});
@@ -152,8 +185,10 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
       timerRef.current = null;
     }
     pointsRef.current = [];
+    poisRef.current = [];
     lastPtRef.current = null;
     setPoints([]);
+    setPois([]);
     setRecording(false);
     setElapsed(0);
   }, []);
@@ -189,25 +224,52 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
 
   const liveStats = useMemo(() => computeTrackStats(points), [points]);
 
-  const hasFix = location.latitude !== 0 || location.longitude !== 0;
-
   const drawPoints = useMemo(() => {
     const pts = points.length > 0 ? points : saved[0]?.points ?? [];
-    if (pts.length === 0) return [] as DrawPoint[];
+    if (pts.length === 0) return { points: [] as DrawPoint[], projection: null };
     const simplified = simplifyPath(pts, 0.00002);
     const maxDraw = 500;
     const step = Math.max(1, Math.ceil(simplified.length / maxDraw));
     const drawn = simplified.filter((_, i) => i % step === 0 || i === simplified.length - 1);
     const projection = projectTrack(drawn, PREVIEW_VIEWPORT);
-    return projection.points.map((q, i) => ({
-      x: q.x,
-      y: q.y,
-      alt: drawn[i].alt,
-    })) as DrawPoint[];
+    return {
+      points: projection.points.map((q, i) => ({
+        x: q.x,
+        y: q.y,
+        alt: drawn[i].alt,
+      })) as DrawPoint[],
+      projection,
+    };
   }, [points, saved]);
 
+  const previewPois = useMemo(
+    () => (points.length > 0 ? pois : saved[0]?.pois ?? []),
+    [points, pois, saved],
+  );
+
+  const poiPixels = useMemo(() => {
+    if (!drawPoints.projection) return [] as { poi: TrackPoi; x: number; y: number }[];
+    const out: { poi: TrackPoi; x: number; y: number }[] = [];
+    for (const poi of previewPois) {
+      const px = toPixel(drawPoints.projection, PREVIEW_VIEWPORT, poi.lat, poi.lon);
+      if (
+        px !== null &&
+        px.x >= 0 &&
+        px.x <= PREVIEW_WIDTH &&
+        px.y >= 0 &&
+        px.y <= PREVIEW_HEIGHT
+      ) {
+        out.push({ poi, x: px.x, y: px.y });
+      }
+    }
+    return out;
+  }, [drawPoints.projection, previewPois]);
+
   const segments = useMemo(
-    () => polylineSegments(drawPoints.map(({ x, y }) => ({ x, y }))),
+    () =>
+      polylineSegments(
+        drawPoints.points.map(({ x, y }) => ({ x, y })),
+      ),
     [drawPoints],
   );
 
@@ -417,14 +479,14 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
                 }}
               />
             ))}
-            {drawPoints.length > 0 && (
+            {drawPoints.points.length > 0 && (
               <>
                 <View
                   style={[
                     styles.dot,
                     {
-                      left: drawPoints[0].x - 4,
-                      top: drawPoints[0].y - 4,
+                      left: drawPoints.points[0].x - 4,
+                      top: drawPoints.points[0].y - 4,
                       backgroundColor: colors.success,
                     },
                   ]}
@@ -433,14 +495,21 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
                   style={[
                     styles.dot,
                     {
-                      left: drawPoints[drawPoints.length - 1].x - 4,
-                      top: drawPoints[drawPoints.length - 1].y - 4,
+                      left: drawPoints.points[drawPoints.points.length - 1].x - 4,
+                      top: drawPoints.points[drawPoints.points.length - 1].y - 4,
                       backgroundColor: colors.north,
                     },
                   ]}
                 />
               </>
             )}
+            {poiPixels.map(({ poi, x, y }) => (
+              <View
+                key={poi.id}
+                style={[styles.poiPin, { left: x - 11, top: y - 18 }]}>
+                <Text style={styles.poiEmoji}>📍</Text>
+              </View>
+            ))}
           </View>
         )}
 
@@ -544,6 +613,21 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
           ) : (
             <>
               <Pressable
+                onPress={() => setPoiModal(true)}
+                disabled={!hasFix}
+                style={[
+                  styles.secondaryButton,
+                  { borderColor: hasFix ? colors.primary : colors.surfaceAlt },
+                ]}>
+                <Text
+                  style={[
+                    styles.secondaryButtonText,
+                    { color: hasFix ? colors.primary : colors.textMuted },
+                  ]}>
+                  📍 {t('poi_mark')}
+                </Text>
+              </Pressable>
+              <Pressable
                 onPress={stop}
                 style={[styles.primaryButton, { backgroundColor: colors.success }]}>
                 <Text style={[styles.primaryButtonText, { color: colors.background }]}>
@@ -577,6 +661,15 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
           )}
         </View>
       </View>
+      <TrackPoiModal
+        visible={poiModal}
+        latitude={location.latitude}
+        longitude={location.longitude}
+        altitude={location.altitude}
+        hasFix={hasFix}
+        onSave={addPoi}
+        onClose={() => setPoiModal(false)}
+      />
 
       {saved.length > 0 && (
         <View style={[styles.savedCard, { borderColor: colors.border }]}>
@@ -595,6 +688,9 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
                 <Text style={[styles.savedMeta, { color: colors.textMuted }]}>
                   {formatDistance(track.distance)} · {formatDuration(track.endedAt - track.startedAt)}{' '}
                   · +{track.eleGain}/-{track.eleLoss} m
+                  {(track.pois ?? []).length > 0
+                    ? ` · 📍 ${track.pois!.length}`
+                    : ''}
                 </Text>
               </View>
               <Pressable
@@ -731,6 +827,12 @@ const createStyles = (colors: {
       width: 8,
       height: 8,
       borderRadius: 4,
+    },
+    poiPin: {
+      position: 'absolute',
+    },
+    poiEmoji: {
+      fontSize: 16,
     },
     controls: {
       flexDirection: 'row',

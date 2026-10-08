@@ -4,6 +4,7 @@ import {
   polylinePath,
   polylineSegments,
   projectTrack,
+  toPixel,
   type GeoPoint,
 } from '../src/utils/trackProjection';
 
@@ -347,5 +348,21 @@ describe('distanceToTrackPath', () => {
       [trail[0]],
     );
     expect(hint!.meters).toBeCloseTo(30, 0);
+  });
+});
+
+describe('toPixel', () => {
+  it('devolve o mesmo pixel do ponto correspondente do trilho', () => {
+    const pts = [offset(LISBOA, 0, 0), offset(LISBOA, 0, 100)];
+    const projection = projectTrack(pts, box);
+    const viaProj = projection.points[1];
+    const viaPixel = toPixel(projection, box, pts[1].lat, pts[1].lon);
+
+    expect(viaPixel!.x).toBeCloseTo(viaProj.x, 6);
+    expect(viaPixel!.y).toBeCloseTo(viaProj.y, 6);
+  });
+
+  it('null sem centro (vazio)', () => {
+    expect(toPixel(projectTrack([], box), box, 0, 0)).toBeNull();
   });
 });
