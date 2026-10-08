@@ -6,6 +6,7 @@ import {
   pushLivePosition,
   pushLivePoint,
   deleteLiveShareRow,
+  markLiveShareStopped,
   deleteExpiredLivePoints,
   noteCloudError,
   takeCloudError,
@@ -87,7 +88,13 @@ export const stopLiveShare = async (token: string): Promise<void> => {
   } catch {}
   try {
     const userId = await ensureCloudUser();
-    if (userId) await deleteLiveShareRow(token, userId);
+    if (!userId) return;
+    // O caminho bom é marcar (#100): a linha fica e o histórico passa a
+    // saber que esta sessão existiu, quando começou e quando acabou. O
+    // DELETE é a reserva — uma sessão que não conseguiu ser marcada não pode
+    // ficar viva a partilhar posição, que é o pior dos dois mundos.
+    const marcada = await markLiveShareStopped(token, userId);
+    if (!marcada) await deleteLiveShareRow(token, userId);
   } catch {}
 };
 

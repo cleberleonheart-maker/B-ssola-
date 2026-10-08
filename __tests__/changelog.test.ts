@@ -13,7 +13,7 @@ import { createTranslator, STRINGS } from '../src/i18n/strings';
 const stringsEn = STRINGS.en;
 
 const t = createTranslator('pt');
-const CURRENT = 170;
+const CURRENT = 171;
 
 const titles = (entries: ChangelogEntry[]) => entries.map(e => e.title);
 

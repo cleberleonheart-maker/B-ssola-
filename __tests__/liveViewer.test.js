@@ -229,6 +229,36 @@ describe('viewer do rastreio ao vivo', () => {
     expect(app.nodes.note.textContent).not.toMatch(/encerrado/i);
   });
 
+  // Parar já não apaga a linha (#100): ela fica com `stopped_at` e a RPC de
+  // posição esconde-a, mas a de status devolve `stopped`. Sem isto, o
+  // sumiço seria indistinguível de um link que ainda está vivo e que a
+  // posição simplesmente ainda não chegou — e a pessoa via "AO VIVO" sobre
+  // uma sessão que já foi parada.
+  it('diz que a pessoa parou quando o status traz stopped antes do prazo', async () => {
+    let positionCalls = 0;
+    const app = boot('#tkn=abc', (url) => {
+      if (String(url).indexOf('get_live_status') >= 0) {
+        return reply([{
+          expires_at: new Date(Date.now() + 600000).toISOString(),
+          updated_at: new Date().toISOString(),
+          expired: false,
+          stopped: true,
+        }]);
+      }
+      positionCalls += 1;
+      return reply(positionCalls === 1 ? [fix()] : []);
+    });
+    await wait(30);
+    expect(app.nodes.liveTag.textContent).toMatch(/AO VIVO/);
+    app.again();
+    await wait(30);
+    expect(app.nodes.note.textContent).toMatch(/encerrado/i);
+    expect(app.nodes.note.textContent).not.toMatch(/expirou/i);
+    expect(app.nodes.liveTag.classList.contains('hidden')).toBe(true);
+    // A última posição ficou: é o que a pessoa que recebeu o link quer ver.
+    expect(app.nodes.coords.textContent).toMatch(/S 23°/);
+  });
+
   it('segue tentando quando a linha continua viva e sem posicao', async () => {
     let positionCalls = 0;
     const app = boot('#tkn=abc', routes({

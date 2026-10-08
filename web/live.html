@@ -300,13 +300,15 @@
       .catch(function (e) { clearTimeout(guard); throw e; });
   }
   // A posição sumiu por dois motivos que o viewer precisa distinguir: a pessoa
-  // parou (a linha foi apagada) ou o prazo venceu (a linha continua lá, e só a
-  // RPC de posição a esconde). Sem perguntar, todo sumiço virava "🛑 encerrado
-  // pela pessoa" — inclusive o caso em que ninguém encostou no botão.
+  // parou (a sessão foi marcada com `stopped_at` e a RPC de posição esconde-a,
+  // #100) ou o prazo venceu (a linha continua lá, e só a RPC de posição a
+  // esconde). Sem perguntar, todo sumiço virava "🛑 encerrado pela pessoa" —
+  // inclusive o caso em que ninguém encostou no botão.
   function resolveEnd() {
     post('get_live_status', { p_token: tkn })
       .then(function (rows) {
         var s = rows && rows.length ? rows[0] : null;
+        if (s && s.stopped) { ended(); return; }
         if (s && s.expired) { expired(); return; }
         if (s) { schedule(POLL_MS); return; }
         ended();

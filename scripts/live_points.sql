@@ -115,6 +115,7 @@ begin
     where p.token = p_token
       and p.id > greatest(coalesce(p_after, 0), 0)
       and s.expires_at > now()
+      and s.stopped_at is null
     order by p.id
     limit 2000;
 end;

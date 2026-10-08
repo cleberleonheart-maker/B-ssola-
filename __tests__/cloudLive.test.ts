@@ -464,3 +464,172 @@ describe('o estado da nuvem em Configurações (#99)', () => {
     }
   });
 });
+
+/**
+ * O histórico de partilhas (#100).
+ *
+ * Parar deixou de apagar a linha — apagá-la era apagar a prova de que a sessão
+ * existiu, e sem ela o "histórico" era uma lista vazia sempre. Agora o Parar
+ * escreve `stopped_at`, e a lista lê os carimbos de tempo sem voltar a pedir
+ * coordenadas: a posição de uma sessão que já acabou não interessa ao ecrã de
+ * Configurações, e o que não se pede não se arrisca a receber.
+ *
+ * O que se verifica aqui é a ordem das escritas e o critério de reserva: só
+ * apagar quando a marca não pegou, nunca por omissão.
+ */
+const carregarParaPartilhas = () => {
+  const chamadas: string[] = [];
+  const actual: { resultado: { data: unknown; error: { message: string } | null } } = {
+    resultado: { data: [], error: null },
+  };
+  const construir = () => {
+    const registar =
+      (nome: string) =>
+      (...args: unknown[]) => {
+        chamadas.push(`${nome}(${args.map(a => JSON.stringify(a)).join(', ')})`);
+        return b;
+      };
+    const b: Record<string, unknown> = {
+      eq: registar('eq'),
+      order: registar('order'),
+      update: registar('update'),
+      delete: registar('delete'),
+      select: registar('select'),
+      limit: registar('limit'),
+    };
+    // O builder do supabase-js e encadeavel *e* esperavel: `await` no fim da
+    // cadeia e o que devolve os dados. Sem o `then`, a promessa resolveria com
+    // o proprio objeto e todo o teste passaria a olhar para `undefined`.
+    b.then = (onOk: unknown, onErr: unknown) =>
+      Promise.resolve(actual.resultado).then(
+        onOk as (v: unknown) => unknown,
+        onErr as (e: unknown) => unknown,
+      );
+    return b;
+  };
+  const from = jest.fn((tabela: string) => {
+    chamadas.push(`from(${JSON.stringify(tabela)})`);
+    return construir();
+  });
+  jest.doMock('@react-native-async-storage/async-storage', () => ({}));
+  jest.doMock('@supabase/supabase-js', () => ({
+    createClient: jest.fn(() => ({
+      auth: { getSession: jest.fn() },
+      from,
+    })),
+  }));
+  let cloud!: typeof import('../src/services/cloud');
+  jest.isolateModules(() => {
+    cloud = jest.requireActual('../src/services/cloud') as typeof import('../src/services/cloud');
+  });
+  const setResultado = (data: unknown, error: { message: string } | null = null) => {
+    actual.resultado = { data, error };
+  };
+  return { cloud, chamadas, setResultado };
+};
+
+describe('parar marca a sessão e só apaga se a marca não pegar (#100)', () => {
+  beforeEach(() => jest.resetModules());
+  afterEach(() => {
+    jest.dontMock('@react-native-async-storage/async-storage');
+    jest.dontMock('@supabase/supabase-js');
+    jest.resetModules();
+  });
+
+  it('escreve stopped_at na linha do próprio e leva os pontos embora', async () => {
+    const { cloud, chamadas, setResultado } = carregarParaPartilhas();
+    setResultado([{ token: 'lnv1' }]);
+
+    await expect(cloud.markLiveShareStopped('lnv1', 'user-1')).resolves.toBe(true);
+
+    const update = chamadas.find(c => c.startsWith('update('));
+    expect(update).toBeDefined();
+    const payload = JSON.parse(update!.slice('update('.length, -1)) as { stopped_at: string };
+    expect(new Date(payload.stopped_at).toISOString()).toBe(payload.stopped_at);
+    expect(Math.abs(Date.parse(payload.stopped_at) - Date.now())).toBeLessThan(5000);
+    expect(chamadas).toContain('eq("token", "lnv1")');
+    expect(chamadas).toContain('eq("user_id", "user-1")');
+    // A linha fica; o trajecto é que sai, tal como saía quando o Parar apagava
+    // a sessão inteira. Os pontos de uma sessão parada não se pedem mais.
+    expect(chamadas).toContain('from("live_points")');
+    expect(chamadas.some(c => c.startsWith('delete('))).toBe(true);
+  });
+
+  it('sem apagar nada quando o Supabase recusa a marca', async () => {
+    const { cloud, chamadas, setResultado } = carregarParaPartilhas();
+    setResultado(null, { message: 'new row violates row-level security policy' });
+
+    await expect(cloud.markLiveShareStopped('lnv1', 'user-1')).resolves.toBe(false);
+
+    // Reserva, não rotina: quem não conseguiu marcar é que decide apagar.
+    expect(chamadas.some(c => c.startsWith('delete('))).toBe(false);
+    expect(chamadas).not.toContain('from("live_points")');
+    expect(cloud.takeCloudError()).toContain('live stop');
+  });
+
+  it('sem apagar nenhuma linha afectada — o update não viu nada do nosso', async () => {
+    const { cloud, chamadas, setResultado } = carregarParaPartilhas();
+    setResultado([]);
+
+    await expect(cloud.markLiveShareStopped('lnv1', 'user-1')).resolves.toBe(false);
+    expect(chamadas.some(c => c.startsWith('delete('))).toBe(false);
+  });
+
+  it('sem cliente, não marca nem apaga', async () => {
+    jest.doMock('@react-native-async-storage/async-storage', () => ({}));
+    jest.doMock('@supabase/supabase-js', () => ({
+      createClient: jest.fn(() => {
+        throw new Error('Invalid supabaseUrl');
+      }),
+    }));
+    let cloud!: typeof import('../src/services/cloud');
+    jest.isolateModules(() => {
+      cloud = jest.requireActual('../src/services/cloud') as typeof import('../src/services/cloud');
+    });
+
+    await expect(cloud.markLiveShareStopped('lnv1', 'user-1')).resolves.toBe(false);
+  });
+});
+
+describe('o histórico lê só os carimbos, do próprio, do mais recente para trás', () => {
+  beforeEach(() => jest.resetModules());
+  afterEach(() => {
+    jest.dontMock('@react-native-async-storage/async-storage');
+    jest.dontMock('@supabase/supabase-js');
+    jest.resetModules();
+  });
+
+  it('pede os campos de tempo, filtra por dono e ordena por início', async () => {
+    const { cloud, chamadas, setResultado } = carregarParaPartilhas();
+    const linha = {
+      token: 'lnv1',
+      started_at: '2026-10-14T21:00:00.000Z',
+      stopped_at: '2026-10-14T21:12:00.000Z',
+      expires_at: '2026-10-14T21:30:00.000Z',
+      updated_at: '2026-10-14T21:12:00.000Z',
+    };
+    setResultado([linha]);
+
+    await expect(cloud.fetchLiveShareHistory('user-1', 5)).resolves.toEqual([linha]);
+
+    expect(chamadas).toContain('from("live_shares")');
+    expect(chamadas).toContain(
+      'select("token, started_at, stopped_at, expires_at, updated_at")',
+    );
+    expect(chamadas).toContain('eq("user_id", "user-1")');
+    expect(chamadas).toContain('order("started_at", {"ascending":false})');
+    expect(chamadas).toContain('limit(5)');
+    // Sem `updated_at` na lista de colunas a ordem ainda funcionaria, mas o
+    // "quando parou" viria sem a coluna que a preenche — e o ecrã mostraria
+    // uma hora que não mudou quando a pessoa carregou em Parar.
+    expect(chamadas.some(c => c.includes('latitude'))).toBe(false);
+  });
+
+  it('devolve lista vazia em vez de rebentar quando o Supabase recusa', async () => {
+    const { cloud, setResultado } = carregarParaPartilhas();
+    setResultado(null, { message: 'permission denied' });
+
+    await expect(cloud.fetchLiveShareHistory('user-1')).resolves.toEqual([]);
+    expect(cloud.takeCloudError()).toContain('live history');
+  });
+});

@@ -24,6 +24,7 @@ import UpdateAvailableModal from './UpdateAvailableModal';
 import WhatsNewModal from './WhatsNewModal';
 import CompassSection from './settings/CompassSection';
 import CloudSection from './settings/CloudSection';
+import ShareHistorySection from './settings/ShareHistorySection';
 import DataSection from './settings/DataSection';
 import ImportDialog from './settings/ImportDialog';
 import PinDialog from './settings/PinDialog';
@@ -422,6 +423,8 @@ const SettingsModal = ({
             />
 
             <CloudSection />
+
+            <ShareHistorySection />
           </ScrollView>
         </Pressable>
       </Pressable>

@@ -33,6 +33,16 @@ create table if not exists public.live_shares (
 create index if not exists live_shares_user_id_idx on public.live_shares (user_id);
 create index if not exists live_shares_expires_idx on public.live_shares (expires_at);
 
+-- stopped_at (ideia #100): quando a pessoa carrega em "Parar", a linha deixa
+-- de ser apagada e passa a ser marcada. Guardar a linha e' o que permite ao
+-- historico de partilhas responder "mandei um link as 21h04 e durou 30 min" --
+-- com a linha apagada nao havia comodo de saber sequer que a sessao existiu.
+-- Enquanto `stopped_at` estiver preenchido, as RPCs de posicao e de trajecto
+-- escondem a sessao como se estivesse apagada: parar e' parar de partilhar.
+-- O `if not exists` e' porque a tabela ja existe na nuvem; sem ele, republicar
+-- este ficheiro rebentaria em cada release.
+alter table public.live_shares add column if not exists stopped_at timestamptz;
+
 alter table live_shares enable row level security;
 
 -- ============================================================
@@ -87,6 +97,7 @@ begin
     from public.live_shares s
     where s.token = p_token
       and s.expires_at > now()
+      and s.stopped_at is null
     limit 1;
 end;
 $$;
@@ -99,27 +110,39 @@ grant execute on function public.get_live_position(text) to anon, authenticated;
 -- Só o estado da sessao, sem coordenada.
 --
 -- A posicao some da resposta por dois motivos que o viewer precisa
--- distinguir: a pessoa encerrou (a linha foi apagada) ou o prazo venceu
--- (a linha continua la, e a RPC acima esconde por `expires_at > now()`).
--- Sem esta funcao o viewer dizia "🛑 encerrado pela pessoa" para um prazo
--- so cumprido -- o sumico ficava sem explicacao nenhuma.
+-- distinguir: a pessoa encerrou (a sessao foi marcada com `stopped_at`, ou a
+-- linha antiga apagada) ou o prazo venceu (a linha continua la, e a RPC
+-- acima esconde por `expires_at > now()`). Sem esta funcao o viewer dizia
+-- "🛑 encerrado pela pessoa" para um prazo so cumprido -- o sumico ficava sem
+-- explicacao nenhuma.
+--
+-- `stopped_at` veio com o historico de partilhas (#100): parar deixou de
+-- apagar a linha e passou a marca-la, e sem esta coluna na resposta o viewer
+-- passava a dizer "expirou" para uma sessao que a propria pessoa parou.
+-- O `drop` antes do `create` e' obrigatorio: o Postgres nao deixa mudar o
+-- tipo de retorno de uma funcao que ja existe, e acrescentar uma coluna a
+-- `returns table` e mudar o tipo.
 --
 -- Devolve carimbos de tempo e nada mais: quem tem o link expirado continua
 -- sem acesso a posicao. A linha expirada fica na tabela de proposito (e o
 -- indice de `expires_at` e o que faz as RPCs acima filtrarem barato), porque e
 -- ela que permite essa resposta.
 -- ============================================================
-create or replace function public.get_live_status(p_token text)
+drop function if exists public.get_live_status(text);
+
+create function public.get_live_status(p_token text)
 returns table (
   expires_at timestamptz,
   updated_at timestamptz,
-  expired boolean
+  expired boolean,
+  stopped boolean
 )
 language sql
 security definer
 set search_path = public, pg_temp
 as $$
-  select s.expires_at, s.updated_at, s.expires_at <= now()
+  select s.expires_at, s.updated_at, s.expires_at <= now(),
+         s.stopped_at is not null
   from public.live_shares s
   where s.token = p_token
   limit 1;

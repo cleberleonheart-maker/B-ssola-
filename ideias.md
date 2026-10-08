@@ -1042,7 +1042,7 @@ a nota de cada uma diz o que a distingue da ideia vizinha.
       apagada sem apagar dados, que é a #101.
 
 ### Produto
-- [ ] **99. 🩺 Estado da nuvem em Configurações** — um painel com o que o
+- [x] **99. 🩺 Estado da nuvem em Configurações** — feito (`bb41d67`). Um painel com o que o
       código já sabe e hoje ninguém lê: se o cliente está ligado e com que
       razão não está (`clientError`, que o #91 passou a mostrar mas só quando
       algo rebenta), a última falha gravada pelo `noteCloudError` (que
@@ -1051,14 +1051,24 @@ a nota de cada uma diz o que a distingue da ideia vizinha.
       sensores (a #64 é isso): é a resposta a "está a chegar à nuvem, ou não?".
       Baseia-se no #91 e no #95, que ambos acabaram por mostrar a causa ao
       utilizador — mas só no momento do erro.
-- [ ] **100. 🗂️ Histórico de partilhas** — `fetchLiveShareRow` lê uma sessão
-      pelo token, e só a que está viva. Não há ecrã que diga "ontem mandei um
-      link às 21h04 que durou 30 min", nem forma de ver as sessões que expiraram
-      sem serem apagadas (`live_shares` guarda a linha expirada de propósito — é
-      ela que permite ao `get_live_status` responder "expirou" em vez de
-      "encerrado"). Uma lista por `user_id` com início, fim e duração também é
-      a pergunta natural depois de um SOS: foi esta sessão que eu mandei, ou
-      outra?
+- [x] **100. 🗂️ Histórico de partilhas** — feito (v7.40). `fetchLiveShareRow` lê uma sessão
+      pelo token, e só a que estava viva; não havia ecrã que dissesse "ontem
+      mandei um link às 21h04 que durou 30 min". Dois lados:
+      **guardar** — parar deixou de apagar a linha e passa a escrever
+      `stopped_at` (`markLiveShareStopped`), com o DELETE como reserva quando a
+      marca não pegou: apagar era apagar a prova de que a sessão existiu. A RPC
+      `get_live_position` e `get_live_track` passam a esconder as paradas
+      (`stopped_at is null`), o `get_live_status` passa a devolver a coluna
+      `stopped`, e o `web/live.html` distingue "a pessoa parou" de "expirou"
+      mesmo com o prazo ainda por vencer. O trajecto dos pontos sai em
+      `markLiveShareStopped`, como saía quando o Parar apagava tudo.
+      **mostrar** — `ShareHistorySection` em Configurações, um toque a mais
+      depois da secção da nuvem: lista as sessões do próprio (a RLS não deixa
+      outras) por início, duração e estado, só com os carimbos de tempo — a
+      coordenada de uma sessão que acabou não volta a entrar no aparelho. A
+      lógica de estado fica em puro em `src/utils/shareHistory.ts` (parada
+      ganha a expirada: dizer "expirou" a uma sessão que a pessoa parou seria
+      mentir sobre a decisão dela).
 - [ ] **101. 🚪 Apagar a minha conta e os dados** — não há sítio nenhum na app
       para largar dados. Todas as tabelas já têm política de DELETE com
       `user_id = auth.uid()` (`tracks`, `notes`, `virgin_memory`, `crashes`,

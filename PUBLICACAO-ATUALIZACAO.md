@@ -201,6 +201,27 @@ Cada commit que toque no script corre-o em modo `--apenas-contar` — conta sem
 escrever, para provar que a chave serve sem apagar produção por haver um
 commit.
 
+### Histórico de partilhas — parar já não apaga (#100)
+
+O "Parar" apagava a linha de `live_shares`, e com ela a única prova de que a
+sessão existiu: não havia ecrã que dissesse "ontem mandei um link às 21h04 que
+durou 30 min". Desde a v7.40 parar **marca** — `markLiveShareStopped` escreve
+`stopped_at` e leva os pontos do trajecto, como levava antes —, e só escreve o
+DELETE quando a marca não pegou (linha já fora, RLS a recusar): uma sessão que
+não se consegue marcar não pode ficar viva a partilhar posição.
+
+O SQL da mudança está todo em `scripts/live_rls.sql` (a coluna, `get_live_position`
+e `get_live_track` a esconderem as paradas com `stopped_at is null`, e
+`get_live_status` a devolver a coluna `stopped`) e em `scripts/live_points.sql`;
+aplica-se sozinho no próximo push, pelo `verificar-nuvem.yml`. Antes da coluna
+existir, `stopped_at is null` avaliaria a `NULL` — as sessões sumiam do viewer —
+portanto o commit tem de trazer o SQL e o código juntos, que é o que faz.
+
+No ecrã, `ShareHistorySection` (Configurações) lê só os carimbos de tempo de
+`live_shares` do próprio: início, duração e estado, sem coordenadas a voltarem a
+entrar no aparelho. As linhas paradas continuam a ser apanhadas pela limpeza de
+#98 ao fim de 90 dias do prazo — o mesmo prazo que já valia às expiradas.
+
 ### `./scripts/verificar-crashes.mjs` — o caminho inteiro, sem aparelho
 
 O `verificar-nuvem.sh` confirma que a tabela existe e que o `anon` a consegue

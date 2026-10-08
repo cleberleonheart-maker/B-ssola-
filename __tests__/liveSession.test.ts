@@ -15,6 +15,11 @@ const loadService = (
   const deleteLiveShareRow = jest.fn(
     async (_token: string, _userId: string) => true,
   );
+  // O caminho bom de parar (#100) e marcar a sessao para o historial; o delete
+  // so entra como reserva, quando a marca nao pegou. Se o mock nao expuser esta
+  // funcao, `stopLiveShare` rebenta nele — e rebentar no mock e o aviso de que
+  // o teste ainda cobre a ordem das escritas.
+  const markLiveShareStopped = jest.fn(async (_token: string, _userId: string) => true);
   const pushLivePosition = jest.fn(
     async (
       _token: string,
@@ -56,6 +61,7 @@ const loadService = (
     pushLivePosition,
     pushLivePoint,
     deleteLiveShareRow,
+    markLiveShareStopped,
     deleteExpiredLivePoints,
   }));
   jest.spyOn(Date, 'now').mockReturnValue(now);
@@ -67,6 +73,7 @@ const loadService = (
     service,
     store,
     deleteLiveShareRow,
+    markLiveShareStopped,
     deleteExpiredLivePoints,
     pushLivePosition,
     pushLivePoint,
@@ -105,13 +112,29 @@ describe('sessão de live', () => {
     expect(s?.expiresAt).toBe(1000 + 5 * MS_PER_MIN);
   });
 
-  it('limpa a sessão ativa ao parar', async () => {
-    const { service, store, deleteLiveShareRow } = loadService(1000);
+  it('limpa a sessão ativa ao parar, marcando em vez de apagar', async () => {
+    const { service, store, deleteLiveShareRow, markLiveShareStopped } =
+      loadService(1000);
     const s = await service.startLiveShare(30);
     await service.stopLiveShare(s!.token);
     expect(store.has('bussola:live:active')).toBe(false);
     expect(store.has('bussola:live:' + s!.token)).toBe(false);
     expect(await service.getActiveLiveSession()).toBeNull();
+    // A linha fica na base com `stopped_at`, que e o que o historial (#100) e o
+    // link (`get_live_status`) leem. Apagar seria o caminho que apaga a prova.
+    expect(markLiveShareStopped).toHaveBeenCalledWith(s!.token, 'user-1');
+    expect(deleteLiveShareRow).not.toHaveBeenCalled();
+  });
+
+  it('apaga quando a marca não pegou, para a sessão não ficar viva a partilhar', async () => {
+    // Uma sessão que não conseguiu ser marcada (RLS a recusar, linha já
+    // desaparecida) não pode ficar a partilhar posição — é o pior dos dois
+    // mundos. O DELETE é a reserva: menos um item no historial, mas o link
+    // deixa de andar.
+    const { service, deleteLiveShareRow, markLiveShareStopped } = loadService(1000);
+    markLiveShareStopped.mockResolvedValueOnce(false);
+    const s = await service.startLiveShare(30);
+    await service.stopLiveShare(s!.token);
     expect(deleteLiveShareRow).toHaveBeenCalledWith(s!.token, 'user-1');
   });
 
@@ -410,8 +433,8 @@ describe('sessão de live', () => {
     await expect(service.pushLiveFix(s!, fixCompleto)).resolves.toBe(true);
   });
 
-  it('usa o mesmo userId no push e na remoção da linha', async () => {
-    const { service, pushLivePosition, deleteLiveShareRow } = loadService(1000);
+  it('usa o mesmo userId no push e ao marcar a paragem', async () => {
+    const { service, pushLivePosition, markLiveShareStopped } = loadService(1000);
     const s = await service.startLiveShare(30);
     await service.pushLiveFix(s!, {
       latitude: -15.8,
@@ -425,8 +448,8 @@ describe('sessão de live', () => {
     });
     await service.stopLiveShare(s!.token);
     const pushedUser = pushLivePosition.mock.calls[0][1];
-    const deletedUser = deleteLiveShareRow.mock.calls[0][1];
-    expect(pushedUser).toBe(deletedUser);
+    const markedUser = markLiveShareStopped.mock.calls[0][1];
+    expect(pushedUser).toBe(markedUser);
   });
 
   // O `LiveTrackingService` grava a posicao em Kotlin e precisa do mesmo id que

@@ -424,7 +424,20 @@ export type LiveShareRow = {
   started_at: string;
   expires_at: string;
   updated_at: string;
+  /**
+   * Preenchido quando a pessoa carrega em "Parar" (#100). A linha fica na
+   * tabela de propósito — é o que faz o histórico responder "mandei um link
+   * às 21h04 e durou 30 min" — e as RPCs de posição e de trajecto escondem a
+   * sessão enquanto isto estiver preenchido.
+   */
+  stopped_at: string | null;
 };
+
+/** O que o histórico de partilhas (#100) lê: carimbos de tempo, sem coordenada. */
+export type LiveShareHistoryRow = Pick<
+  LiveShareRow,
+  'token' | 'started_at' | 'stopped_at' | 'expires_at' | 'updated_at'
+>;
 
 export const pushLivePosition = async (
   token: string,
@@ -597,6 +610,54 @@ export const deleteLiveShareRow = async (
   }
 };
 
+/**
+ * Para uma sessao sem apagar a linha (#100).
+ *
+ * Antes, o "Parar" fazia um DELETE: o link morria na hora, mas a sessao
+ * deixava de existir em qualquer sítio — nem o proprio dono conseguia dizer
+ * que tinha partilhado a posicao, nem quando, nem durante quanto tempo. Agora
+ * a linha fica marcada com `stopped_at`, e as RPCs de posicao e de trajecto
+ * escondem-na como se estivesse apagada: parar e' parar de partilhar.
+ *
+ * Devolve `false` em tres casos, e nenhum deles e' o mesmo: sem ligacao (o
+ * `withTimeout` ou o fetch lancam), o PostgREST a recusar (erro), ou nenhuma
+ * linha afectada — o token não é desta pessoa, e aí não há nada para parar.
+ * Quem chama cai no DELETE de reserva, que e' o comportamento antigo e o que
+ * garante que uma sessao nunca fica viva so porque o UPDATE falhou.
+ */
+export const markLiveShareStopped = async (
+  token: string,
+  userId: string,
+): Promise<boolean> => {
+  if (!client) return false;
+  try {
+    const { data, error } = await withTimeout(
+      client
+        .from('live_shares')
+        .update({ stopped_at: new Date().toISOString() })
+        .eq('token', token)
+        .eq('user_id', userId)
+        .select('token'),
+      15000,
+    );
+    if (error) {
+      noteCloudError('live stop', error.message);
+      return false;
+    }
+    if (!data || (data as unknown[]).length === 0) return false;
+    // O trajecto segue a linha: parar leva os pontos embora, como levava
+    // quando o "Parar" apagava a sessao inteira.
+    await withTimeout(
+      client.from('live_points').delete().eq('token', token).eq('user_id', userId),
+      15000,
+    );
+    return true;
+  } catch (error) {
+    noteCloudError('live stop', error);
+    return false;
+  }
+};
+
 // A coluna expires_at e NOT NULL na tabela, mas o runtime pode devolver
 // ausente em respostas parciais; o contrato original expunha string | null.
 type LiveShareSnapshot = Pick<
@@ -615,6 +676,41 @@ export const fetchLiveShareRow = async (
     return (data as unknown as LiveShareSnapshot) ?? null;
   } catch {
     return null;
+  }
+};
+
+/**
+ * As partilhas de sempre de quem pede, da mais nova para a mais velha (#100).
+ *
+ * A RLS já limita às linhas do próprio (`user_id = auth.uid()`), portanto o
+ * `eq('user_id')` é redundante com a política e obrigatório com o código: sem
+ * ele, a consulta dependia de o runtime incluir o filtro sozinho, e é o tipo
+ * de coisa que se esquece num refactor. Só os campos do histórico — a
+ * coordenada não vem para o aparelho de quem já parou de partilhar, e aqui é
+ * o próprio dono a pedir.
+ */
+export const fetchLiveShareHistory = async (
+  userId: string,
+  limit = 20,
+): Promise<LiveShareHistoryRow[]> => {
+  if (!client) return [];
+  try {
+    const { data, error } = await withTimeout(
+      client
+        .from('live_shares')
+        .select('token, started_at, stopped_at, expires_at, updated_at')
+        .eq('user_id', userId)
+        .order('started_at', { ascending: false })
+        .limit(limit),
+      15000,
+    );
+    if (error) {
+      noteCloudError('live history', error.message);
+      return [];
+    }
+    return (data as unknown as LiveShareHistoryRow[]) ?? [];
+  } catch {
+    return [];
   }
 };
 
