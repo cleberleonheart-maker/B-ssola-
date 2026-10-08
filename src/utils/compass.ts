@@ -83,6 +83,119 @@ export const getHeading = (
   return normalizeHeading((Math.atan2(-xh, yh) * 180) / Math.PI);
 };
 
+/**
+ * Inclinação do aparelho em graus, a partir do acelerômetro.
+ *
+ * Convenções (retrato, eixo X p/ a direita, Y p/ o topo da tela, Z para fora
+ * da tela): `pitch` é a rotação em torno de X (positivo = topo para cima) e
+ * `roll` a rotação em torno de Y (positivo = lado direito para baixo). Em
+ * repouso sobre a mesa os dois dão 0; num aparelho deitado de lado, o roll
+ * fica em ±90.
+ *
+ * Como `verticalAngle` (HeightView), não divide por G: `asin` de um componente
+ * já normalizado recebe o mesmo resultado com m/s² (Android) ou g (iOS).
+ *
+ * Em paisagem os rótulos trocam de lugar (o que chamamos de pitch passa a ser
+ * o roll físico). O nível é uma leitura de bolha — o valor é o que importa, e
+ * a orientação continua a ser a do aparelho, não a do usuário.
+ */
+export const pitchRollDeg = (accel: Vector3): { pitch: number; roll: number } => {
+  const { x, y, z } = accel;
+  if (![x, y, z].every(Number.isFinite)) {
+    return { pitch: 0, roll: 0 };
+  }
+  const mag = Math.sqrt(x * x + y * y + z * z);
+  if (!(mag > 0)) {
+    return { pitch: 0, roll: 0 };
+  }
+  const clamp = (v: number) => Math.max(-1, Math.min(1, v));
+  const pitch = (Math.asin(clamp(y / mag)) * 180) / Math.PI;
+  const roll = (Math.asin(clamp(-x / mag)) * 180) / Math.PI;
+  return { pitch: Number.isFinite(pitch) ? pitch : 0, roll: Number.isFinite(roll) ? roll : 0 };
+};
+
+/**
+ * Elevação do eixo da câmera (lado de trás) acima do horizonte, em graus.
+ *
+ * A câmera traseira olha ao longo de −Z (o Z do sensor sai pela tela), então a
+ * componente vertical do eixo de visão é −z/|a| e a elevação é o arcseno dela.
+ * Com o aparelho de bruços na mesa o eixo aponta para baixo: −90°. Retido na
+ * vertical, z ≈ 0: 0°, o horizonte. De costas para o chão: +90°.
+ *
+ * O sinal desta leitura é o único ancorado num facto que não depende da
+ * convenção de eixos em disputa (ideias #64/#65): com a tela para cima o
+ * Android entrega z > 0 — é o mesmo pressuposto do fixture `restMS` dos testes
+ * de `verticalAngle`. Não usa Y, portanto é a mesma em retrato e em paisagem.
+ */
+export const viewElevationDeg = (accel: Vector3): number => {
+  const { x, y, z } = accel;
+  if (![x, y, z].every(Number.isFinite)) {
+    return 0;
+  }
+  const mag = Math.sqrt(x * x + y * y + z * z);
+  if (!(mag > 0)) {
+    return 0;
+  }
+  const value = (Math.asin(Math.max(-1, Math.min(1, -z / mag))) * 180) / Math.PI;
+  return Number.isFinite(value) ? value : 0;
+};
+
+/**
+ * FOV vertical, derivado do horizontal calibrado pelo utilizador e da forma do
+ * ecrã: a pré-visualização cobre o contentor (`resizeMode="cover"`), então o
+ * ângulo que sobra em cima/baixo depende da razão altura/largura. Sem ecrã
+ * medido devolve uma estimativa de 60% do horizontal — melhor que apanhar
+ * `Infinity` no primeiro render.
+ */
+export const verticalFovDeg = (horizontalFovDeg: number, width: number, height: number): number => {
+  const horizontal =
+    Number.isFinite(horizontalFovDeg) && horizontalFovDeg > 1 && horizontalFovDeg < 179
+      ? horizontalFovDeg
+      : 90;
+  const estimate = horizontal * 0.6;
+  if (!(width > 0) || !(height > 0)) {
+    return estimate;
+  }
+  const half = ((horizontal * Math.PI) / 180) / 2;
+  const vertical = (2 * Math.atan(Math.tan(half) * (height / width)) * 180) / Math.PI;
+  return Number.isFinite(vertical) && vertical > 1 ? vertical : estimate;
+};
+
+/**
+ * Posição vertical de um marcador no AR, em % da altura da camada (0 = topo,
+ * 50 = centro, 100 = base), ou seja: onde o ângulo do alvo cai na pré-
+ * visualização da câmera.
+ *
+ * `targetElevation` é a elevação do alvo acima do horizonte, `viewElevation`
+ * a do eixo de visão (`viewElevationDeg`) e `verticalFov` o ângulo vertical da
+ * imagem. Um alvo no horizonte com a câmera nivelada fica em 50 (a linha do
+ * horizonte); subir o alvo acima do eixo de visão move-o para o topo.
+ *
+ * Sem elevação (waypoint sem altitude) ou sem ecrã medido, fica em
+ * `fallbackPct` — o valor fixo de sempre. O retorno é aparado a 6–94 para o
+ * chip não sair da tela quando o alvo está fora do campo.
+ */
+export const markerTopPct = (
+  targetElevation: number | null,
+  viewElevation: number,
+  verticalFov: number,
+  fallbackPct: number,
+): number => {
+  if (
+    targetElevation === null ||
+    !Number.isFinite(targetElevation) ||
+    !Number.isFinite(viewElevation) ||
+    !(verticalFov > 0)
+  ) {
+    return fallbackPct;
+  }
+  const pct = 50 - ((targetElevation - viewElevation) / verticalFov) * 100;
+  if (!Number.isFinite(pct)) {
+    return fallbackPct;
+  }
+  return Math.max(6, Math.min(94, pct));
+};
+
 export const DIRECTIONS = ['N', 'NE', 'L', 'SE', 'S', 'SO', 'O', 'NO'] as const;
 export const DIRECTION_NAMES = [
   'Norte',

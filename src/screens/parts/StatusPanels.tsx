@@ -26,6 +26,7 @@ export type ActiveTarget = {
   name: string;
   bearing: number;
   distance: number;
+  elevation: number | null;
 };
 
 type Props = {

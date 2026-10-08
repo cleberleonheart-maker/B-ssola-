@@ -19,7 +19,8 @@ export type DisplayMode =
   | 'car'
   | 'tri'
   | 'odometer'
-  | 'selftest';
+  | 'selftest'
+  | 'cadence';
 
 export type WindCal = { zero: number; strong: number };
 
@@ -30,6 +31,15 @@ const VOICE_GUIDE_KEY = '@bussola/voiceGuide';
 const WIND_CAL_KEY = '@bussola/windCal';
 const VIRTUAL_WP_KEY = '@bussola/virtualWp';
 const USE_MILS_KEY = '@bussola/useMils';
+const CADENCE_BPM_KEY = '@bussola/cadenceBpm';
+
+export const CADENCE_BPM = { min: 90, max: 160, step: 5, fallback: 120 } as const;
+
+export const clampBpm = (value: number) =>
+  Math.min(
+    CADENCE_BPM.max,
+    Math.max(CADENCE_BPM.min, Math.round(value / CADENCE_BPM.step) * CADENCE_BPM.step),
+  );
 
 export const DEFAULT_WIND_CAL: WindCal = { zero: 0.015, strong: 0.22 };
 
@@ -85,6 +95,7 @@ export const loadDisplayMode = async (): Promise<DisplayMode> => {
       'tri',
       'odometer',
       'selftest',
+      'cadence',
     ];
     return modes.includes(raw as DisplayMode) ? (raw as DisplayMode) : 'compass';
   } catch {
@@ -94,6 +105,20 @@ export const loadDisplayMode = async (): Promise<DisplayMode> => {
 
 export const saveDisplayMode = async (mode: DisplayMode) => {
   await AsyncStorage.setItem(DISPLAY_MODE_KEY, mode);
+};
+
+export const loadCadenceBpm = async (): Promise<number> => {
+  try {
+    const raw = await AsyncStorage.getItem(CADENCE_BPM_KEY);
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? clampBpm(parsed) : CADENCE_BPM.fallback;
+  } catch {
+    return CADENCE_BPM.fallback;
+  }
+};
+
+export const saveCadenceBpm = async (bpm: number) => {
+  await AsyncStorage.setItem(CADENCE_BPM_KEY, String(clampBpm(bpm)));
 };
 
 export const loadVoiceGuide = async (): Promise<boolean> => {

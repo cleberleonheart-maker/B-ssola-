@@ -17,7 +17,7 @@ import {
 import { useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
-import { cardinalOf, normalizeHeading, formatAzimuth } from '../utils/compass';
+import { cardinalOf, normalizeHeading, formatAzimuth, viewElevationDeg, verticalFovDeg, markerTopPct } from '../utils/compass';
 import { formatDistance } from '../utils/geo';
 import type { CelestialPoint } from '../utils/astro';
 import {
@@ -33,13 +33,29 @@ const PREVIEW_PULSE_MS = 1100;
 const PREVIEW_MODES = ['performance', 'compatible'] as const;
 type PreviewMode = (typeof PREVIEW_MODES)[number];
 
+// posições fixas usadas quando não há câmera (modo gráfico) ou quando o alvo
+// não tem altitude: o ecrã não dá informação sobre a elevação
+const FALLBACK_MARKER_TOP = 30;
+const FALLBACK_CARDINAL_TOP = 14;
+
 type Props = {
   heading: number;
+  accel: { x: number; y: number; z: number };
   sun: CelestialPoint | null;
   moon: CelestialPoint | null;
   moonIcon: string;
-  target: { name: string; bearing: number; distance: number } | null;
-  virtual: { name: string; bearing: number; distance: number } | null;
+  target: {
+    name: string;
+    bearing: number;
+    distance: number;
+    elevation?: number | null;
+  } | null;
+  virtual: {
+    name: string;
+    bearing: number;
+    distance: number;
+    elevation?: number | null;
+  } | null;
   active: boolean;
   mils?: boolean;
 };
@@ -50,6 +66,19 @@ type Marker = {
   angle: number;
   label: string;
   sub: string;
+  elevation: number | null;
+};
+
+/**
+ * Elevação acima/baixo do horizonte, com a seta a carregar o sinal (assim
+ * `▼12°` em vez de `▼-12°`). Perto do zero degrau nenhum: fica `0°`.
+ */
+const elevationText = (elevation: number) => {
+  const rounded = Math.round(elevation);
+  if (Math.abs(elevation) < 0.5) {
+    return `${rounded}°`;
+  }
+  return `${rounded > 0 ? '▲' : '▼'}${Math.abs(rounded)}°`;
 };
 
 const angularDiff = (from: number, to: number): number => {
@@ -60,6 +89,7 @@ const CAMERA_ZOOM_STEPS = [1, 1.5, 2, 3, 4, 6] as const;
 
 const CameraARView = ({
   heading,
+  accel,
   sun,
   moon,
   moonIcon,
@@ -270,7 +300,8 @@ const CameraARView = ({
       icon: '☀️',
       angle: sun.azimuth,
       label: t('ui_sun_short'),
-      sub: `${Math.round(sun.elevation)}°`,
+      sub: elevationText(sun.elevation),
+      elevation: sun.elevation,
     });
   }
   if (moon) {
@@ -279,7 +310,8 @@ const CameraARView = ({
       icon: moonIcon,
       angle: moon.azimuth,
       label: t('ui_moon_short'),
-      sub: `${Math.round(moon.elevation)}°`,
+      sub: elevationText(moon.elevation),
+      elevation: moon.elevation,
     });
   }
   if (target) {
@@ -288,7 +320,11 @@ const CameraARView = ({
       icon: '📍',
       angle: target.bearing,
       label: target.name,
-      sub: formatDistance(target.distance),
+      sub:
+        target.elevation === null || target.elevation === undefined
+          ? formatDistance(target.distance)
+          : `${formatDistance(target.distance)} · ${elevationText(target.elevation)}`,
+      elevation: target.elevation ?? null,
     });
   }
   if (virtual) {
@@ -297,7 +333,11 @@ const CameraARView = ({
       icon: '◆',
       angle: virtual.bearing,
       label: virtual.name,
-      sub: formatDistance(virtual.distance),
+      sub:
+        virtual.elevation === null || virtual.elevation === undefined
+          ? formatDistance(virtual.distance)
+          : `${formatDistance(virtual.distance)} · ${elevationText(virtual.elevation)}`,
+      elevation: virtual.elevation ?? null,
     });
   }
   const cardinals: { key: string; icon: string; angle: number }[] = [
@@ -306,6 +346,19 @@ const CameraARView = ({
     { key: 'S', icon: t('ui_dir_s'), angle: 180 },
     { key: 'W', icon: t('ui_dir_w'), angle: 270 },
   ];
+
+  // Elevação do eixo de visão e FOV vertical: é o que decide onde cada ângulo
+  // cai na tela. Antes da primeira amostra o acelerômetro está a zero (o
+  // estado inicial do CompassScreen) e não diz nada — aí fica o horizonte.
+  // O limiar é em unidades livres (9,81 em m/s², ~1 em g no iOS) e só quer
+  // separar "sem leitura" de "leitura real".
+  const accelMagnitude = Math.sqrt(
+    accel.x * accel.x + accel.y * accel.y + accel.z * accel.z,
+  );
+  const viewElevation = accelMagnitude > 0.5 ? viewElevationDeg(accel) : 0;
+  const vFov = verticalFovDeg(fov, viewSize.w, viewSize.h);
+  // no modo gráfico não há imagem a mirar: mantêm-se as posições fixas
+  const placeVertically = !graphical;
 
   const cardinal = cardinalOf(heading);
   const notDenied = hasPermission || canRequestPermission;
@@ -372,12 +425,16 @@ const CameraARView = ({
             const diff = angularDiff(heading, card.angle);
             const clamped = Math.max(-1, Math.min(1, diff / fov));
             const leftPct = 50 + clamped * 50;
+            // cardeais ficam no horizonte (elevação 0), como no resto do céu
+            const topPct = placeVertically
+              ? markerTopPct(0, viewElevation, vFov, FALLBACK_CARDINAL_TOP)
+              : FALLBACK_CARDINAL_TOP;
             return (
               <View
                 key={card.key}
                 style={[
                   styles.cardLeft,
-                  { left: `${leftPct}%` },
+                  { left: `${leftPct}%`, top: `${topPct}%` },
                   Math.abs(diff) > fov && styles.markerDim,
                 ]}>
                 <Text style={[styles.cardText, { color: colors.primary }]}>
@@ -390,12 +447,15 @@ const CameraARView = ({
             const diff = angularDiff(heading, marker.angle);
             const clamped = Math.max(-1, Math.min(1, diff / fov));
             const leftPct = 50 + clamped * 50;
+            const topPct = placeVertically
+              ? markerTopPct(marker.elevation, viewElevation, vFov, FALLBACK_MARKER_TOP)
+              : FALLBACK_MARKER_TOP;
             return (
               <View
                 key={marker.key}
                 style={[
                   styles.marker,
-                  styles.markerTop,
+                  { top: `${topPct}%` },
                   { left: `${leftPct}%` },
                   Math.abs(diff) > fov && styles.markerDim,
                   !graphical && styles.markerCamera,
@@ -605,9 +665,6 @@ const createStyles = (colors: {
       marginLeft: -30,
       width: 60,
     },
-    markerTop: {
-      top: '30%',
-    },
     markerDim: {
       opacity: 0.35,
     },
@@ -709,7 +766,6 @@ const createStyles = (colors: {
     },
     cardLeft: {
       position: 'absolute',
-      top: '14%',
       alignItems: 'center',
       marginLeft: -18,
       width: 36,

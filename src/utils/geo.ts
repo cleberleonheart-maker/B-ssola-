@@ -40,3 +40,22 @@ export const formatDistance = (meters: number) => {
   if (meters >= 100) return `${Math.round(meters)} m`;
   return `${meters.toFixed(1)} m`;
 };
+
+/**
+ * Elevação de um alvo acima do horizonte, em graus, dado o desnível e a
+ * distância horizontal (a do haversine, que já é a cateta oposta). Positivo =
+ * alvo acima de quem observa. `null` quando a distância não permite ângulo.
+ */
+export const elevationAngle = (
+  deltaAltitude: number,
+  horizontalDistance: number,
+): number | null => {
+  if (!Number.isFinite(deltaAltitude) || !Number.isFinite(horizontalDistance)) {
+    return null;
+  }
+  if (!(horizontalDistance > 0)) {
+    return null;
+  }
+  const degrees = (Math.atan2(deltaAltitude, horizontalDistance) * 180) / Math.PI;
+  return Number.isFinite(degrees) ? degrees : null;
+};

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing } from '../theme/colors';
+import { pitchRollDeg } from '../utils/compass';
 
 type Props = {
   x: number;
@@ -12,6 +13,11 @@ type Props = {
 };
 
 const LEVEL_TOLERANCE = 0.5;
+
+const fmtDeg = (value: number) => {
+  const text = value.toFixed(1);
+  return text === '-0.0' ? '0.0' : text;
+};
 
 const BubbleLevel = ({ x, y, z, size = 260 }: Props) => {
   const colors = useThemeColors();
@@ -24,6 +30,7 @@ const BubbleLevel = ({ x, y, z, size = 260 }: Props) => {
   const tiltY = -y / g;
   const level = Math.max(0, 1 - Math.sqrt(tiltX * tiltX + tiltY * tiltY));
   const leveled = level >= 1 - LEVEL_TOLERANCE / 100;
+  const { pitch, roll } = pitchRollDeg({ x, y, z });
 
   const bubbleMax = radius * 0.55;
   const bubbleOffset = Math.min(1, Math.sqrt(tiltX * tiltX + tiltY * tiltY)) * bubbleMax;
@@ -63,7 +70,7 @@ const BubbleLevel = ({ x, y, z, size = 260 }: Props) => {
           {leveled ? t('level_ok') : `${(level * 100).toFixed(0)}%`}
         </Text>
         <Text style={styles.coords}>
-          X {tiltX.toFixed(2)} · Y {tiltY.toFixed(2)}
+          {t('level_readout', { p: fmtDeg(pitch), r: fmtDeg(roll) })}
         </Text>
       </View>
     </View>

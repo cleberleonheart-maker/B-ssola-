@@ -109,6 +109,7 @@ import {
   haversine,
   initialBearing,
   formatDistance,
+  elevationAngle,
 } from '../utils/geo';
 import {
   solarPosition,
@@ -176,7 +177,9 @@ const CompassScreen = () => {
 
   const [heading, setHeading] = useState(0);
   const [rotation, setRotation] = useState(0);
-  const [accel, setAccel] = useState({ x: 0, y: 0, z: 9.81 });
+  // zero = "sem amostra ainda": viewElevationDeg(0,0,0) devolve 0 (horizonte)
+  // em vez de −90°, e BubbleLevel/HeightView continuam a dar 0 de inclinação
+  const [accel, setAccel] = useState({ x: 0, y: 0, z: 0 });
   const [sensorError, setSensorError] = useState<string | null>(null);
   const [accelError, setAccelError] = useState<string | null>(null);
   const [locError, setLocError] = useState<string | null>(null);
@@ -770,8 +773,14 @@ const CompassScreen = () => {
     if (!wp || (location.latitude === 0 && location.longitude === 0)) return null;
     const distance = haversine(location.latitude, location.longitude, wp.latitude, wp.longitude);
     const bearing = initialBearing(location.latitude, location.longitude, wp.latitude, wp.longitude);
-    return { name: wp.name, bearing, distance };
-  }, [activeWpId, waypoints, location.latitude, location.longitude]);
+    // elevação do alvo acima de quem observa: só existe se os dois tiverem
+    // altitude guardada (waypoints sem altitude ficam sem marcador vertical)
+    const elevation =
+      wp.altitude !== null && location.altitude !== null
+        ? elevationAngle(wp.altitude - location.altitude, distance)
+        : null;
+    return { name: wp.name, bearing, distance, elevation };
+  }, [activeWpId, waypoints, location.latitude, location.longitude, location.altitude]);
 
   const shareLocation = useCallback(async () => {
     if (location.latitude === 0 && location.longitude === 0) {
@@ -831,7 +840,7 @@ const CompassScreen = () => {
     if (!wp) return null;
     const hasPos = location.latitude !== 0 || location.longitude !== 0;
     if (!hasPos) {
-      return { name: wp.name, bearing: 0, distance: 0 };
+      return { name: wp.name, bearing: 0, distance: 0, elevation: null };
     }
     const distance = haversine(
       location.latitude,
@@ -851,12 +860,17 @@ const CompassScreen = () => {
         bearing - (declination.enabled ? 0 : declination.degrees),
       ),
       distance,
+      elevation:
+        wp.altitude !== null && location.altitude !== null
+          ? elevationAngle(wp.altitude - location.altitude, distance)
+          : null,
     };
   }, [
     virtualWpId,
     waypoints,
     location.latitude,
     location.longitude,
+    location.altitude,
     declination.enabled,
     declination.degrees,
   ]);

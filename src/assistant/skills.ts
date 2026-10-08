@@ -542,6 +542,10 @@ const MODE_ALIASES: { mode: DisplayMode; terms: string[] }[] = [
     mode: 'odometer',
     terms: ['odometro', 'odometer', 'odómetro', 'historico de distancia', 'distancia por dia'],
   },
+  {
+    mode: 'cadence',
+    terms: ['metronomo', 'cadencia', 'ritmo de passo', 'passos por minuto'],
+  },
 ];
 
 const MODE_ARTICLES = new Set([

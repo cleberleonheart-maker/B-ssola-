@@ -3,6 +3,7 @@ import { View, Text, type LayoutChangeEvent } from 'react-native';
 import AROverlay from '../../components/AROverlay';
 import BubbleLevel from '../../components/BubbleLevel';
 import CameraARView from '../../components/CameraARView';
+import CadenceView from '../../components/CadenceView';
 import CarSpotView from '../../components/CarSpotView';
 import CompassDial from '../../components/CompassDial';
 import EmfReaderView from '../../components/EmfReaderView';
@@ -52,10 +53,16 @@ const MODE_LABEL_KEY: Record<DisplayMode, string> = {
   map: 'ui_card_map',
   notes: 'ui_card_notes',
   odometer: 'ui_card_odometer',
+  cadence: 'ui_mode_cadence',
   selftest: 'ui_card_selftest',
 };
 
-export type DialMarker = { name: string; bearing: number; distance: number };
+export type DialMarker = {
+  name: string;
+  bearing: number;
+  distance: number;
+  elevation?: number | null;
+};
 
 type Props = {
   displayMode: DisplayMode;
@@ -168,6 +175,7 @@ const ModeView = (props: Props) => {
         <View style={styles.arArea}>
           <CameraARView
             heading={heading}
+            accel={accel}
             sun={sun}
             moon={moon}
             moonIcon={moonIcon ?? '🌙'}
@@ -252,6 +260,10 @@ const ModeView = (props: Props) => {
       ) : displayMode === 'odometer' ? (
         <View style={styles.trackArea}>
           <OdometerView />
+        </View>
+      ) : displayMode === 'cadence' ? (
+        <View style={styles.arArea}>
+          <CadenceView />
         </View>
       ) : displayMode === 'selftest' ? (
         <SensorSelfTestView

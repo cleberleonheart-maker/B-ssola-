@@ -54,7 +54,7 @@ const NEWER = INSTALLED + 2;
 
 const nextRow = (overrides: Record<string, unknown> = {}) => ({
   version_code: NEXT,
-  version_name: '7.33',
+  version_name: '7.34',
   update_url: `https://exemplo.test/bussola-v${NEXT}.apk`,
   message: null,
   required: false,

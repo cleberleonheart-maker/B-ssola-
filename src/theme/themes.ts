@@ -20,7 +20,8 @@ export type ThemeName =
   | 'minimal'
   | 'adventure'
   | 'neon'
-  | 'night';
+  | 'night'
+  | 'sun';
 
 export const themes: Record<ThemeName, ColorScheme> = {
   space: {
@@ -121,12 +122,32 @@ export const themes: Record<ThemeName, ColorScheme> = {
     danger: '#FF1E4F',
     warning: '#FFB300',
   },
+  // "Sol forte": contraste máximo para ler o ecrã com o sol em cima. Branco e
+  // preto puros (21:1), bordas quase pretas para o conteúdo não se dissolver
+  // no branco e cores saturadas escuras o bastante para passarem 4.5:1 sobre
+  // branco — nada de cinzentos nem transparências, que é o que desaparece
+  // primeiro debaixo do sol.
+  sun: {
+    background: '#FFFFFF',
+    surface: '#FFFFFF',
+    surfaceAlt: '#E6E6E6',
+    text: '#000000',
+    textMuted: '#333333',
+    primary: '#002DB3',
+    accent: '#006B3C',
+    north: '#D40000',
+    border: '#1A1A1A',
+    success: '#006B3C',
+    danger: '#C40000',
+    warning: '#8A5A00',
+  },
 };
 
 export const THEME_OPTIONS: { key: ThemeName; label: string }[] = [
   { key: 'space', label: 'Espacial' },
   { key: 'dark', label: 'Escuro' },
   { key: 'light', label: 'Claro' },
+  { key: 'sun', label: 'Sol forte' },
   { key: 'minimal', label: 'Minimalista' },
   { key: 'adventure', label: 'Aventura' },
   { key: 'neon', label: 'Neon' },

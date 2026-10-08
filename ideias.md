@@ -101,8 +101,15 @@
 - [x] **10. Kefera conta o histórico** — ✅ feito na v7.17 (hoje, ontem, semana, trilha
       mais longa).
 - [ ] **11. Alarme de chegada por voz** — Kefera lembra ao chegar perto de ponto.
-- [ ] **12. Elevação no AR** — além do azimute, indicar se o alvo está acima/abaixo do
-      horizonte (usando `accel` no `CameraARView`).
+- [x] **12. Elevação no AR** — ✅ feito: na Visão (câmera) o marcador do alvo
+      move-se na vertical conforme a elevação real; usando `accel` no
+      `CameraARView`, calcula-se a elevação do eixo de visão (via −z) e o FOV
+      vertical (do horizontal calibrado × razão do ecrã). Sol/lua mostram `▲/▼`
+      (sempre têm elevação); o waypoint ativo e o marco virtual mostram
+      `· ▲N°` quando o waypoint e a posição têm altitude — senão ficam na
+      altura fixa de sempre. Os cardeais N/E/S/O passam a desenhar-se na linha
+      do horizonte. Helpers puros (e testados) em `utils/compass.ts`:
+      `viewElevationDeg`, `verticalFovDeg`, `markerTopPct`.
 - [ ] **13. Calibração pela Estrela Polar** — usar Polaris para o norte geográfico quando
       visível.
 - [ ] **14. Tiles Android** — quick-settings tile para abrir direto num modo.
@@ -122,8 +129,13 @@
       fala com a nuvem nenhuma; não há detenção de conflito nem aviso de offline. Trocar
       de telemóvel continua a perder os waypoints, e as notas de uma sessão anterior só
       existem onde foram escritas.
-- [ ] **19. Nível em graus** — além do nível de bolha, mostrar inclinação exata
-      (pitch/roll em °) e cruzar com o teodolito para leituras mais precisas.
+- [x] **19. Nível em graus** — ✅ feito: a leitura de bolha mostra agora
+      `Pitch N° · Roll N°` no lugar do `X/Y` adimensional. Usa
+      `pitchRollDeg(accel)` (novo, `utils/compass.ts`): pitch do eixo Y, roll
+      do eixo X, correto em m/s² e em g. O cruzamento com o teodolito continua
+      a ser manual: a altura já mostra o ângulo em tempo real. **Atenção:**
+      `verticalAngle` do Rezarte tem sinal provavelmente invertido — ver nota
+      na 65.
 - [ ] **20. Widget do rumo — publicar/validar** — o `widgetService` existe; confirmar se
       o widget está publicado na Play e polir (rumo, pressão, temperatura).
 - [x] **21. FOV calibrado por aparelho** — ✅ feito em v7.9: botões −/+ (60°–140°, passo
@@ -151,7 +163,11 @@
 - [x] **24. Rastreio ao vivo por link** — ✅ feito na v7.19 (30 min, expira sozinho).
 - [ ] **25. Foto com rumo** — na caderneta, guardar junto da foto a direção da bússola
       apontada no momento.
-- [ ] **26. Metrônomo de passo** — bipes de cadência (~120/min) para caminhada no ritmo.
+- [x] **26. Metrônomo de passo** — ✅ feito: novo modo 👣 Cadência. Bipe agudo
+      (1,2 kHz) + vibração por pulso, com BPM ajustável em −/+ de 5 entre 90 e
+      160 (default 120, persistido em `@bussola/cadenceBpm`), contagem de
+      passos e pulso visual sincronizado. Pausar não perde a contagem; sair do
+      modo reinicia. "Kefera, abre o metrônomo" reconhece o modo.
 - [ ] **27. Triangulação offline por rumos** — estimar a posição mirando 2 marcos
       conhecidos, sem GPS.
 
@@ -492,8 +508,12 @@ foram encontrados de verdade, não ideias soltas.
       "use pinça" nos três idiomas e era verdade em nenhum — passou a dizer só
       os botões. A linha continua aberta porque o que falta é o gesto, e isso é
       dependência nativa nova; com o texto certo, já não é promessa vazia.
-- [ ] **42. 🎨 Tema "sol forte"** — tema de alto contraste para leitura outdoor sob sol
-      direto (além do Noturno e Neon).
+- [x] **42. 🎨 Tema "sol forte"** — ✅ feito: novo tema `sun` (8º), contraste
+      máximo para leitura sob o sol: branco puro e preto puro (21:1), bordas
+      quase pretas, cores saturadas escuras o suficiente para passarem 4.5:1
+      sobre branco, sem cinzentos nem transparências. Aparece na grelha de
+      temas ao lado do Claro; persistência automaticamente válida (a lista de
+      temas é a fonte da verdade).
 - [ ] **43. ⚡ Performance: memoizar marcos** — evitar recálculo de distância/rumo de
       waypoints a cada fix (já há useMemo parcial; revisar).
 - [ ] **44. 🧾 Caderneta: exportar relatório** — gerar PDF/GPX com notas + fotos
@@ -504,12 +524,20 @@ foram encontrados de verdade, não ideias soltas.
 ## Ideias novas (23/09/2026, 5ª leva — EMF)
 - [ ] **46. 🧲 EMF com calibração magnética** — aplicar o hard/soft-iron da calibração
       da bússola no cálculo da magnitude (hoje usa o magnetômetro cru).
-- [ ] **47. 🧭 EMF: direção da fonte** — mostrar qual eixo (X/Y/Z) domina o pico para
-      apontar onde a fonte está.
+- [x] **47. 🧭 EMF: direção da fonte** — ✅ feito: três pastilhas X/Y/Z com as
+      componentes filtradas (EMA) e a dominante destacada. Com linha de base
+      ("🍃 Ambiente") o dominante é o eixo que mais se afastou do ambiente —
+      aponta para a anomalia enquanto caminha; sem ambiente, é o de maior
+      magnitude (o que depende da orientação do aparelho). Legenda explicita:
+      "Eixo dominante: X". Lógica pura e testada em `utils/emf.ts`.
 - [ ] **48. 🗺️ EMF: levantamento geolocalizado** — marcar leituras num mini-mapa
       (heatmap) para mapear fontes numa área.
-- [ ] **49. ❄️ EMF: travar leitura** — congelar o valor na tela ao caminhar em direção
-      à fonte (pico mantido).
+- [x] **49. ❄️ EMF: travar leitura** — ✅ feito: chip ❄️ Congelar ao lado do valor
+      (torna-se ▶️ Retomar). Enquanto congelado o subscription é ignorado —
+      ecrã, barra, histórico, min/máx, bipes e vibração ficam no último valor,
+      e o 📌 Ponto quente marca o pico congelado. "🍃 Ambiente" fica
+      desativado (o valor em ecrã já não é o ambiente). Ao sair do modo a
+      leitura volta a correr.
 
 ## Ideias novas (29/09/2026, 7ª leva — pós-auditoria)
 Saem da auditoria dos bugs corrigidos (commit 8dc0c59). Não repetem ideias já
@@ -566,6 +594,19 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       inclinar ~90°, se `verticalAngle` tender a 180° em vez de 0°, inverte
       silenciosamente com aviso ("Convenção de inclinação corrigida") e permite
       desfazer num toque. Barato, cobre o caso do usuário sem painel completo.
+
+      **Nota (implementação da 19/12/2026):** a análise sugere que a convenção
+      é mesmo invertida. O fixture de `bugfixes.test.ts` aplica `rotX(rest,
+      +deg)` a `rest={x:0,y:0,z:+9,8}` → `y = −9,8·sen deg, z = +9,8·cos deg` e
+      chama a isto "topo elevado", mas a física documentada do Android (leitura
+      em repouso = reação, aponta para cima) dá `y = +9,8·sen deg` quando o
+      topo sobe — e o próprio repo usa esse pressuposto no `restMS`. Ou seja,
+      em hardware o `verticalAngle` devolve **negativo** ao mirar para cima,
+      invertendo a medição da altura e o ângulo do teodolito. Verificação de
+      10 s em campo: na Visão/Altura, apontar o topo para o céu — se marcar
+      positivo, está certo; se marcar negativo, trocar `-lateral` por
+      `+lateral` em `verticalAngle` (HeightView) corrige, e os tests do
+      `bugfixes.test.ts` passam a rodar com o fixture de sinal trocado.
 - [ ] **66. 🎙️ Pré-visualizar o que a Kefera ouviu** — exibe a transcrição (com
       confiança baixa) **antes** de executar: "Ouvi: *marcar waypoint*. Executar?
       [Sim] [Corrigir]". Evita execuções erradas e facilita o ajuste do wake word.

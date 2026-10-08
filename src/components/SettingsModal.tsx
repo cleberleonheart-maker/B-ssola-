@@ -78,6 +78,7 @@ const APP_MODES = (
 
 const THEME_LABEL_KEYS: Record<string, string> = {
   light: 'ui_theme_light',
+  sun: 'ui_theme_sun',
   dark: 'ui_theme_dark',
   space: 'ui_theme_space',
   minimal: 'ui_theme_minimal',

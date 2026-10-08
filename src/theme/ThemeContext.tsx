@@ -27,16 +27,11 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then(saved => {
-        if (
-          saved === 'space' ||
-          saved === 'dark' ||
-          saved === 'light' ||
-          saved === 'minimal' ||
-          saved === 'adventure' ||
-          saved === 'neon' ||
-          saved === 'night'
-        ) {
-          setThemeState(saved);
+        // a lista de temas é a fonte da verdade: um tema novo não precisa de
+        // ser reescrito aqui (o fallback continua no estado inicial 'space')
+        const match = saved === null ? undefined : THEME_OPTIONS.find(o => o.key === saved);
+        if (match) {
+          setThemeState(match.key);
         }
       })
       .catch(() => {});
