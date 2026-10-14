@@ -78,7 +78,12 @@ probe() {
     FAILED=$((FAILED + 1))
     return 1
   fi
-  if printf '%s' "$body" | grep -q 'PGRST'; then
+  # `PGRST...` e a resposta do PostgREST a uma funcao a faltar; um select a uma
+  # coluna que nao existe devolve o 42703 do proprio Postgres (e 42P01 para uma
+  # tabela). Sem o "42" aqui, uma coluna em falta virava `ERRO`, e o `--strict`
+  # so falha em `FALTA` -- ou seja, o verde escondia exatamente o que se queria
+  # apanhar (foi o caso do `crashes.sensor_log` da #63).
+  if printf '%s' "$body" | grep -qE 'PGRST|"code":"42'; then
     printf '  FALTA %s\n' "$label"
     printf '%s' "$body" | grep -oE '"(code|details|message)":"[^"]*"' | head -2 | sed 's/^/          /'
     MISSING=$((MISSING + 1))
@@ -111,6 +116,13 @@ probe "app_version.apk_sha256" GET "app_version?select=version_code,apk_sha256&l
 # e e isso que o probe apanha antes de uma release.
 probe "live_shares.battery_level" GET "live_shares?select=battery_level&limit=1" || true
 probe "live_points.battery_level" GET "live_points?select=battery_level&limit=1" || true
+
+# O log de sensores do relato de problema (ideia #63): entra por um `alter table`
+# no `crashes.sql` e o app passa a enviá-lo em cada crash. Sem a coluna na nuvem
+# o insert leva 42703 — o `pushCrashReport` já cai para um sem o campo, mas o
+# probe confirma que ela chegou antes de a release sair, em vez de o "verde" o
+# esconder.
+probe "crashes.sensor_log" GET "crashes?select=sensor_log&limit=1" || true
 
 echo "Funcoes (a pagina web do rastreio ao vivo chama-as sem login):"
 # Com o nome do argumento e nao um valor solto: o PostgREST casa por nome, e um
