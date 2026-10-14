@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DEFAULT_DECLINATION, type Declination } from '../utils/declination';
+import type { UnitSystem } from '../utils/units';
 
 export type AppMode = 'full' | 'minimal' | 'adventure';
 export type DisplayMode =
@@ -31,6 +32,7 @@ const VOICE_GUIDE_KEY = '@bussola/voiceGuide';
 const WIND_CAL_KEY = '@bussola/windCal';
 const VIRTUAL_WP_KEY = '@bussola/virtualWp';
 const USE_MILS_KEY = '@bussola/useMils';
+const UNIT_SYSTEM_KEY = '@bussola/unitSystem';
 const CADENCE_BPM_KEY = '@bussola/cadenceBpm';
 const CADENCE_MODE_KEY = '@bussola/cadenceMode';
 const KEEP_AWAKE_KEY = '@bussola/keepAwake';
@@ -197,6 +199,20 @@ export const loadUseMils = async (): Promise<boolean> => {
 
 export const saveUseMils = async (enabled: boolean) => {
   await AsyncStorage.setItem(USE_MILS_KEY, enabled ? '1' : '0');
+};
+
+export const loadUnitSystem = async (): Promise<UnitSystem> => {
+  try {
+    return (await AsyncStorage.getItem(UNIT_SYSTEM_KEY)) === 'imperial'
+      ? 'imperial'
+      : 'metric';
+  } catch {
+    return 'metric';
+  }
+};
+
+export const saveUnitSystem = async (units: UnitSystem) => {
+  await AsyncStorage.setItem(UNIT_SYSTEM_KEY, units);
 };
 
 export const loadKeepAwake = async (): Promise<boolean> => {

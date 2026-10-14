@@ -92,11 +92,28 @@ const bindIdleListeners = () => {
 
 export const isSpeaking = (): boolean => speaking;
 
+/**
+ * "Silenciar a Kefera" (#69): enquanto `muted` for verdadeiro, nenhuma fala
+ * nova sai — `speak` e `speakAndWait` desistem logo no início. É o único ponto
+ * por onde toda a fala passa, então desligá-lo aqui cala a assistente inteira
+ * (respostas, boas-vindas, guia de voz) sem espalhar verificações pelo app.
+ *
+ * `stopSpeaking` continua a funcionar de propósito: silenciar precisa de cortar
+ * a fala que já está a acontecer, e isso é responsabilidade de quem chama.
+ */
+let muted = false;
+
+export const setMuted = (value: boolean): void => {
+  muted = value;
+};
+
+export const isMuted = (): boolean => muted;
+
 export const whenSpeechIdle = (): Promise<void> =>
   speaking ? new Promise<void>(resolve => idleWaiters.push(resolve)) : Promise.resolve();
 
 export const speak = async (text: string): Promise<void> => {
-  if (!text) {
+  if (!text || muted) {
     return;
   }
   try {
@@ -115,7 +132,7 @@ export const speakAndWait = async (
   text: string,
   timeoutMs = 8000,
 ): Promise<void> => {
-  if (!text) {
+  if (!text || muted) {
     return;
   }
   try {

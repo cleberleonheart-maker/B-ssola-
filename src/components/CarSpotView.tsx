@@ -9,6 +9,7 @@ import {
   formatDistance,
 } from '../utils/geo';
 import { cardinalOf, normalizeHeading, formatAzimuth } from '../utils/compass';
+import { formatAccuracy } from '../utils/units';
 import { carSpotService, type CarSpot } from '../services/carSpotService';
 
 type Props = {
@@ -164,7 +165,7 @@ const CarSpotView = ({
 
       {car.accuracy != null && (
         <Text style={[styles.time, { color: colors.textMuted }]}>
-          ±{Math.round(car.accuracy)} m
+          ±{formatAccuracy(car.accuracy)}
         </Text>
       )}
     </View>

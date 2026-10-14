@@ -27,9 +27,13 @@ import EmergencyModal from '../components/EmergencyModal';
 import CoordModal from '../components/CoordModal';
 import {
   fetchCivilAlerts,
+  fetchCurrentTemperature,
   isSevere,
 } from '../services/alertsService';
-import { showAlertNotification } from '../services/notifications';
+import {
+  showAlertNotification,
+  showPressureDropNotification,
+} from '../services/notifications';
 import { useThemeColors, useTheme } from '../theme/ThemeContext';
 import { useAssistant } from '../assistant/AssistantContext';
 import { speak } from '../assistant/voice';
@@ -57,6 +61,16 @@ import {
   barometricAltitude,
 } from '../services/barometerService';
 import {
+  loadPressureHistory,
+  recordPressure,
+  fastPressureDrop,
+} from '../services/pressureHistoryService';
+import {
+  recordMotionSample,
+  updateFixQuality,
+} from '../services/sensorLogService';
+import { setLastLocation } from '../services/lastLocation';
+import {
   loadWaypoints,
   saveWaypoint,
   removeWaypoint,
@@ -76,6 +90,8 @@ import {
   saveVirtualWp,
   loadUseMils,
   saveUseMils,
+  loadUnitSystem,
+  saveUnitSystem,
   loadLockPin,
   saveLockPin,
   clearLockPin,
@@ -120,6 +136,7 @@ import {
   moonPhase,
   type CelestialPoint,
 } from '../utils/astro';
+import { setUnitSystem, formatAccuracy, type UnitSystem } from '../utils/units';
 import { useRepetitiveBeep, soundAvailable } from '../services/sound';
 import {
   updateWidget,
@@ -210,6 +227,20 @@ const CompassScreen = () => {
   });
   const [place, setPlace] = useState<{ name: string; cep: string | null } | null>(null);
   const geoLastRef = useRef<{ lat: number; lon: number; at: number } | null>(null);
+  // Última posição conhecida, sempre atual: usada por efeitos de polling que
+  // não podem se recriar a cada fix do GPS (alertas de clima, etc.).
+  const latestFixRef = useRef<{ latitude: number; longitude: number }>({
+    latitude: 0,
+    longitude: 0,
+  });
+  // Inline-fix contínuo: ref carregada a cada render, que é onde a localização
+  // realmente muda, sem forçar re-execução de efeitos dependentes dela.
+  useEffect(() => {
+    latestFixRef.current = {
+      latitude: location.latitude,
+      longitude: location.longitude,
+    };
+  });
 
   const prevHeadingRef = useRef<number | null>(null);
   const continuousRef = useRef(0);
@@ -243,11 +274,19 @@ const CompassScreen = () => {
   }, [width, height, dialAreaH, appMode]);
 
   const [baroPressure, setBaroPressure] = useState<number | null>(null);
+  // Temperatura atual para o widget (ideia #20): só a rede a dá, então é
+  // opcional e atualiza no mesmo ritmo dos alertas.
+  const [widgetTemp, setWidgetTemp] = useState<string | null>(null);
   const [baroAvailable, setBaroAvailable] = useState(true);
   const [baroBaseline, setBaroBaseline] = useState<number | null>(null);
+  // O alarme da queda de pressão (ideia #104) dispara uma vez por episódio: só
+  // volta a avisar depois de a série deixar de ultrapassar o limite, senão cada
+  // leitura dos 10 s seguintes repetia a mesma notificação.
+  const pressureAlertRef = useRef(false);
 
   const [odometer, setOdometer] = useState(0);
   const [useMils, setUseMils] = useState(false);
+  const [unitSystem, setUnitSystemState] = useState<UnitSystem>('metric');
   const [odoHistory, setOdoHistory] = useState<{
     today: number;
     week: number;
@@ -294,6 +333,10 @@ const CompassScreen = () => {
       setVirtualWpId(id);
     });
     loadUseMils().then(setUseMils);
+    loadUnitSystem().then(units => {
+      setUnitSystem(units);
+      setUnitSystemState(units);
+    });
     loadKeepAwake().then(setKeepAwake);
   }, []);
 
@@ -357,6 +400,16 @@ const CompassScreen = () => {
     });
   }, []);
 
+  const toggleUnitSystem = useCallback(() => {
+    setUnitSystemState(prev => {
+      const next: UnitSystem = prev === 'imperial' ? 'metric' : 'imperial';
+      saveUnitSystem(next).catch(() => {});
+      // aplica já na fonte: as formatações leem a escolha viva em `units.ts`
+      setUnitSystem(next);
+      return next;
+    });
+  }, []);
+
   const toggleKeepAwake = useCallback(() => {
     setKeepAwake(prev => {
       const next = !prev;
@@ -412,6 +465,10 @@ const CompassScreen = () => {
         loadVoiceGuide().then(setVoiceGuide),
         loadVirtualWp().then(setVirtualWpId),
         loadUseMils().then(setUseMils),
+        loadUnitSystem().then(units => {
+          setUnitSystem(units);
+          setUnitSystemState(units);
+        }),
       ]);
       getTotals()
         .then(setOdoHistory)
@@ -506,6 +563,10 @@ const CompassScreen = () => {
     setLocation(fix);
     setLocLoading(false);
     setLocError(null);
+    // Só a qualidade do GPS entra no log (ideia #63), nunca a posição.
+    updateFixQuality(fix.accuracy, fix.speed);
+    // A posição partilhada serve o tema "pelo sol real" (ideia #15).
+    setLastLocation(fix.latitude, fix.longitude);
   }, []);
 
   const handleLocError = useCallback((error: Error) => {
@@ -538,6 +599,7 @@ const CompassScreen = () => {
 
     let lastAccel = { x: 0, y: 0, z: 1 };
     let lastMag = { x: 0, y: 0, z: 0 };
+    let lastHeading: number | null = null;
     let accelSamples = 0;
     let accelMagMax = 0;
 
@@ -546,6 +608,7 @@ const CompassScreen = () => {
         lastMag = applyCalibration({ x, y, z }, calibrationRef.current);
         const headingDeg = getHeading(lastAccel, lastMag);
         if (headingDeg !== null && headingDeg !== undefined) {
+          lastHeading = headingDeg;
           handleHeading(headingDeg);
         }
       },
@@ -580,6 +643,18 @@ const CompassScreen = () => {
           accelSamples = 0;
           accelMagMax = 0;
         }
+
+        // Alimenta o log de sensores (ideia #63) para o relato de problema.
+        // Sem coordenadas: só o movimento, o heading e a qualidade do GPS.
+        recordMotionSample({
+          ax: x,
+          ay: y,
+          az: z,
+          mx: lastMag.x,
+          my: lastMag.y,
+          mz: lastMag.z,
+          heading: lastHeading,
+        });
       },
       error: (error: Error) => {
         setAccelError(t('ui_accel_unavailable'));
@@ -594,12 +669,28 @@ const CompassScreen = () => {
   }, [handleHeading, t]);
 
   useEffect(() => {
+    void loadPressureHistory().catch(() => {});
     const stop = watchBarometer(
-      reading => setBaroPressure(reading.pressure),
+      reading => {
+        setBaroPressure(reading.pressure);
+        // Alimenta o histórico partilhado (o painel do barómetro lê-o) e avalia
+        // a regra de campo no mesmo passo: a queda tem de soar mesmo quando o
+        // painel não está montado, que é o caso de uso da ideia #104.
+        const series = recordPressure(reading.pressure);
+        const drop = fastPressureDrop(series);
+        if (drop) {
+          if (!pressureAlertRef.current) {
+            pressureAlertRef.current = true;
+            void showPressureDropNotification(drop.dropHpa, t);
+          }
+        } else {
+          pressureAlertRef.current = false;
+        }
+      },
       () => setBaroAvailable(false),
     );
     return stop;
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     applyWatching(locationMode);
@@ -643,13 +734,51 @@ const CompassScreen = () => {
     return () => clearInterval(id);
   }, [location.latitude, location.longitude]);
 
+  // Verificação imediata: no primeiro fix real (0,0 = sem fix ainda). Antes
+  // este efeito também criava o intervalo de 30 min, mas como dependia de
+  // latitude/longitude ele se recriava a cada fix e o timer nunca atingia os
+  // 30 min enquanto o usuário se movia.
   useEffect(() => {
-    const lat = location.latitude;
-    const lon = location.longitude;
-    if (lat === 0 && lon === 0) return;
+    if (location.latitude === 0 && location.longitude === 0) return;
+    if (alertsCheckedRef.current) return;
+    alertsCheckedRef.current = true;
+    let cancelled = false;
+    fetchCivilAlerts(location.latitude, location.longitude).then(result => {
+      if (cancelled) return;
+      if (isSevere(result)) {
+        setAlertsVisible(true);
+      }
+      result.weather
+        .filter(
+          alert => alert.severity === 'orange' || alert.severity === 'red',
+        )
+        .forEach(alert => {
+          const key = `${alert.severity}|${alert.event}|${alert.expires ?? 'x'}`;
+          if (!notifiedAlertsRef.current.has(key)) {
+            notifiedAlertsRef.current.add(key);
+            showAlertNotification(alert, t);
+          }
+        });
+    });
+    fetchCurrentTemperature(location.latitude, location.longitude).then(temp => {
+      if (!cancelled && temp != null) {
+        setWidgetTemp(`${Math.round(temp)}°C`);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [location.latitude, location.longitude, t]);
+
+  // Polling de 30 min desacoplado do GPS: lê a última posição do ref em vez
+  // de fechar sobre um fix capturado, então o intervalo não se reinicia a cada
+  // atualização de localização.
+  useEffect(() => {
     let active = true;
     const check = () => {
-      fetchCivilAlerts(lat, lon).then(result => {
+      const fix = latestFixRef.current;
+      if (fix.latitude === 0 && fix.longitude === 0) return;
+      fetchCivilAlerts(fix.latitude, fix.longitude).then(result => {
         if (!active) return;
         if (isSevere(result)) {
           setAlertsVisible(true);
@@ -666,17 +795,18 @@ const CompassScreen = () => {
             }
           });
       });
+      fetchCurrentTemperature(fix.latitude, fix.longitude).then(temp => {
+        if (active && temp != null) {
+          setWidgetTemp(`${Math.round(temp)}°C`);
+        }
+      });
     };
-    if (!alertsCheckedRef.current) {
-      alertsCheckedRef.current = true;
-      check();
-    }
     const id = setInterval(check, 30 * 60 * 1000);
     return () => {
       active = false;
       clearInterval(id);
     };
-  }, [location.latitude, location.longitude, t]);
+  }, [t]);
 
   useEffect(() => {
     const lat = location.latitude;
@@ -808,7 +938,7 @@ const CompassScreen = () => {
     }
     try {
       await Share.share({
-        message: `📍 ${t('ui_share_here')} — ${t('ui_app_title')}\n${formatCoord(location.latitude, true)}\n${formatCoord(location.longitude, false)}\n${t('ui_share_accuracy')}: ±${Math.round(location.accuracy ?? 0)} m`,
+        message: `📍 ${t('ui_share_here')} — ${t('ui_app_title')}\n${formatCoord(location.latitude, true)}\n${formatCoord(location.longitude, false)}\n${t('ui_share_accuracy')}: ±${formatAccuracy(location.accuracy ?? 0)}`,
       });
     } catch {
       Alert.alert(t('ui_error'), t('ui_share_error'));
@@ -1162,19 +1292,16 @@ const CompassScreen = () => {
       pressure: baroPressure ?? 0,
       altitude: baroAlt ?? location.altitude ?? 0,
       hasAlt: baroAlt != null || location.altitude != null,
+      temp: widgetTemp,
     });
-  }, [heading, cardinalFull, baroPressure, baroAlt, location.altitude]);
+  }, [heading, cardinalFull, baroPressure, baroAlt, location.altitude, widgetTemp]);
 
   useEffect(() => {
-    if (!geofenceSupported || waypoints.length === 0) return;
-    if (location.latitude === 0 && location.longitude === 0) return;
-    const d = haversine(
-      location.latitude,
-      location.longitude,
-      waypoints[0].latitude,
-      waypoints[0].longitude,
-    );
-    if (!Number.isFinite(d)) return;
+    if (!geofenceSupported || waypoints.length === 0 || !hasFix) return;
+    // Recria só quando os waypoints (ou a disponibilidade de fix) mudam. Antes
+    // o efeito dependia de lat/lon e disparava a cada fix, removendo e
+    // re-registrando todas as geofences — com o remove (fire-and-forget) e o
+    // add concorrendo, dava para uma geofence cair no chão em silêncio.
     for (const wp of waypoints) {
       addGeofence({
         id: wp.id,
@@ -1190,7 +1317,7 @@ const CompassScreen = () => {
         removeGeofence(wp.id).catch(() => {});
       }
     };
-  }, [waypoints, location.latitude, location.longitude, t]);
+  }, [waypoints, hasFix, t]);
 
   const modeCards = useMemo(() => buildModeCards(t), [t]);
 
@@ -1395,6 +1522,8 @@ const CompassScreen = () => {
         onToggleVoiceGuide={toggleVoiceGuide}
         mils={useMils}
         onToggleMils={toggleMils}
+        unitSystem={unitSystem}
+        onToggleUnitSystem={toggleUnitSystem}
         keepAwake={keepAwake}
         onToggleKeepAwake={toggleKeepAwake}
         onVerifyPin={handleVerifyPin}

@@ -1,9 +1,11 @@
 import type { Translator } from '../i18n/strings';
 import { matches } from './matcher';
+import { buildCommandCatalog } from './suggest';
 import { normalizeText } from './normalizer';
 import { evalArithmetic } from './math';
 import { cardinalOf, formatCoord } from '../utils/compass';
 import { haversine, initialBearing, formatDistance } from '../utils/geo';
+import { formatSpeed } from '../utils/units';
 import { toDMS, toUTM, formatUTM } from '../utils/coords';
 import type { DisplayMode } from '../services/preferencesService';
 import { getTotals } from '../services/odometerService';
@@ -481,7 +483,7 @@ const speedSkill: Skill = {
       return t('as_speed_none');
     }
     return t('as_speed_now', {
-      kmh: Math.round(ctx.speed * 3.6),
+      speed: formatSpeed(ctx.speed),
     });
   },
 };
@@ -871,6 +873,10 @@ const skills: Skill[] = [
   howAreYouSkill,
   complimentSkill,
 ];
+
+// Catálogo de comandos concretos para a "segunda chance" (ideia #67): o motor
+// consulta-o só quando nenhum skill casou, em vez de repetir o fallback seco.
+export const skillCatalog = buildCommandCatalog(skills);
 
 export const runSkills = async (
   ctx: AssistantContextData,

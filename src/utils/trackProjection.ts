@@ -258,15 +258,18 @@ export const distanceToTrackPath = (
   points: readonly GeoPoint[],
 ): TrackPathHint | null => {
   if (points.length === 0) return null;
-  const cosLat = Math.cos(toRad(lat));
+  // O resto do módulo usa METERS_PER_DEGREE_LAT (111320); aqui estava
+  // hardcoded 111000, dando ~0.3% de diferença nas distâncias.
+  const cosLat = Math.max(Math.abs(Math.cos(toRad(lat))), 0.05);
+  const mPerDeg = METERS_PER_DEGREE_LAT;
   const toPlanar = (p: GeoPoint) => ({
-    x: (p.lon - lon) * 111000 * cosLat,
-    y: (p.lat - lat) * 111000,
+    x: (p.lon - lon) * mPerDeg * cosLat,
+    y: (p.lat - lat) * mPerDeg,
   });
 
   const nearest = (x: number, y: number): GeoPoint => ({
-    lat: lat + y / 111000,
-    lon: lon + x / (111000 * cosLat),
+    lat: lat + y / mPerDeg,
+    lon: lon + x / (mPerDeg * cosLat),
   });
 
   const first = toPlanar(points[0]);

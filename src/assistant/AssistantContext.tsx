@@ -25,6 +25,8 @@ import {
   stopSpeaking,
   destroyVoice,
   setVoiceLanguage,
+  setMuted,
+  isMuted,
   whenSpeechIdle,
 } from './voice';
 import {
@@ -45,6 +47,10 @@ type AssistantApi = {
   listening: boolean;
   wakeOn: boolean;
   toggleWake: () => void;
+  /** Instante (epoch ms) até quando a Kefera está silenciada, ou null. */
+  mutedUntil: number | null;
+  muteFor: (minutes: number) => void;
+  unmute: () => void;
   open: boolean;
   setOpen: (open: boolean) => void;
   toggleVoice: () => Promise<void>;
@@ -105,6 +111,7 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [listening, setListening] = useState(false);
   const [wakeOn, setWakeOnState] = useState(false);
+  const [mutedUntil, setMutedUntil] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
@@ -118,6 +125,7 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
   const commandRetriesRef = useRef(0);
   const voiceModeRef = useRef<VoiceMode>('none');
   const wakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const unmuteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toggleWakeRef = useRef<() => void>(() => {});
   const actionHandlerRef = useRef<(action: AssistantAction) => void>(() => {});
 
@@ -215,6 +223,12 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
 
   const beginSession = useCallback(
     async (mode: Exclude<VoiceMode, 'none' | 'manual'>) => {
+      // Silenciada: não reabrir o microfone, senão a palavra de ativação
+      // voltaria a disparar e a assistente continuaria a ouvir apesar do
+      // "silêncio". A escuta volta sozinha quando o prazo termina.
+      if (isMuted()) {
+        return;
+      }
       if (
         mode === 'command' &&
         sessionActiveRef.current &&
@@ -269,6 +283,54 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       beginSession('wake');
     }, 450);
   }, [beginSession, clearWakeTimer]);
+
+  const clearUnmuteTimer = useCallback(() => {
+    if (unmuteTimerRef.current) {
+      clearTimeout(unmuteTimerRef.current);
+      unmuteTimerRef.current = null;
+    }
+  }, []);
+
+  /**
+   * Silencia a Kefera até `Date.now() + minutes` (#69).
+   *
+   * Cala a fala na fonte (`setMuted`), corta o que estiver a tocar e fecha a
+   * escuta — sem isto o microfone continuaria aberto e a palavra de ativação
+   * dispararia respostas que ninguém ouve mas que gastam bateria e rede. O
+   * prazo pedido é reposto a cada chamada: escolher "30 min" depois de um
+   * "5 min" não pode deixar o prazo mais curto a mandar.
+   */
+  const muteFor = useCallback(
+    (minutes: number) => {
+      clearUnmuteTimer();
+      const until = Date.now() + minutes * 60_000;
+      setMuted(true);
+      setMutedUntil(until);
+      stopSpeaking();
+      if (sessionActiveRef.current) {
+        stopSession();
+      }
+      setListening(false);
+      unmuteTimerRef.current = setTimeout(() => {
+        unmuteTimerRef.current = null;
+        setMuted(false);
+        setMutedUntil(null);
+        if (wakeOnRef.current && appActiveRef.current) {
+          scheduleWakeCycle();
+        }
+      }, minutes * 60_000);
+    },
+    [clearUnmuteTimer, scheduleWakeCycle, stopSession],
+  );
+
+  const unmute = useCallback(() => {
+    clearUnmuteTimer();
+    setMuted(false);
+    setMutedUntil(null);
+    if (wakeOnRef.current && appActiveRef.current) {
+      scheduleWakeCycle();
+    }
+  }, [clearUnmuteTimer, scheduleWakeCycle]);
 
   const wakeDetected = useCallback(
     async (inlineCommand?: string) => {
@@ -469,6 +531,13 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     let alive = true;
+    // O silêncio do `muted` em `voice.ts` é estado de módulo e sobrevive a uma
+    // remontagem do provider (fast refresh em desenvolvimento). O silêncio é
+    // temporário e só de sessão, então o arranque parte sempre sem ele — senão
+    // a tela diria "não silenciada" enquanto a voz continuava calada.
+    setMuted(false);
+    setMutedUntil(null);
+
     isVoiceAvailable()
       .then(ok => {
         if (alive) {
@@ -528,11 +597,13 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       detach();
       appSub.remove();
       clearWakeTimer();
+      clearUnmuteTimer();
       stopSession();
     };
   }, [
     beginSession,
     clearWakeTimer,
+    clearUnmuteTimer,
     handleTranscription,
     handleVoiceEnd,
     handleVoiceError,
@@ -546,6 +617,9 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       listening,
       wakeOn,
       toggleWake,
+      mutedUntil,
+      muteFor,
+      unmute,
       open,
       setOpen: handleSetOpen,
       toggleVoice,
@@ -562,6 +636,9 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       listening,
       wakeOn,
       toggleWake,
+      mutedUntil,
+      muteFor,
+      unmute,
       open,
       handleSetOpen,
       toggleVoice,

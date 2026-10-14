@@ -7,6 +7,8 @@ import {
   saveVoiceGuide,
   loadUseMils,
   saveUseMils,
+  loadUnitSystem,
+  saveUnitSystem,
   loadAppMode,
   saveAppMode,
   loadVirtualWp,
@@ -33,6 +35,7 @@ import {
   type DayTotal,
 } from './odometerService';
 import type { Declination } from '../utils/declination';
+import type { UnitSystem } from '../utils/units';
 
 export const BACKUP_FILE_VERSION = 1;
 
@@ -45,6 +48,7 @@ export type BackupData = {
   fov: number;
   voiceGuide: boolean;
   useMils: boolean;
+  unitSystem: UnitSystem;
   appMode: AppMode;
   virtualWpName: string | null;
   carSpot: CarSpot | null;
@@ -68,6 +72,7 @@ export const buildBackup = async (): Promise<string> => {
     fov,
     voiceGuide,
     useMils,
+    unitSystem,
     appMode,
     virtualWpId,
     carSpot,
@@ -81,6 +86,7 @@ export const buildBackup = async (): Promise<string> => {
     loadFov(),
     loadVoiceGuide(),
     loadUseMils(),
+    loadUnitSystem(),
     loadAppMode(),
     loadVirtualWp(),
     carSpotService.load(),
@@ -106,6 +112,7 @@ export const buildBackup = async (): Promise<string> => {
       fov,
       voiceGuide,
       useMils,
+      unitSystem,
       appMode,
       virtualWpName,
       carSpot,
@@ -180,6 +187,9 @@ export const applyBackup = async (raw: string): Promise<BackupResult> => {
     }
     if (typeof data.useMils === 'boolean') {
       await saveUseMils(data.useMils);
+    }
+    if (data.unitSystem === 'metric' || data.unitSystem === 'imperial') {
+      await saveUnitSystem(data.unitSystem);
     }
     if (typeof data.appMode === 'string') {
       await saveAppMode(data.appMode as AppMode);

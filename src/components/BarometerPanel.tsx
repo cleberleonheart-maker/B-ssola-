@@ -1,10 +1,15 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
+import {
+  loadPressureHistory,
+  subscribePressureHistory,
+  type BaroEntry as Entry,
+} from '../services/pressureHistoryService';
 import TrendChart from './TrendChart';
+import { altitudeValue, altitudeUnit } from '../utils/units';
 
 type Props = {
   pressure: number | null;
@@ -14,14 +19,6 @@ type Props = {
   onResetBaseline: () => void;
   available: boolean;
 };
-
-const HISTORY_KEY = '@bussola/baroHistory';
-const SAMPLE_INTERVAL_MS = 10000;
-const SAVE_INTERVAL_MS = 90000;
-const LIVE_MAX = 120;
-const PERSIST_MAX = 140;
-
-type Entry = { ts: number; p: number };
 
 const BarometerPanel = ({
   pressure,
@@ -35,61 +32,15 @@ const BarometerPanel = ({
   const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
+  // O painel já não é dono do histórico (ideia #104): só o lê. Quem coleta é o
+  // `CompassScreen`, que observa o barómetro em qualquer modo — é o que permite
+  // o alarme funcionar com os painéis fechados.
   const [history, setHistory] = useState<Entry[]>([]);
-  const liveRef = useRef<Entry[]>([]);
-  const lastSampleRef = useRef(0);
-  const lastSaveRef = useRef(0);
 
   useEffect(() => {
-    let alive = true;
-    AsyncStorage.getItem(HISTORY_KEY)
-      .then(raw => {
-        if (!raw || !alive) return;
-        try {
-          const arr = JSON.parse(raw) as unknown;
-          if (!Array.isArray(arr)) return;
-          const entries = arr
-            .filter(
-              (e): e is Entry =>
-                !!e && typeof e.ts === 'number' && typeof e.p === 'number',
-            )
-            .slice(-PERSIST_MAX);
-          const now = Date.now();
-          const stored = entries
-            .filter(e => now - e.ts < 30 * 60 * 1000)
-            .slice(-LIVE_MAX);
-          // preserva as amostras já coletadas nesta sessão, que a leitura do
-          // AsyncStorage pode resolver depois do primeiro sample
-          liveRef.current = [...stored, ...liveRef.current]
-            .filter((e, i, merged) => merged.findIndex(x => x.ts === e.ts) === i)
-            .sort((a, b) => a.ts - b.ts)
-            .slice(-LIVE_MAX);
-          setHistory(liveRef.current);
-        } catch {
-          // ignore bad data
-        }
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
+    void loadPressureHistory();
+    return subscribePressureHistory(setHistory);
   }, []);
-
-  useEffect(() => {
-    if (pressure == null || !available) return;
-    const now = Date.now();
-    if (now - lastSampleRef.current < SAMPLE_INTERVAL_MS) return;
-    lastSampleRef.current = now;
-    const next: Entry[] = [...liveRef.current.slice(-(LIVE_MAX - 1)), { ts: now, p: pressure }];
-    liveRef.current = next;
-    setHistory(next);
-    if (now - lastSaveRef.current >= SAVE_INTERVAL_MS) {
-      lastSaveRef.current = now;
-      AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next.slice(-PERSIST_MAX))).catch(
-        () => {},
-      );
-    }
-  }, [pressure, available]);
 
   const trend = useMemo(() => {
     const h = history;
@@ -164,8 +115,10 @@ const BarometerPanel = ({
                 {altitude != null ? (
                   <>
                     {altitude >= 0 ? '+' : ''}
-                    {Math.round(altitude)}{' '}
-                    <Text style={[styles.unit, { color: colors.textMuted }]}>m</Text>
+                    {altitudeValue(altitude)}{' '}
+                    <Text style={[styles.unit, { color: colors.textMuted }]}>
+                      {altitudeUnit()}
+                    </Text>
                   </>
                 ) : (
                   <Text style={[styles.none, { color: colors.textMuted }]}>—</Text>

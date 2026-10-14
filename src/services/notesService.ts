@@ -8,6 +8,7 @@ export type FieldNote = {
   alt: number | null;
   at: number;
   photoPath: string | null;
+  heading: number | null;
   cloudSynced: boolean;
 };
 

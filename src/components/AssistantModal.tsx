@@ -183,6 +183,9 @@ const AssistantModal = () => {
     toggleVoice,
     wakeOn,
     toggleWake,
+    mutedUntil,
+    muteFor,
+    unmute,
   } = useAssistant();
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
@@ -383,6 +386,42 @@ const AssistantModal = () => {
               </React.Fragment>
             )}
           </ScrollView>
+
+          {ready && (
+            <View style={styles.muteRow}>
+              {mutedUntil != null ? (
+                <>
+                  <Text style={[styles.muteStatus, { color: colors.textMuted }]}>
+                    🔇 {t('as_muted_note')}
+                  </Text>
+                  <Pressable
+                    onPress={unmute}
+                    hitSlop={8}
+                    style={[styles.muteChip, { borderColor: colors.primary }]}>
+                    <Text style={[styles.muteChipText, { color: colors.primary }]}>
+                      🔊 {t('as_unmute')}
+                    </Text>
+                  </Pressable>
+                </>
+              ) : (
+                <>
+                  <Text style={[styles.muteStatus, { color: colors.textMuted }]}>
+                    {t('as_mute_label')}
+                  </Text>
+                  {[5, 15, 30].map(minutes => (
+                    <Pressable
+                      key={minutes}
+                      onPress={() => muteFor(minutes)}
+                      style={[styles.muteChip, { borderColor: colors.border }]}>
+                      <Text style={[styles.muteChipText, { color: colors.text }]}>
+                        {t(`as_mute_${minutes}`)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </>
+              )}
+            </View>
+          )}
 
           <View style={styles.inputRow}>
             <Pressable
@@ -758,6 +797,27 @@ const createStyles = (colors: {
       color: colors.textMuted,
       marginTop: 3,
       marginHorizontal: 4,
+    },
+    muteRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      paddingTop: spacing.sm,
+      gap: spacing.sm,
+    },
+    muteStatus: {
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    muteChip: {
+      borderWidth: 1,
+      borderRadius: radius.full,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 4,
+    },
+    muteChipText: {
+      fontSize: 12,
+      fontWeight: '700',
     },
     inputRow: {
       flexDirection: 'row',

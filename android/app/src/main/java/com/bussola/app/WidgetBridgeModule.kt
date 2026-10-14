@@ -27,8 +27,12 @@ class WidgetBridgeModule(private val reactContext: ReactApplicationContext) :
       .putBoolean("has_alt", data.getBoolean("hasAlt"))
       .putString("temp", data.getString("temp"))
       .apply()
-    val intent = Intent(BussolaWidgetProvider.ACTION_UPDATE)
-      .setPackage(reactContext.packageName)
+    // Intenção explícita para o provider: um `sendBroadcast` só com `setPackage`
+    // e uma ação que não está no <intent-filter> do receiver nunca era entregue
+    // (o manifesto só declara APPWIDGET_UPDATE), então o widget ficava preso no
+    // último valor. Apontar para o componente dispensa o filtro.
+    val intent = Intent(reactContext, BussolaWidgetProvider::class.java)
+      .setAction(BussolaWidgetProvider.ACTION_UPDATE)
     reactContext.sendBroadcast(intent)
   }
 }

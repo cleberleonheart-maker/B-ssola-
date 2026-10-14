@@ -11,6 +11,7 @@ import { useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import { formatDistance, haversine, initialBearing, normalizeAzimuth } from '../utils/geo';
+import { altitudeValue, altitudeUnit } from '../utils/units';
 import {
   distanceToTrackPath,
   polylineSegments,
@@ -38,6 +39,12 @@ import {
 } from '../services/trackService';
 import { ensureCloudUser, pushTracks } from '../services/cloud';
 import { flushOdometer } from '../services/odometerService';
+import { sunEvents } from '../utils/astro';
+import {
+  estimateReturnBeforeDark,
+  formatClock,
+} from '../utils/returnBeforeDark';
+import { showReturnBeforeDarkNotification } from '../services/notifications';
 
 const MIN_SEGMENT_M = 3;
 const MIN_GAP_MS = 1000;
@@ -223,6 +230,52 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
   }, [location, recording]);
 
   const liveStats = useMemo(() => computeTrackStats(points), [points]);
+
+  // Pôr do sol na posição atual (ideia #23). Só depende do sítio: dentro do
+  // mesmo dia, a hora-limite muda por causa do ritmo, não do sol.
+  const sunset = useMemo(() => {
+    if (!hasFix) return null;
+    return sunEvents(new Date(), location.latitude, location.longitude).sunset;
+  }, [hasFix, location.latitude, location.longitude]);
+
+  const returnDark = useMemo(() => {
+    if (!recording || points.length < 2 || !hasFix) return null;
+    const startPoint = points[0];
+    return estimateReturnBeforeDark({
+      traveledMeters: liveStats.distance,
+      elapsedMs: elapsed,
+      returnMeters: haversine(
+        location.latitude,
+        location.longitude,
+        startPoint.lat,
+        startPoint.lon,
+      ),
+      now: Date.now(),
+      sunset,
+    });
+  }, [
+    recording,
+    points,
+    hasFix,
+    liveStats.distance,
+    elapsed,
+    location.latitude,
+    location.longitude,
+    sunset,
+  ]);
+
+  // Aviso uma vez por sessão, quando a hora-limite passa.
+  const lateNotifiedRef = useRef(false);
+  useEffect(() => {
+    if (!recording) {
+      lateNotifiedRef.current = false;
+      return;
+    }
+    if (sunset && returnDark?.late && !lateNotifiedRef.current) {
+      lateNotifiedRef.current = true;
+      showReturnBeforeDarkNotification(formatClock(sunset), t).catch(() => {});
+    }
+  }, [recording, returnDark, sunset, t]);
 
   const drawPoints = useMemo(() => {
     const pts = points.length > 0 ? points : saved[0]?.points ?? [];
@@ -444,7 +497,7 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
                 {t('track_gain')}
               </Text>
               <Text style={[styles.statValue, { color: colors.success }]}>
-                +{liveStats.eleGain} m
+                +{altitudeValue(liveStats.eleGain)} {altitudeUnit()}
               </Text>
             </View>
             <View style={styles.statCell}>
@@ -452,7 +505,7 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
                 {t('track_loss')}
               </Text>
               <Text style={[styles.statValue, { color: colors.north }]}>
-                -{liveStats.eleLoss} m
+                -{altitudeValue(liveStats.eleLoss)} {altitudeUnit()}
               </Text>
             </View>
           </View>
@@ -460,6 +513,31 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
           <Text style={[styles.noFix, { color: colors.textMuted }]}>
             {t('track_no_gps')}
           </Text>
+        )}
+
+        {recording && returnDark && sunset && (
+          <View
+            style={[
+              styles.returnCard,
+              { borderColor: returnDark.late ? colors.danger : colors.accent },
+            ]}>
+            <Text
+              style={[
+                styles.returnTitle,
+                { color: returnDark.late ? colors.danger : colors.accent },
+              ]}>
+              🌇 {t('track_return_dark_title')}
+            </Text>
+            <Text style={[styles.returnText, { color: colors.text }]}>
+              {returnDark.late
+                ? t('track_return_dark_late', { sunset: formatClock(sunset) })
+                : t('track_return_dark_body', {
+                    time: formatClock(returnDark.turnBackAt),
+                    pace: returnDark.paceMinPerKm.toFixed(1),
+                    sunset: formatClock(sunset),
+                  })}
+            </Text>
+          </View>
         )}
 
         {points.length >= 2 && (
@@ -687,7 +765,7 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
                 </Text>
                 <Text style={[styles.savedMeta, { color: colors.textMuted }]}>
                   {formatDistance(track.distance)} · {formatDuration(track.endedAt - track.startedAt)}{' '}
-                  · +{track.eleGain}/-{track.eleLoss} m
+                  · +{altitudeValue(track.eleGain)}/-{altitudeValue(track.eleLoss)} {altitudeUnit()}
                   {(track.pois ?? []).length > 0
                     ? ` · 📍 ${track.pois!.length}`
                     : ''}
@@ -810,6 +888,23 @@ const createStyles = (colors: {
       textAlign: 'center',
       paddingVertical: spacing.md,
       fontSize: 13,
+    },
+    returnCard: {
+      borderWidth: 1,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      marginTop: spacing.sm,
+    },
+    returnTitle: {
+      fontSize: 14,
+      fontWeight: '900',
+    },
+    returnText: {
+      fontSize: 12,
+      fontWeight: '600',
+      marginTop: 2,
+      lineHeight: 17,
     },
     canvas: {
       width: PREVIEW_WIDTH,

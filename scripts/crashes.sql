@@ -59,6 +59,14 @@ create table if not exists public.crashes (
   expires_at timestamptz not null
 );
 
+-- O log anónimo de sensores do relato de problema (ideia #63): os segundos que
+-- antecedem o momento em que a pessoa relatou. Fica numa coluna própria e não
+-- dentro do `stack`, porque não é um stack e quem lê a tabela não o deve
+-- confundir com um. `alter` separado para que a tabela que já existe a ganhe
+-- sem uma migração à mão — e `if not exists` para continuar a correr duas vezes.
+alter table public.crashes
+  add column if not exists sensor_log text;
+
 -- A pergunta que se faz ao Table Editor é "quais são os bugs que ainda existem
 -- na versão actual", e a resposta é filtrar por versão e ordenar por contagem.
 create index if not exists crashes_fingerprint_idx

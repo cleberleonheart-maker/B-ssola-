@@ -14,6 +14,7 @@ import {
   formatAzimuth,
 } from '../../utils/compass';
 import { formatDistance } from '../../utils/geo';
+import { formatAltitude, formatAccuracy, formatSpeed } from '../../utils/units';
 import { createStyles } from './styles';
 
 export type Celestial = {
@@ -234,7 +235,7 @@ const StatusPanels = (props: Props) => {
                   <Text style={styles.coordLabel}>{t('ui_altitude')}</Text>
                   <Text style={styles.coordValue}>
                     {location.altitude != null
-                      ? `${Math.round(location.altitude)} m`
+                      ? formatAltitude(location.altitude)
                       : '—'}
                   </Text>
                 </View>
@@ -242,7 +243,7 @@ const StatusPanels = (props: Props) => {
                   <Text style={styles.coordLabel}>{t('ui_accuracy')}</Text>
                   <Text style={styles.coordValue}>
                     {location.accuracy != null
-                      ? `± ${Math.round(location.accuracy)} m`
+                      ? `± ${formatAccuracy(location.accuracy)}`
                       : '—'}
                   </Text>
                 </View>
@@ -250,7 +251,7 @@ const StatusPanels = (props: Props) => {
                   <Text style={styles.coordLabel}>{t('ui_speed')}</Text>
                   <Text style={styles.coordValue}>
                     {location.speed != null && location.speed > 0
-                      ? `${((location.speed ?? 0) * 3.6).toFixed(1)} km/h`
+                      ? formatSpeed(location.speed ?? 0)
                       : '—'}
                   </Text>
                 </View>
@@ -258,7 +259,7 @@ const StatusPanels = (props: Props) => {
                   <Text style={styles.coordLabel}>{t('ui_odometer')}</Text>
                   <Pressable onPress={onResetOdometer}>
                     <Text style={[styles.coordValue, { color: colors.primary }]}>
-                      {odometer > 0 ? formatDistance(odometer) : '0 m'}
+                      {odometer > 0 ? formatDistance(odometer) : formatDistance(0)}
                     </Text>
                   </Pressable>
                 </View>
@@ -295,7 +296,7 @@ const StatusPanels = (props: Props) => {
               <Text style={styles.locSummarySub} numberOfLines={1}>
                 {(place?.cep ? `CEP ${place.cep}` : '') +
                   (location.accuracy != null
-                    ? `${place?.cep ? '  ·  ' : ''}±${Math.round(location.accuracy)} m`
+                    ? `${place?.cep ? '  ·  ' : ''}±${formatAccuracy(location.accuracy)}`
                     : '')}
               </Text>
             </View>

@@ -7,6 +7,7 @@ import {
   type CrashReport,
 } from './cloud';
 import { APP_VERSION, APP_VERSION_CODE } from '../version.generated';
+import { sensorLogText } from './sensorLogService';
 
 /**
  * Relatório de crash (ideia #56).
@@ -87,7 +88,11 @@ export const fingerprintOf = (message: string): string => {
  * primeiro, que é onde a excepção nasceu, e o resto vai tal e qual: um stack
  * truncado é um stack que não se pode ler.
  */
-const reportFor = (message: string, stack: string | null): CrashReport => ({
+const reportFor = (
+  message: string,
+  stack: string | null,
+  sensorLog: string | null = null,
+): CrashReport => ({
   message: message.slice(0, 2000),
   stack: stack ? stack.slice(0, 8000) : null,
   fingerprint: fingerprintOf(message),
@@ -95,6 +100,7 @@ const reportFor = (message: string, stack: string | null): CrashReport => ({
   versionCode: APP_VERSION_CODE,
   happenedAt: new Date().toISOString(),
   expiresAt: new Date(Date.now() + DIAS * 24 * 60 * 60 * 1000).toISOString(),
+  sensorLog: sensorLog ? sensorLog.slice(0, 12000) : null,
 });
 
 /**
@@ -123,6 +129,37 @@ export const recordCrash = async (error: unknown): Promise<void> => {
   } catch {
     // Um reporter de crash que falha é o fim: silenciar é a única opção, e é o
     // que o resto do app faz com os erros de armazenamento.
+  }
+};
+
+/**
+ * Relato de problema feito pela pessoa (ideia #63).
+ *
+ * Ao contrário do crash, este envia já e não vai para a fila: quem o escreve
+ * está à espera de uma resposta, e "enviamos no próximo arranque" é uma
+ * resposta que não se pode dar a quem acabou de escrever. O texto vai como
+ * mensagem (com um prefixo que o distingue de um crash) e o log de sensores
+ * como `sensor_log`, que é o que dá reprodução ao relato.
+ *
+ * Os estados são poucos e explícitos: `sent` (chegou), `offline` (sem sessão
+ * nem rede) e `failed` (havia caminho e a nuvem recusou). A UI diz qual foi —
+ * "enviado" para um relato que não chegou seria o mesmo que não o ter.
+ */
+export type ProblemReportResult = 'sent' | 'offline' | 'failed';
+
+export const reportProblem = async (
+  description: string,
+): Promise<ProblemReportResult> => {
+  const texto = description.trim();
+  if (texto.length === 0) return 'failed';
+  const report = reportFor(`[relato] ${texto}`, null, sensorLogText());
+  try {
+    const userId = await ensureCloudUser();
+    if (!userId) return 'offline';
+    const ok = await pushCrashReport(userId, report);
+    return ok ? 'sent' : 'failed';
+  } catch {
+    return 'failed';
   }
 };
 

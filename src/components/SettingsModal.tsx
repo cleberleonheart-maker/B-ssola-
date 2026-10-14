@@ -12,9 +12,11 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { LANGS } from '../i18n/strings';
 import type { Translator } from '../i18n/strings';
 import type { ThemeName } from '../theme/themes';
+import { THEME_AUTO_MODES, type ThemeAutoMode } from '../theme/themeAuto';
 import type { LocationMode } from '../services/locationService';
 import type { AppMode } from '../services/preferencesService';
 import type { Declination } from '../utils/declination';
+import type { UnitSystem } from '../utils/units';
 import { loadLockPin } from '../services/preferencesService';
 import { BACKUP_FILE_VERSION } from '../services/backupService';
 import { APP_VERSION, APP_VERSION_CODE } from '../version.generated';
@@ -30,7 +32,9 @@ import DataSection from './settings/DataSection';
 import ImportDialog from './settings/ImportDialog';
 import PinDialog from './settings/PinDialog';
 import SecuritySection, { type PinFlowKind } from './settings/SecuritySection';
+import ReportProblemDialog from './settings/ReportProblemDialog';
 import {
+  ChevronRow,
   GridOption,
   GroupCard,
   RadioRow,
@@ -57,6 +61,8 @@ type Props = {
   onToggleVoiceGuide: () => void;
   mils: boolean;
   onToggleMils: () => void;
+  unitSystem: UnitSystem;
+  onToggleUnitSystem: () => void;
   keepAwake: boolean;
   onToggleKeepAwake: () => void;
   onVerifyPin: (pin: string) => Promise<boolean>;
@@ -92,6 +98,18 @@ const THEME_LABEL_KEYS: Record<string, string> = {
   night: 'ui_theme_night',
 };
 
+// As três estratégias do tema automático (ideia #15).
+const THEME_AUTO_LABEL: Record<ThemeAutoMode, string> = {
+  scheduleLight: 'theme_auto_sched_light',
+  scheduleSun: 'theme_auto_sched_sun',
+  sunReal: 'theme_auto_sunreal',
+};
+const THEME_AUTO_SUB: Record<ThemeAutoMode, string> = {
+  scheduleLight: 'theme_auto_sched_light_sub',
+  scheduleSun: 'theme_auto_sched_sun_sub',
+  sunReal: 'theme_auto_sunreal_sub',
+};
+
 type PinFlow = PinFlowKind | null;
 
 const SettingsModal = ({
@@ -113,6 +131,8 @@ const SettingsModal = ({
   onToggleVoiceGuide,
   mils,
   onToggleMils,
+  unitSystem,
+  onToggleUnitSystem,
   keepAwake,
   onToggleKeepAwake,
   onVerifyPin,
@@ -120,10 +140,16 @@ const SettingsModal = ({
   onExportBackup,
   onApplyBackup,
 }: Props) => {
-  const { colors, theme, setTheme, themeOptions } = useTheme();
+  const { colors, preference, autoMode, setTheme, setAutoMode, themeOptions } = useTheme();
   const { t, lang, setLang } = useLanguage();
   const locationModes = LOCATION_MODES(t);
   const appModes = APP_MODES(t);
+  const autoModes = THEME_AUTO_MODES.map(key => ({
+    key,
+    icon: key === 'scheduleSun' ? '🔆' : key === 'sunReal' ? '🌅' : '☀️',
+    label: t(THEME_AUTO_LABEL[key]),
+    sub: t(THEME_AUTO_SUB[key]),
+  }));
 
   const [update, setUpdate] = useState<AvailableUpdate | null>(null);
   const [checking, setChecking] = useState(false);
@@ -133,6 +159,7 @@ const SettingsModal = ({
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
   const [importVisible, setImportVisible] = useState(false);
+  const [reportVisible, setReportVisible] = useState(false);
   const [importText, setImportText] = useState('');
   const [exporting, setExporting] = useState(false);
   const [hasPin, setHasPin] = useState(false);
@@ -340,16 +367,42 @@ const SettingsModal = ({
           <ScrollView showsVerticalScrollIndicator={false}>
             <SectionLabel label={t('set_section_theme')} />
             <View style={styles.gridRow}>
+              <GridOption
+                selected={preference === 'auto'}
+                onPress={() => setTheme('auto')}
+                label={t('ui_theme_auto')}
+              />
               {themeOptions.map(option => (
                 <GridOption
                   key={option.key}
-                  selected={theme === option.key}
+                  selected={preference === option.key}
                   onPress={() => setTheme(option.key as ThemeName)}
                   swatch
                   label={t(THEME_LABEL_KEYS[option.key] ?? 'ui_theme_dark')}
                 />
               ))}
             </View>
+
+            {preference === 'auto' && (
+              <>
+                <Text style={[styles.autoHint, { color: colors.textMuted }]}>
+                  {t('set_theme_auto_hint')}
+                </Text>
+                <GroupCard>
+                  {autoModes.map((mode, i) => (
+                    <RadioRow
+                      key={mode.key}
+                      divider={i > 0}
+                      icon={mode.icon}
+                      label={mode.label}
+                      sub={mode.sub}
+                      selected={autoMode === mode.key}
+                      onPress={() => setAutoMode(mode.key)}
+                    />
+                  ))}
+                </GroupCard>
+              </>
+            )}
 
             <SectionLabel label={t('set_section_lang')} />
             <View style={styles.gridRow}>
@@ -405,6 +458,8 @@ const SettingsModal = ({
               onToggleSound={toggleSound}
               mils={mils}
               onToggleMils={onToggleMils}
+              unitSystem={unitSystem}
+              onToggleUnitSystem={onToggleUnitSystem}
               keepAwake={keepAwake}
               onToggleKeepAwake={onToggleKeepAwake}
               onOpenWaypoints={onOpenWaypoints}
@@ -428,6 +483,17 @@ const SettingsModal = ({
             <ShareHistorySection />
 
             <AccountSection />
+
+            <SectionLabel label={t('set_section_help')} />
+            <GroupCard>
+              <ChevronRow
+                icon="📝"
+                label={t('set_report_problem')}
+                sub={t('set_report_problem_sub')}
+                lines={2}
+                onPress={() => setReportVisible(true)}
+              />
+            </GroupCard>
           </ScrollView>
         </Pressable>
       </Pressable>
@@ -453,6 +519,10 @@ const SettingsModal = ({
           onClose={() => setImportVisible(false)}
           onRestore={handleRestore}
         />
+      )}
+
+      {reportVisible && (
+        <ReportProblemDialog onClose={() => setReportVisible(false)} />
       )}
 
       <UpdateAvailableModal

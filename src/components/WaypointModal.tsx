@@ -12,6 +12,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import { haversine, initialBearing, formatDistance } from '../utils/geo';
+import { formatAltitude } from '../utils/units';
 import type { Waypoint } from '../services/waypointsService';
 
 type Props = {
@@ -141,7 +142,7 @@ const WaypointModal = ({
                         {distance != null
                           ? t('wp_distance_label', { distance: formatDistance(distance), deg: Math.round(bearing ?? 0) })
                           : '—'}
-                        {wp.altitude != null ? ` · ${Math.round(wp.altitude)} m` : ''}
+                        {wp.altitude != null ? ` · ${formatAltitude(wp.altitude)}` : ''}
                       </Text>
                       {active && (
                         <Text style={[styles.activeTag, { color: colors.success }]}>

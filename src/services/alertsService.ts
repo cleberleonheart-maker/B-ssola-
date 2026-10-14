@@ -115,6 +115,38 @@ export const fetchWeatherAlerts = async (
   }
 };
 
+/**
+ * Lê a temperatura atual do corpo do open-meteo (`current.temperature_2m`).
+ *
+ * Fica separado do fetch para poder ser testado sem rede, como os outros
+ * parsers deste serviço. Qualquer coisa fora do previsto devolve `null` — uma
+ * temperatura errada seria pior do que nenhuma no widget.
+ */
+export const parseCurrentTemperature = (data: unknown): number | null => {
+  const current = (data as { current?: { temperature_2m?: unknown } } | null)
+    ?.current;
+  const t = current?.temperature_2m;
+  return typeof t === 'number' && Number.isFinite(t) ? t : null;
+};
+
+export const fetchCurrentTemperature = async (
+  latitude: number,
+  longitude: number,
+): Promise<number | null> => {
+  try {
+    const data = await fetchJson(
+      `https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(
+        4,
+      )}&longitude=${longitude.toFixed(
+        4,
+      )}&current=temperature_2m`,
+    );
+    return parseCurrentTemperature(data);
+  } catch {
+    return null;
+  }
+};
+
 export const fetchNearbyQuakes = async (
   latitude: number,
   longitude: number,

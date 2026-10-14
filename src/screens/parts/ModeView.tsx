@@ -254,6 +254,7 @@ const ModeView = (props: Props) => {
             latitude={location.latitude}
             longitude={location.longitude}
             altitude={location.altitude}
+            heading={heading}
             hasFix={hasFix}
           />
         </View>

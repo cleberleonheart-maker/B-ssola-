@@ -300,6 +300,18 @@ importInput: {
   marginTop: spacing.sm,
   fontFamily: 'monospace',
 },
+reportPrivacy: {
+  fontSize: 11,
+  marginTop: spacing.sm,
+  lineHeight: 15,
+},
+autoHint: {
+  fontSize: 12,
+  marginTop: spacing.xs,
+  marginBottom: spacing.sm,
+  paddingLeft: spacing.xs,
+  lineHeight: 16,
+},
 importActions: {
   flexDirection: 'row',
   alignItems: 'center',

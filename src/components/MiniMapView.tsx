@@ -5,6 +5,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import { cardinalOf, formatAzimuth, formatCoord } from '../utils/compass';
 import { formatDistance, haversine } from '../utils/geo';
+import { formatAccuracy } from '../utils/units';
 import {
   niceScaleBar,
   polylineSegments,
@@ -19,12 +20,17 @@ import type { LocationFix } from '../services/locationService';
  * Não há tiles, não há `react-native-maps`, não há pedidos: o desenho é uma
  * função pura das coordenadas em `utils/trackProjection`, a mesma que a página
  * `web/live.html` traz escrita em JavaScript. Sem um basemap não há ruas nem
- * nomes de Rua — o que há é a sua posição, o rumo, o círculo de precisão, a
- * escala e obreadcrumb do que andou desde que abriu o ecrã.
+ * nomes de rua — o que há é a sua posição, o rumo, o círculo de precisão, a
+ * escala e o breadcrumb do que andou desde que abriu o ecrã.
  *
  * A janela é centrada na posição e tem largura fixa (`spanMeters`): o mapa
  * segue a pessoa em vez de se ajustar ao caminho, que é o que se quer quando
  * se está a tentar orientação no sitio.
+ *
+ * A ausência de base cartográfica é uma decisão, não um defeito (ideia #93):
+ * zero pedidos, zero tiles, funciona sem rede. O próximo que mexer aqui não
+ * deve tratar "não vejo ruas" como bug — o que a tela promete está em
+ * `map_offline` ("Não mostra ruas: mostra você").
  */
 
 const MIN_STEP_METERS = 5;
@@ -288,7 +294,7 @@ const MiniMapView = ({ active, location, heading }: Props) => {
           <Row
             label={t('map_accuracy')}
             value={
-              location.accuracy != null ? `±${Math.round(location.accuracy)} m` : t('map_unknown')
+              location.accuracy != null ? `±${formatAccuracy(location.accuracy)}` : t('map_unknown')
             }
           />
           <Row label={t('map_heading')} value={headingText} />

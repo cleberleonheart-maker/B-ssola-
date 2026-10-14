@@ -39,6 +39,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import { cardinalOf, formatCoord, formatTime } from '../utils/compass';
+import { formatAltitude, formatAccuracy } from '../utils/units';
 import type { LocationFix } from '../services/locationService';
 
 type Props = {
@@ -53,7 +54,9 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
   const { colors } = useTheme();
   const { t } = useLanguage();
 
-  const hasFix = location.latitude !== 0 && location.longitude !== 0;
+  // "Sem fix" é latitude E longitude zeradas; usar `&&` desabilitaria o SOS
+  // para quem está exatamente no equador (latitude 0).
+  const hasFix = location.latitude !== 0 || location.longitude !== 0;
   const locationRef = useRef(location);
   const headingRef = useRef(heading);
 
@@ -80,10 +83,10 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
       rawLines.push(`• ${place.name}`);
     }
     if (location.accuracy != null) {
-      rawLines.push(`• ${t('em_accuracy')}: ±${Math.round(location.accuracy)} m`);
+      rawLines.push(`• ${t('em_accuracy')}: ±${formatAccuracy(location.accuracy)}`);
     }
     if (location.altitude != null) {
-      rawLines.push(`• ${t('em_altitude')}: ${Math.round(location.altitude)} m`);
+      rawLines.push(`• ${t('em_altitude')}: ${formatAltitude(location.altitude)}`);
     }
     rawLines.push(`• ${t('em_heading')}: ${Math.round(heading)}° ${cardinalOf(heading).full}`);
     if (location.updatedAt) {
@@ -335,9 +338,9 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
                 )}
                 <Text style={[styles.metaText, { color: colors.textMuted }]}>
                   {[
-                    location.accuracy != null ? `±${Math.round(location.accuracy)} m` : null,
+                    location.accuracy != null ? `±${formatAccuracy(location.accuracy)}` : null,
                     location.altitude != null
-                      ? `${t('em_altitude')}: ${Math.round(location.altitude)} m`
+                      ? `${t('em_altitude')}: ${formatAltitude(location.altitude)}`
                       : null,
                     null,
                   ]

@@ -7,7 +7,8 @@ import {
   DEFAULT_MEMORY,
   type MemoryState,
 } from './memory';
-import { runSkills } from './skills';
+import { runSkills, skillCatalog } from './skills';
+import { suggestCommand } from './suggest';
 import { toTokens } from './normalizer';
 import { buildEmptyContext, type ActionResult, type AssistantContextData, type AssistantAction } from './types';
 import { createTranslator, Lang, Translator } from '../i18n/strings';
@@ -101,6 +102,11 @@ export class KeferaEngine {
     }
     if (skill) {
       return this.response(skill.text, 'answer', skill.action);
+    }
+
+    const suggestion = suggestCommand(normalized, skillCatalog);
+    if (suggestion) {
+      return this.response(t('as_did_you_mean', { phrase: suggestion.display }), 'help');
     }
 
     return this.response(

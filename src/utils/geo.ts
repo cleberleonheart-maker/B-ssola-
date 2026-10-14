@@ -35,11 +35,10 @@ export const initialBearing = (
   return normalizeAzimuth(toDeg(Math.atan2(y, x)));
 };
 
-export const formatDistance = (meters: number) => {
-  if (meters >= 1000) return `${(meters / 1000).toFixed(2)} km`;
-  if (meters >= 100) return `${Math.round(meters)} m`;
-  return `${meters.toFixed(1)} m`;
-};
+// A formatação de distância passa a viver em `units.ts` (ideia #68), que a torna
+// sensível ao sistema de unidades (métrico/imperial). Segue reexportada daqui
+// para não mexer nos muitos sítios que já a importam de `utils/geo`.
+export { formatDistance } from './units';
 
 /**
  * Elevação de um alvo acima do horizonte, em graus, dado o desnível e a

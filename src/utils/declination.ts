@@ -43,7 +43,9 @@ const REFERENCE_POINTS: {
 ];
 
 export const suggestDeclination = (lat: number, lon: number) => {
-  if (!lat && !lon) return null;
+  // Sem fix o app chega com (0,0); testar com `!` descartaria também o
+  // equador (latitude exatamente 0), então vamos no mesmo padrão do resto.
+  if (lat === 0 && lon === 0) return null;
   let best = null as null | { city: string; uf: string; decl: number; dist: number };
   for (const p of REFERENCE_POINTS) {
     const dist = haversine(lat, lon, p.lat, p.lon);

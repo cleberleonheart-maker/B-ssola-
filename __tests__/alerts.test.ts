@@ -1,8 +1,10 @@
 import {
+  fetchCurrentTemperature,
   fetchNearbyQuakes,
   inmetRings,
   pointInRing,
   parseInmetSeverity,
+  parseCurrentTemperature,
 } from '../src/services/alertsService';
 
 describe('inmetRings', () => {
@@ -105,5 +107,44 @@ describe('fetchNearbyQuakes', () => {
   it('descarta um sismo distante alem do raio pedido', async () => {
     stub([featureAt(-46.63, 10.0, 5)]);
     expect(await fetchNearbyQuakes(-23.55, -46.63, 1000)).toHaveLength(0);
+  });
+});
+
+describe('parseCurrentTemperature', () => {
+  it('le a temperatura do corpo do open-meteo', () => {
+    expect(parseCurrentTemperature({ current: { temperature_2m: 23.4 } })).toBe(
+      23.4,
+    );
+  });
+
+  it('devolve null sem o campo ou com tipo errado', () => {
+    expect(parseCurrentTemperature({ current: {} })).toBeNull();
+    expect(parseCurrentTemperature({})).toBeNull();
+    expect(parseCurrentTemperature(null)).toBeNull();
+    expect(parseCurrentTemperature({ current: { temperature_2m: 'x' } })).toBeNull();
+    expect(parseCurrentTemperature({ current: { temperature_2m: NaN } })).toBeNull();
+  });
+});
+
+describe('fetchCurrentTemperature', () => {
+  const originalFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it('pede e devolve a temperatura atual', async () => {
+    globalThis.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ current: { temperature_2m: 19 } }),
+    }) as unknown as typeof fetch;
+    expect(await fetchCurrentTemperature(-23.5, -46.6)).toBe(19);
+  });
+
+  it('devolve null quando a rede falha', async () => {
+    globalThis.fetch = jest
+      .fn()
+      .mockRejectedValue(new Error('network_error')) as unknown as typeof fetch;
+    expect(await fetchCurrentTemperature(-23.5, -46.6)).toBeNull();
   });
 });

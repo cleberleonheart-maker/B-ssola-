@@ -20,6 +20,7 @@ import {
   openLink,
 } from '../utils/coords';
 import { formatCoord } from '../utils/compass';
+import { formatAltitude } from '../utils/units';
 
 type Props = {
   visible: boolean;
@@ -44,7 +45,7 @@ const CoordModal = ({ visible, onClose, latitude, longitude, altitude }: Props) 
       { label: 'UTM (WGS84)', value: utmText, mono: true },
       {
         label: t('ui_altitude'),
-        value: altitude != null ? `${Math.round(altitude)} m` : '—',
+        value: altitude != null ? formatAltitude(altitude) : '—',
         mono: false,
       },
     ];

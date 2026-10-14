@@ -661,6 +661,12 @@ export type CrashReport = {
   happenedAt: string;
   /** Prazo da purga: 90 dias. Um crash de há seis meses já não interessa. */
   expiresAt: string;
+  /**
+   * Log anónimo de sensores dos segundos anteriores (ideia #63), no relato de
+   * problema. Opcional: um crash automático não o tem — nem podia, o buffer
+   * morre com o processo. Sem coordenadas, por desenho.
+   */
+  sensorLog?: string | null;
 };
 
 /**
@@ -691,6 +697,7 @@ export const pushCrashReport = async (
         happened_at: report.happenedAt,
         reported_at: new Date().toISOString(),
         expires_at: report.expiresAt,
+        sensor_log: report.sensorLog ?? null,
       }),
       15000,
     );

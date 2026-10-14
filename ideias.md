@@ -103,7 +103,10 @@
 - [x] **9. Kefera troca modos** — ✅ feito em v7.5: "Kefera, abre o detector de metais" / "modo sol".
 - [x] **10. Kefera conta o histórico** — ✅ feito na v7.17 (hoje, ontem, semana, trilha
       mais longa).
-- [ ] **11. Alarme de chegada por voz** — Kefera lembra ao chegar perto de ponto.
+- [x] **11. Alarme de chegada por voz** — ✅ já implementado: com um waypoint ativo
+      e o "Compasso falado" ligado (`voiceGuide`), ao chegar a `ARRIVE_METERS`
+      (15 m) a Kefera vibra e fala `voice_guide_arrived` = "Você chegou a
+      {nome}". `CompassScreen.tsx:1145`. A linha só não estava marcada.
 - [x] **12. Elevação no AR** — ✅ feito: na Visão (câmera) o marcador do alvo
       move-se na vertical conforme a elevação real; usando `accel` no
       `CameraARView`, calcula-se a elevação do eixo de visão (via −z) e o FOV
@@ -116,7 +119,12 @@
 - [ ] **13. Calibração pela Estrela Polar** — usar Polaris para o norte geográfico quando
       visível.
 - [ ] **14. Tiles Android** — quick-settings tile para abrir direto num modo.
-- [ ] **15. Tema automático** — seguir horário (dia/noite) com transição suave.
+- [x] **15. Tema automático** — ✅ feito: opção "Automático" no grid de tema, com
+      três estratégias (Claro/Escuro por horário 6h–18h; Sol forte/Noturno por
+      horário; e "pelo sol real" via `sunEvents`, com recuo ao horário sem GPS).
+      Reavalia a cada minuto e ao voltar ao primeiro plano; transição com fade de
+      250 ms. Lógica pura em `themeAuto.ts`; última posição partilhada por
+      `lastLocation.ts`. Testes em `__tests__/themeAuto.test.ts`.
 - [x] **16. Brilho/keep-awake outdoor** — ✅ feito na v7.36: toggle "Tela sempre
       acesa" em Configurações. Aplica `FLAG_KEEP_SCREEN_ON` na janela da Activity
       (`KeepAwakeModule`, módulo nativo) enquanto o app está aberto — ideal para
@@ -148,8 +156,20 @@
       a ser manual: a altura já mostra o ângulo em tempo real. **Atenção:**
       `verticalAngle` do Rezarte tem sinal provavelmente invertido — ver nota
       na 65.
-- [ ] **20. Widget do rumo — publicar/validar** — o `widgetService` existe; confirmar se
-      o widget está publicado na Play e polir (rumo, pressão, temperatura).
+- [ ] **20. Widget do rumo — publicar/validar** — o `widgetService` existe. Dois
+      defeitos corrigidos daqui: (A) o push do JS mandava `sendBroadcast` só com
+      `setPackage` e a ação `WIDGET_UPDATE`, que não está no `<intent-filter>` do
+      receiver (o manifesto só declara `APPWIDGET_UPDATE`) — nunca era entregue, e
+      o widget ficava preso no último valor; agora `WidgetBridgeModule` aponta
+      para o componente (`Intent(context, BussolaWidgetProvider::class.java)`) e o
+      `onReceive` roda. (B) a temperatura era morta (`--°C` para sempre): não havia
+      fonte. Passou a buscar `current.temperature_2m` no open-meteo
+      (`fetchCurrentTemperature` em `alertsService`, com parser puro
+      `parseCurrentTemperature`), atualizada no mesmo ritmo dos alertas (primeiro
+      fixe + a cada 30 min) e enviada ao widget. **Falta validar no aparelho**:
+      widget no seletor, rumo vivo ao girar, pressão/altitude, tap abre o app.
+      Limitação conhecida: `updatePeriodMillis="0"` — com o app fechado o widget
+      congela no último valor.
 - [x] **21. FOV calibrado por aparelho** — ✅ feito em v7.9: botões −/+ (60°–140°, passo
       10) que gravam por aparelho (`fovService`). A linha ficou por marcar desde 23/09.
 - [x] **22. Cadência GPS econômica** — ✅ feito em v7.9: parado (4 leituras sem
@@ -170,11 +190,19 @@
    "chegou" guiam de volta; ponto fica salvo no aparelho.
 
 ## Ideias novas (23/09/2026, 2ª leva)
-- [ ] **23. "Volte antes do escuro"** — com a trilha gravando, estimar o ritmo e avisar a
-      hora-limite de retorno antes do pôr do sol (junta trilha + relógio de sol).
+- [x] **23. "Volte antes do escuro"** — ✅ feito: com a trilha gravando, o
+      `TrackView` estima o ritmo médio e a distância em linha reta de volta e
+      mostra a hora-limite para começar a regressar antes do pôr do sol (com
+      20 min de margem). Passada a hora, o cartão fica em vermelho e dispara uma
+      notificação (`showReturnBeforeDarkNotification`) uma vez por sessão, para
+      o aviso chegar com o telemóvel no bolso. Lógica pura em
+      `src/utils/returnBeforeDark.ts`; testes em `__tests__/returnBeforeDark.test.ts`.
 - [x] **24. Rastreio ao vivo por link** — ✅ feito na v7.19 (30 min, expira sozinho).
-- [ ] **25. Foto com rumo** — na caderneta, guardar junto da foto a direção da bússola
-      apontada no momento.
+- [x] **25. Foto com rumo** — ✅ feito: ao tirar a foto, a `FieldNotesSheet`
+      grava o rumo da bússola daquele instante (`heading` em `FieldNote`) e a
+      anotação mostra `🧭 137° SE`; sem foto, guarda o rumo atual. O campo vai
+      também no push para a nuvem, é opcional (anotações antigas sem ele são
+      toleradas) e sobrevive ao backup. Testes em `__tests__/fieldNotes.test.ts`.
 - [x] **26. Metrônomo de passo** — ✅ feito nos modos 👣 Cadência. Bipe agudo
       (1,2 kHz) + vibração por pulso. Dois gatilhos:
       - ⏱️ **No tempo**: BPM ajustável em −/+ de 5 entre 90 e 160 (default 120,
@@ -534,8 +562,14 @@ foram encontrados de verdade, não ideias soltas.
       sobre branco, sem cinzentos nem transparências. Aparece na grelha de
       temas ao lado do Claro; persistência automaticamente válida (a lista de
       temas é a fonte da verdade).
-- [ ] **43. ⚡ Performance: memoizar marcos** — evitar recálculo de distância/rumo de
-      waypoints a cada fix (já há useMemo parcial; revisar).
+- [x] **43. ⚡ Performance: memoizar marcos** — ✅ revisado: já está memoizado.
+      `activeTarget` (`CompassScreen.tsx:897`), `virtualMarker` (:964) e
+      `assistantWaypoints` (:1169) são `useMemo` com as dependências certas
+      (`waypoints` + lat/lon/alt). O recálculo por fix é inerente — distância e
+      rumo a um marco mudam mesmo com a posição — e é O(N) de trig barato para
+      N pequeno; os skills leem `wp.distance/bearing` já prontos e caem no
+      `ctx.latitude/longitude` quando são `null` (`skills.ts:441`). Sem ganho
+      real em mexer.
 - [ ] **44. 🧾 Caderneta: exportar relatório** — gerar PDF/GPX com notas + fotos
       (geo-relato do dia de campo).
 - [x] **45. 🧪 Verificação cruzada da calibração** — comparar o norte do app com o
@@ -600,10 +634,20 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       é a pergunta certa. `MOVED_SPREAD_G` (0,5 g) existe para o caso de
       nível errado *e* dispersão larga, que é movimento, não ganho torto.
       10 testes novos, 4 mutações confirmadas.
-- [ ] **63. 🔇 Relatório de bug com dados de sensores** — ao relatar um problema, o
-      app pode anexar um trecho anônimo (30–60 s) dos últimos logs de sensores (mag/accel,
-      GPS, heading). Dá reproduzibilidade sem vazar localização sensível (pode filtrar
-      coordenadas). Ajuda muito nos bugs que acabei de corrigir.
+ - [x] **63. 🔇 Relatório de bug com dados de sensores** — feito. "Ajuda → Relatar um
+      problema" abre um diálogo com campo de texto; ao enviar, o relato vai para a mesma
+      tabela dos crashes com `message = "[relato] …"` e o trecho dos sensores na coluna
+      nova `sensor_log`. O `sensorLogService` mantém um ring buffer em memória (últimos
+      60 s, uma amostra por segundo, alimentado no callback do acelerómetro do
+      `CompassScreen`) com ax/ay/az, mx/my/mz, heading e a **qualidade** do GPS
+      (precisão e velocidade) — **nunca coordenadas**, como a ideia pedia: as lat/lon
+      nem chegam ao serviço. É só em memória porque o momento do crash morre com o
+      processo — um relato manual, com a app viva, é o caso em que o trecho existe.
+      `reportProblem` envia já (não vai para a fila): quem escreveu está à espera, e a
+      UI distingue `sent`/`offline`/`failed`. Como no crash, o `user_id` vem da sessão
+      anônima e a RLS garante que o relato de um aparelho nunca cai na linha de outro.
+      11 testes em `problemReport.test.ts` (buffer, throttle, esquecimento aos 60 s,
+      ausência de "lat"/"lon" no payload, envio/anexo/offline).
 
 ### Produto
 - [ ] **64. 📟 Painel de diagnóstico dos sensores** — mostra valores brutos X/Y/Z do
@@ -630,16 +674,43 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
 - [ ] **66. 🎙️ Pré-visualizar o que a Kefera ouviu** — exibe a transcrição (com
       confiança baixa) **antes** de executar: "Ouvi: *marcar waypoint*. Executar?
       [Sim] [Corrigir]". Evita execuções erradas e facilita o ajuste do wake word.
-- [ ] **67. 🕵️ Segunda chance com confiança baixa** — reaproveita o fuzzy matcher:
-      quando a pontuação ficar abaixo do limiar, oferece a alternativa mais próxima
-      ("Você quis dizer *gravar trilha*?"). Reduz falhas silenciosas sem complicar
-      o fluxo.
-- [ ] **68. 📏 Unidades imperiais** — adicionar pés, milhas, pés-polegadas nas
-      configurações (juntamente com a troca entre graus/mils já existente). Mantém
-      coerência entre todos os painéis (distância, altura, vento).
-- [ ] **69. 🔇 Silenciar Kefera por N minutos** — botão "Silenciar por 5/15/30 min"
-      que desliga TTS/wake word temporariamente. Útil em acampamento, reuniões ou
-      locais onde falar incomoda.
+- [x] **67. 🕵️ Segunda chance com confiança baixa** — ✅ feito. Novo
+      `assistant/suggest.ts` (puro): distância de Levenshtein + sobreposição de
+      palavras dão um "quão perto" entre 0 e 1, comparado contra um catálogo de
+      comandos concretos extraído dos `patterns` dos skills (`buildCommandCatalog`,
+      exportado como `skillCatalog`). Quando todos os skills falham, o motor
+      consulta o catálogo e, se o vizinho mais próximo passar do limiar de 0,5,
+      responde `as_did_you_mean` ("Acho que não entendi. Você quis dizer *que hora
+      sao*?") em vez do fallback seco. Padrões abertos (`*`, `...`, `{a|b}`) ficam
+      de fora: não são comandos sugeríveis. Testes em `__tests__/suggest.test.ts`.
+- [x] **68. 📏 Unidades imperiais** — ✅ feito. Novo `utils/units.ts` (puro) com
+      o tipo `UnitSystem` ('metric'|'imperial'), conversões (metros↔pés/milhas,
+      m/s↔km/h/mph) e formatadores `formatDistance`/`formatAltitude`/`formatSpeed`/
+      `formatAccuracy` (+ `altitudeValue`/`altitudeUnit` para layouts que estilizam
+      a unidade à parte). O app segue a medir e guardar tudo em SI; a conversão é
+      só na apresentação. `formatDistance` passou a viver em `units.ts` e é
+      reexportada de `utils/geo` — os ~50 call sites ficam unit-aware sem mudanças.
+      O sistema escolhido vive num único global (`setUnitSystem`), carregado do
+      disco no `CompassScreen`; os formatadores leem-no por omissão, mas aceitam
+      um argumento explícito (usado nos testes). Toggle "Unidades imperiais" em
+      Configurações → Bússola (`set_units_*` ×3), persistido em
+      `@bussola/unitSystem` e incluído no backup. Aplicado em distância (todas as
+      telas), altitude (Barômetro, Coordenadas, waypoint, Emergência, StatusPanels,
+      ganho/perda de trilha), velocidade (StatusPanels e a fala da Kefera) e
+      precisão do GPS. Fora do escopo: pressão (hPa), temperatura (°C), vento (é
+      índice %), o input manual de distância do Altímetro e a página web de
+      rastreio (formata no seu próprio `live.html`). Testes em
+      `__tests__/units.test.ts`.
+- [x] **69. 🔇 Silenciar Kefera por N minutos** — ✅ feito: chips "Silenciar:
+      5/15/30 min" no rodapé da Kefera (`AssistantModal`) e, enquanto durar, a
+      linha vira "🔇 Silenciada · 🔊 Reativar". O silêncio é desligado na fonte
+      (`setMuted` em `assistant/voice.ts`), por onde passa toda a fala — nada de
+      espalhar verificações pelo app. Silenciar também fecha a escuta
+      (`beginSession` recusa reabrir o microfone), senão a palavra de ativação
+      continuaria a disparar respostas que ninguém ouve; ao terminar o prazo (ou
+      no "Reativar"), a escuta volta sozinha se o wake estava ligado. O prazo é
+      reposto a cada escolha. É temporário e só em memória: reiniciar o app
+      reativa a voz. Testes em `__tests__/keferaMute.test.ts`.
 - [ ] **70. ♻️ Importar backup com pré-visualização** — além de exportar (#38),
       importar um ZIP/JSON com **preview**: "Vai importar: 3 waypoints, 1 trilha,
       declinação, calibrações. Substituir ou mesclar?". Evita sobrescrever dados
@@ -898,10 +969,13 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       mexer, o aparelho volta a falhar em silêncio.
 
 ### Dívidas que ficaram do mesmo commit
-- [ ] **93. 🗺️ Sem base cartográfica** — o mapa mostra a sua posição, o rumo, o
-      círculo de precisão e a escala, mas não ruas nem nomes de rua. É uma
-      decisão (zero pedidos, zero tiles, funciona sem rede), não um esquecimento;
-      fica escrito para o próximo não tratar a ausência como bug.
+- [x] **93. 🗺️ Sem base cartográfica** — ✅ documentado: o mapa mostra a sua
+      posição, o rumo, o círculo de precisão e a escala, mas não ruas nem nomes
+      de rua. É uma decisão (zero pedidos, zero tiles, funciona sem rede), não um
+      esquecimento. Fica escrito para o próximo não tratar a ausência como bug:
+      no cabeçalho do `MiniMapView.tsx` (com a intenção explícita) e no texto de
+      ecrã `map_offline` ("Não mostra ruas: mostra você"). Sem alteração de
+      comportamento.
 - [x] **94. 🧪 Um bug que só os stubs apanharam** — o `svgNode` do `live.html`
       fazia `setAttribute.apply(node, [[...], [...]])`, e o `apply` com uma
       lista de pares punha o primeiro par como nome e o segundo como valor: o
@@ -1130,12 +1204,21 @@ a nota de cada uma diz o que a distingue da ideia vizinha.
       chega com o campo vazio; o serviço assume do segundo em diante e a % em
       `live_shares` sobe num push. No iOS não há serviço nativo, o push fica
       no JS e o viewer simplesmente esconde a linha.
-- [ ] **104. 🌩️ Alarme de queda rápida da pressão** — o `TrendChart` do
-      barômetro mostra a tendência, mas mostra a quem está a olhar para o
-      ecrã. A regra clássica de campo (queda de ~4 hPa em 3 h, ou mais
-      abrupta) é barata de calcular com o histórico que já existe no
-      aparelho, e o caso de uso é justamente o em que ninguém está a olhar:
-      dentro da tenda, à noite. Não depende de rede nem de API nenhuma.
+ - [x] **104. 🌩️ Alarme de queda rápida da pressão** — feito. O problema não era
+      a regra, era onde é que o histórico vivia: o `BarometerPanel` é que o
+      guardava, e por isso ele só existia no modo Completo com os painéis à vista
+      — o oposto do caso de uso (a tenda, à noite). A coleta saiu para o
+      `pressureHistoryService` (estado de módulo, uma série e uma persistência no
+      mesmo `@bussola/baroHistory`), alimentado pelo `CompassScreen`, que já
+      observa o barómetro em qualquer modo; o painel passou a ser só um assinante.
+      `fastPressureDrop` é pura e testável sem sensor: dispara numa queda de ~4 hPa
+      em 3 h **ou** de 2 hPa em 1 h (a janela curta apanha o caso abrupto que a
+      média de 3 h diluía). Ao disparar, mostra uma notificação num canal próprio
+      (`aviso-pressao`) — distinto dos alertas civis — e não repete enquanto a
+      série continuar a disparar. Sem barômetro (como no aparelho do dono) o painel
+      já dizia "indisponível"; o alarme simplesmente nunca dispara, sem erro.
+      12 testes em `pressureAlarm.test.ts` (regra, janelas, futuro/relógio torto,
+      throttle e assinatura da série).
 - [ ] **105. 🧭 Partilhar a posição a partir do widget** — o widget mostra
       rumo, pressão e temperatura, e é só leitura. Um botão nele (ou um atalho
       no `quick settings`, que é a #14 — aqui é o widget da tela inicial) para

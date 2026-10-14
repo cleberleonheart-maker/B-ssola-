@@ -14,7 +14,7 @@ import {
 import { useTheme } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
-import { formatCoord, formatTime } from '../utils/compass';
+import { cardinalOf, formatCoord, formatTime } from '../utils/compass';
 import { openLink, googleMapsUrl } from '../utils/coords';
 import {
   loadNotes,
@@ -30,10 +30,17 @@ type Props = {
   latitude: number;
   longitude: number;
   altitude: number | null;
+  heading: number;
   hasFix: boolean;
 };
 
-const FieldNotesSheet = ({ latitude, longitude, altitude, hasFix }: Props) => {
+const FieldNotesSheet = ({
+  latitude,
+  longitude,
+  altitude,
+  heading,
+  hasFix,
+}: Props) => {
   const { colors } = useTheme();
   const { t } = useLanguage();
   const styles = createStyles(colors);
@@ -41,6 +48,7 @@ const FieldNotesSheet = ({ latitude, longitude, altitude, hasFix }: Props) => {
   const [notes, setNotes] = useState<FieldNote[]>([]);
   const [text, setText] = useState('');
   const [photoPath, setPhotoPath] = useState<string | null>(null);
+  const [photoHeading, setPhotoHeading] = useState<number | null>(null);
   const [photoLoading, setPhotoLoading] = useState(false);
   const [cloudMsg, setCloudMsg] = useState<string | null>(null);
 
@@ -60,12 +68,14 @@ const FieldNotesSheet = ({ latitude, longitude, altitude, hasFix }: Props) => {
       alt: altitude,
       at: Date.now(),
       photoPath,
+      heading: photoPath ? photoHeading : heading,
       cloudSynced: false,
     };
     const next = await saveNote(note);
     setNotes(next);
     setText('');
     setPhotoPath(null);
+    setPhotoHeading(null);
   };
 
   const takePhoto = async () => {
@@ -74,9 +84,11 @@ const FieldNotesSheet = ({ latitude, longitude, altitude, hasFix }: Props) => {
       return;
     }
     setPhotoLoading(true);
+    const headingAtShot = heading;
     try {
       const path = await NativeModules.Photo.takePhoto();
       setPhotoPath(path);
+      setPhotoHeading(headingAtShot);
     } catch {
       setCloudMsg(t('fn_photo_fail'));
     } finally {
@@ -106,6 +118,7 @@ const FieldNotesSheet = ({ latitude, longitude, altitude, hasFix }: Props) => {
             alt: note.alt,
             at: note.at,
             photoPath: note.photoPath,
+            heading: note.heading,
           },
         },
       ]);
@@ -137,7 +150,10 @@ const FieldNotesSheet = ({ latitude, longitude, altitude, hasFix }: Props) => {
           <Image source={{ uri: photoPath }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           <View style={styles.cameraActions}>
             <Pressable
-              onPress={() => setPhotoPath(null)}
+              onPress={() => {
+                setPhotoPath(null);
+                setPhotoHeading(null);
+              }}
               style={[styles.cancelBtn, { borderColor: colors.border }]}>
               <Text style={[styles.cancelTxt, { color: colors.textMuted }]}>
                 {t('fn_remove_photo')}
@@ -224,6 +240,9 @@ const FieldNotesSheet = ({ latitude, longitude, altitude, hasFix }: Props) => {
               </Text>
               <Text style={[styles.rowMeta, { color: colors.textMuted }]}>
                 {formatCoord(note.lat, true)}, {formatCoord(note.lon, false)} · {formatTime(note.at)}
+                {note.heading != null
+                  ? ` · 🧭 ${Math.round(note.heading)}° ${cardinalOf(note.heading).short}`
+                  : ''}
               </Text>
               <View style={styles.rowActions}>
                 <Pressable

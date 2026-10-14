@@ -5,6 +5,7 @@ import { useThemeColors } from '../../theme/ThemeContext';
 import { soundAvailable } from '../../services/sound';
 import { APP_VERSION, APP_VERSION_CODE } from '../../version.generated';
 import type { Declination } from '../../utils/declination';
+import type { UnitSystem } from '../../utils/units';
 import {
   ChevronRow,
   GroupCard,
@@ -32,6 +33,8 @@ type Props = {
   onToggleSound: () => void;
   mils: boolean;
   onToggleMils: () => void;
+  unitSystem: UnitSystem;
+  onToggleUnitSystem: () => void;
   keepAwake: boolean;
   onToggleKeepAwake: () => void;
   onOpenWaypoints: () => void;
@@ -59,6 +62,8 @@ const CompassSection = (props: Props) => {
     onToggleSound,
     mils,
     onToggleMils,
+    unitSystem,
+    onToggleUnitSystem,
     keepAwake,
     onToggleKeepAwake,
     onOpenWaypoints,
@@ -167,6 +172,15 @@ const CompassSection = (props: Props) => {
           sub={t('set_mils_sub')}
           on={mils}
           onPress={onToggleMils}
+        />
+
+        <SwitchRow
+          divider
+          icon="📏"
+          label={t('set_units_title')}
+          sub={unitSystem === 'imperial' ? t('set_units_imperial') : t('set_units_metric')}
+          on={unitSystem === 'imperial'}
+          onPress={onToggleUnitSystem}
         />
 
         <SwitchRow
