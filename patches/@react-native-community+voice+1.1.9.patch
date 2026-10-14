@@ -83,3 +83,15 @@ diff --git a/node_modules/@react-native-community/voice/android/build.gradle b/n
 -}
 +}
 \ No newline at end of file
+diff --git a/node_modules/@react-native-community/voice/android/src/main/java/com/wenkesj/voice/VoiceModule.java b/node_modules/@react-native-community/voice/android/src/main/java/com/wenkesj/voice/VoiceModule.java
+--- a/node_modules/@react-native-community/voice/android/src/main/java/com/wenkesj/voice/VoiceModule.java
++++ b/node_modules/@react-native-community/voice/android/src/main/java/com/wenkesj/voice/VoiceModule.java
+@@ -146,7 +146,7 @@
+ 
+   @Override
+   public String getName() {
+-    return "RCTVoice";
++    return "Voice";
+   }
+ 
+   @ReactMethod

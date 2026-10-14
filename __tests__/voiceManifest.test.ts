@@ -9,6 +9,15 @@ const manifest = fs.readFileSync(
 const idxQueries = manifest.indexOf('<queries>');
 const idxApplication = manifest.indexOf('<application');
 
+const patch = fs.readFileSync(
+  path.join(raiz, 'patches/@react-native-community+voice+1.1.9.patch'),
+  'utf8',
+);
+const voiceJs = fs.readFileSync(
+  path.join(raiz, 'node_modules/@react-native-community/voice/dist/index.js'),
+  'utf8',
+);
+
 /**
  * Android 11+ (API 30) esconde servicos de terceiros por omissao. Sem declarar
  * o servico de reconhecimento de voz, `SpeechRecognizer.isRecognitionAvailable()`
@@ -36,5 +45,27 @@ describe('manifest de voz', () => {
     for (const c of comentarios) {
       expect(c.slice(4, -3)).not.toContain('--');
     }
+  });
+});
+
+/**
+ * `@react-native-community/voice@1.1.9` regista o modulo nativo no Android
+ * como "RCTVoice", mas o JavaScript da mesma versao le `NativeModules.Voice`.
+ * Com a New Architecture o modulo nao aparece sob o nome errado, `Voice` fica
+ * `undefined`, `isAvailable()` falha dentro da Promise e `voiceSupported`
+ * fica false: o microfone nasce cinza e a palavra de ativacao nunca funciona.
+ * O patch peca-lhe o `getName()` a devolver "Voice". Sem ele o APK compila e
+ * o app abre sem reclamar -- o defeito so existe no aparelho.
+ */
+describe('nome do modulo de voz', () => {
+  it('o JavaScript procura NativeModules.Voice', () => {
+    expect(voiceJs).toMatch(/NativeModules\.Voice\b/);
+    expect(voiceJs).not.toMatch(/NativeModules\.RCTVoice/);
+  });
+
+  it('o patch faz o getName() do Android devolver "Voice"', () => {
+    expect(patch).toContain('VoiceModule.java');
+    expect(patch).toMatch(/-[ \t]+return "RCTVoice";/);
+    expect(patch).toMatch(/\+[ \t]+return "Voice";/);
   });
 });
