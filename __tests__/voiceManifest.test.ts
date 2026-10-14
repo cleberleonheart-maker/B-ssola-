@@ -69,3 +69,22 @@ describe('nome do modulo de voz', () => {
     expect(patch).toMatch(/\+[ \t]+return "Voice";/);
   });
 });
+
+/**
+ * `startListening` do nativo destruía e recriava o `SpeechRecognizer` a cada
+ * início. Numa conversa (ativação -> comando -> novo ciclo de ativação) o
+ * Android respondia `RECOGNIZER_BUSY`: só bipes e "nenhuma fala", sem resposta.
+ * O patch passa a reusar a mesma instância (`cancel()` antes de reiniciar) e,
+ * se o `startListening` rebentar na mesma, recria uma vez.
+ */
+describe('reuso do reconhecedor de voz', () => {
+  it('deixa de destruir o reconhecedor a cada inicio', () => {
+    expect(patch).toMatch(/-[ \t]+speech\.destroy\(\);/);
+    expect(patch).toMatch(/\+[ \t]+speech\.cancel\(\);/);
+  });
+
+  it('tenta outra vez se o start falhar apos o reuso', () => {
+    expect(patch).toContain('start apos reuso');
+    expect(patch).toMatch(/\+[ \t]+speech\.startListening\(intent\);/);
+  });
+});

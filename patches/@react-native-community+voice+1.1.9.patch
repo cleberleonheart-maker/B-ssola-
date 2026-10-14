@@ -86,7 +86,53 @@ diff --git a/node_modules/@react-native-community/voice/android/build.gradle b/n
 diff --git a/node_modules/@react-native-community/voice/android/src/main/java/com/wenkesj/voice/VoiceModule.java b/node_modules/@react-native-community/voice/android/src/main/java/com/wenkesj/voice/VoiceModule.java
 --- a/node_modules/@react-native-community/voice/android/src/main/java/com/wenkesj/voice/VoiceModule.java
 +++ b/node_modules/@react-native-community/voice/android/src/main/java/com/wenkesj/voice/VoiceModule.java
-@@ -146,7 +146,7 @@
+@@ -56,19 +56,16 @@
+ 
+   private void startListening(ReadableMap opts) {
+     if (speech != null) {
+-      speech.destroy();
+-      speech = null;
+-    }
+-    
+-    if(opts.hasKey("RECOGNIZER_ENGINE")) {
+-      switch (opts.getString("RECOGNIZER_ENGINE")) {
+-        case "GOOGLE": {
+-          speech = SpeechRecognizer.createSpeechRecognizer(this.reactContext, ComponentName.unflattenFromString("com.google.android.googlequicksearchbox/com.google.android.voicesearch.serviceapi.GoogleRecognitionService"));
+-          break;
+-        }
+-        default:
+-          speech = SpeechRecognizer.createSpeechRecognizer(this.reactContext);
++      // Reaproveita o reconhecedor: destruir e recriar a cada início fazia o
++      // Android responder RECOGNIZER_BUSY (bipes, "nenhuma fala") quando os
++      // ciclos de ativação/comando se sucediam rapidamente.
++      try {
++        speech.cancel();
++      } catch (Exception e) {
++        Log.d("ASR", "cancel antes de reusar falhou: " + e.getMessage());
+       }
++    } else if (opts.hasKey("RECOGNIZER_ENGINE") && opts.getString("RECOGNIZER_ENGINE").equals("GOOGLE")) {
++      speech = SpeechRecognizer.createSpeechRecognizer(this.reactContext, ComponentName.unflattenFromString("com.google.android.googlequicksearchbox/com.google.android.voicesearch.serviceapi.GoogleRecognitionService"));
+     } else {
+       speech = SpeechRecognizer.createSpeechRecognizer(this.reactContext);
+     }
+@@ -123,7 +120,15 @@
+     }
+ 
+     intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, getLocale(this.locale));
+-    speech.startListening(intent);
++    try {
++      speech.startListening(intent);
++    } catch (Exception e) {
++      Log.d("ASR", "start apos reuso falhou, recriando: " + e.getMessage());
++      try { speech.destroy(); } catch (Exception ignored) {}
++      speech = SpeechRecognizer.createSpeechRecognizer(this.reactContext);
++      speech.setRecognitionListener(this);
++      speech.startListening(intent);
++    }
+   }
+ 
+   private void startSpeechWithPermissions(final String locale, final ReadableMap opts, final Callback callback) {
+@@ -146,7 +151,7 @@
  
    @Override
    public String getName() {

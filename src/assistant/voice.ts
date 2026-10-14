@@ -227,10 +227,14 @@ export const attachVoice = (handlers: VoiceHandlers): (() => void) => {
   };
   Voice.onSpeechError = (e: SpeechErrorEvent) => {
     handlers.onStateChange?.(false);
+    const err = e?.error as
+      | string
+      | { code?: string; message?: string }
+      | undefined;
     const raw =
-      typeof e?.error === 'string'
-        ? e.error
-        : (e?.error?.code as string) ?? 'erro_de_voz';
+      typeof err === 'string'
+        ? err
+        : err?.code ?? err?.message ?? 'erro_de_voz';
     handlers.onError?.(raw);
   };
   Voice.onSpeechResults = (e: SpeechResultsEvent) => {
