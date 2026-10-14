@@ -115,6 +115,29 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
+  // DIAGNÓSTICO TEMPORÁRIO (remover depois): mostra na conversa o que o
+  // reconhecedor de voz ouve e os erros que devolve, para descobrir por que a
+  // pergunta não chega ao motor. `coalesce` troca a mesma linha em vez de
+  // encher a conversa com cada resultado parcial.
+  const debugMsgIdRef = useRef<string | null>(null);
+  const pushDebug = useCallback((text: string, coalesce = false) => {
+    setMessages(prev => {
+      if (coalesce && debugMsgIdRef.current) {
+        const idx = prev.findIndex(m => m.id === debugMsgIdRef.current);
+        if (idx >= 0) {
+          const next = prev.slice();
+          next[idx] = { ...next[idx], text };
+          return next;
+        }
+      }
+      const msg = createMessage('assistant', text, false);
+      if (coalesce) {
+        debugMsgIdRef.current = msg.id;
+      }
+      return [...prev, msg];
+    });
+  }, []);
+
   const sendRef = useRef<(text: string) => Promise<void>>(async () => {});
   const initPromiseRef = useRef<Promise<void> | null>(null);
 
@@ -261,6 +284,7 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       setListening(true);
       const started = await startListening();
       if (!started) {
+        pushDebug(`⚠️ escuta não iniciou (${mode})`);
         sessionActiveRef.current = false;
         voiceModeRef.current = 'none';
         setListening(false);
@@ -274,7 +298,7 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     },
-    [clearWakeTimer, voiceSupported],
+    [clearWakeTimer, pushDebug, voiceSupported],
   );
 
   const scheduleWakeCycle = useCallback(() => {
@@ -483,6 +507,7 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     if (!voiceSupported) {
+      pushDebug('⚠️ voz indisponível (voiceSupported=false)');
       Alert.alert(
         t('as_voice_unavailable_title'),
         t('as_voice_unavailable_body'),
@@ -496,12 +521,13 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       setListening(true);
     } else {
       setListening(false);
+      pushDebug('⚠️ microfone manual não abriu');
       Alert.alert(
         t('as_mic_unavailable_title'),
         t('as_mic_unavailable_body'),
       );
     }
-  }, [beginSession, clearWakeTimer, stopSession, voiceSupported, t]);
+  }, [beginSession, clearWakeTimer, pushDebug, stopSession, voiceSupported, t]);
 
   const clear = useCallback(() => {
     setMessages([]);
@@ -566,9 +592,16 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       .catch(() => {});
 
     const detach = attachVoice({
-      onResult: handleTranscription,
+      onResult: text => {
+        pushDebug(`🎧 ouvi: ${text}`);
+        handleTranscription(text);
+      },
+      onPartial: text => {
+        pushDebug(`🎧 ...${text}`, true);
+      },
       onStateChange: () => {},
-      onError: () => {
+      onError: code => {
+        pushDebug(`⚠️ voz erro: ${code}`);
         handleVoiceError();
       },
       onEnd: () => {
@@ -607,6 +640,7 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
     handleTranscription,
     handleVoiceEnd,
     handleVoiceError,
+    pushDebug,
     stopSession,
   ]);
 

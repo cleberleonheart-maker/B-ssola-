@@ -213,6 +213,7 @@ export const isVoiceAvailable = async (): Promise<boolean> => {
 
 export type VoiceHandlers = {
   onResult: (text: string) => void;
+  onPartial?: (text: string) => void;
   onStateChange?: (listening: boolean) => void;
   onError?: (code: string) => void;
   onEnd?: () => void;
@@ -238,12 +239,19 @@ export const attachVoice = (handlers: VoiceHandlers): (() => void) => {
       handlers.onResult(value[0]);
     }
   };
+  Voice.onSpeechPartialResults = (e: SpeechResultsEvent) => {
+    const value = e?.value;
+    if (value && value.length > 0 && value[0]) {
+      handlers.onPartial?.(value[0]);
+    }
+  };
 
   return () => {
     Voice.onSpeechStart = noop;
     Voice.onSpeechEnd = noop;
     Voice.onSpeechError = noop;
     Voice.onSpeechResults = noop;
+    Voice.onSpeechPartialResults = noop;
   };
 };
 
