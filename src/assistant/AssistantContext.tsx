@@ -21,7 +21,6 @@ import {
   speak,
   speakAndWait,
   startListening,
-  stopListening,
   stopSpeaking,
   destroyVoice,
   setVoiceLanguage,
@@ -51,10 +50,11 @@ const parseVoiceErrorCode = (raw: string): number | null => {
   return match ? Number(match[1]) : null;
 };
 
-// 5 = ERROR_CLIENT, 11 = ERROR_LANGUAGE_NOT_SUPPORTED, 12 =
-// ERROR_LANGUAGE_UNAVAILABLE: o motor padrão do aparelho a recusar a sessão. O
-// motor Google costuma aceitar (ver listVoiceServices).
-const VOICE_ENGINE_FALLBACK_CODES = new Set([5, 11, 12]);
+// 5 = ERROR_CLIENT, 10 = ERROR_SERVER_DISCONNECTED, 11 =
+// ERROR_LANGUAGE_NOT_SUPPORTED, 12 = ERROR_LANGUAGE_UNAVAILABLE: o motor padrão
+// do aparelho a recusar/cortar a sessão. O motor Google costuma aceitar (ver
+// listVoiceServices). O 7 (NO_MATCH) fica de fora: é só "não ouvi nada".
+const VOICE_ENGINE_FALLBACK_CODES = new Set([5, 10, 11, 12]);
 
 type AssistantApi = {
   ready: boolean;
@@ -383,13 +383,14 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
   const wakeDetected = useCallback(
     async (inlineCommand?: string) => {
       clearWakeTimer();
+      // A sessão de ativação já terminou (foi o resultado dela que chegou até
+      // aqui), então não vale a pena insistir num `stop`: um `stopListening`
+      // extra re-disparava `onEndOfSpeech` e criava um timer de folga que, mais
+      // tarde, abria um comando a mais por cima do verdadeiro (erros 5/10).
+      // O `startListening` já abre um reconhecedor novo (destrói o anterior).
+      clearSettleTimer();
       awaitingCommandRef.current = true;
       commandRetriesRef.current = 0;
-      try {
-        await stopListening();
-      } catch {
-        // ignore
-      }
       sessionActiveRef.current = false;
       voiceModeRef.current = 'none';
       setListening(false);
@@ -422,16 +423,22 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
         beginSession('command');
       }
     },
-    [beginSession, clearWakeTimer, scheduleWakeCycle, t],
+    [beginSession, clearSettleTimer, clearWakeTimer, scheduleWakeCycle, t],
   );
   const handleTranscription = useCallback(
     (text: string) => {
-      clearSettleTimer();
-      sessionActiveRef.current = false;
-      const mode = voiceModeRef.current;
       if (!text) {
         return;
       }
+      const mode = voiceModeRef.current;
+      // Resultado de uma sessão que já não está à espera (ex.: chegou depois de
+      // pararmos/destruirmos o reconhecedor). Antes isto caía no `send` final e
+      // a Kefera executava lixo ou um comando repetido.
+      if (mode === 'none') {
+        return;
+      }
+      clearSettleTimer();
+      sessionActiveRef.current = false;
       if (mode === 'wake') {
         if (!isWakeWord(text)) {
           // Estávamos à espera do comando mas a sessão já voltou para a
@@ -443,6 +450,9 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
             clearWakeTimer();
             voiceModeRef.current = 'none';
             sendRef.current(text);
+            if (wakeOnRef.current && appActiveRef.current) {
+              scheduleWakeCycle();
+            }
           }
           return;
         }
@@ -456,11 +466,19 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
         clearWakeTimer();
         voiceModeRef.current = 'none';
         sendRef.current(text);
+        // Retoma a escuta da palavra de ativação sem depender do `onEnd` que
+        // ainda vem a seguir (esse é agora ignorado, porque o modo é 'none').
+        if (wakeOnRef.current && appActiveRef.current) {
+          scheduleWakeCycle();
+        }
         return;
       }
-      sendRef.current(text);
+      if (mode === 'manual') {
+        sendRef.current(text);
+        return;
+      }
     },
-    [clearSettleTimer, clearWakeTimer, wakeDetected],
+    [clearSettleTimer, clearWakeTimer, scheduleWakeCycle, wakeDetected],
   );
 
   const endCommandListening = useCallback(() => {
@@ -506,6 +524,12 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
   // responder (aí sim repetimos como antes).
   const handleVoiceEnd = useCallback(() => {
     setListening(false);
+    // Evento de uma sessão já abandonada (ex.: o `onEndOfSpeech` da ativação a
+    // chegar durante o "Estou aqui", já com o modo em 'none'): ignorar. Antes
+    // criava um timer de folga que abria um comando extra sobre o verdadeiro.
+    if (voiceModeRef.current === 'none') {
+      return;
+    }
     clearSettleTimer();
     settleTimerRef.current = setTimeout(() => {
       settleTimerRef.current = null;
@@ -522,9 +546,14 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
   }, [clearSettleTimer, endCommandListening, scheduleWakeCycle]);
 
   const handleVoiceError = useCallback(() => {
+    setListening(false);
+    // Idem: erro de uma sessão que já não está ativa não deve mexer no fluxo
+    // (senão reabria comando/ativação por cima do que está a acontecer).
+    if (voiceModeRef.current === 'none') {
+      return;
+    }
     clearSettleTimer();
     sessionActiveRef.current = false;
-    setListening(false);
     fallbackFromCommand();
   }, [clearSettleTimer, fallbackFromCommand]);
 
