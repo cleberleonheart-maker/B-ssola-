@@ -14,6 +14,9 @@ jest.mock('@react-native-community/voice', () => ({
     destroy: jest.fn(),
     isAvailable: jest.fn(async () => true),
     requestPermissions: jest.fn(async () => true),
+    getSpeechRecognitionServices: jest.fn(async () => [
+      'com.google.android.googlequicksearchbox',
+    ]),
   },
   SpeechResultsEvent: {},
   SpeechErrorEvent: {},

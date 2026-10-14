@@ -28,6 +28,9 @@ import {
   setMuted,
   isMuted,
   whenSpeechIdle,
+  setVoiceEngine,
+  getVoiceEngine,
+  listVoiceServices,
 } from './voice';
 import {
   buildEmptyContext,
@@ -40,6 +43,18 @@ import { migrateKey } from '../utils/storage';
 
 const WAKE_PREF_KEY = '@bussola/kefera/wake';
 const LEGACY_WAKE_PREF_KEY = '@bussola/virgin/wake';
+
+// O nativo envia o erro como "%d/%s" (ex.: "11/Didn't understand..."). Extrai o
+// número para decidir se vale trocar de motor.
+const parseVoiceErrorCode = (raw: string): number | null => {
+  const match = /^\s*(\d+)/.exec(raw);
+  return match ? Number(match[1]) : null;
+};
+
+// 5 = ERROR_CLIENT, 11 = ERROR_LANGUAGE_NOT_SUPPORTED, 12 =
+// ERROR_LANGUAGE_UNAVAILABLE: o motor padrão do aparelho a recusar a sessão. O
+// motor Google costuma aceitar (ver listVoiceServices).
+const VOICE_ENGINE_FALLBACK_CODES = new Set([5, 11, 12]);
 
 type AssistantApi = {
   ready: boolean;
@@ -572,6 +587,14 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       })
       .catch(() => {});
 
+    listVoiceServices()
+      .then(services => {
+        if (alive && services.length > 0) {
+          pushDebug(`🔎 motores de voz: ${services.join(', ')}`);
+        }
+      })
+      .catch(() => {});
+
     migrateKey(LEGACY_WAKE_PREF_KEY, WAKE_PREF_KEY)
       .then(value => {
         if (!alive) {
@@ -602,6 +625,15 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       onStateChange: () => {},
       onError: code => {
         pushDebug(`⚠️ voz erro: ${code}`);
+        const numeric = parseVoiceErrorCode(code);
+        if (
+          numeric !== null &&
+          VOICE_ENGINE_FALLBACK_CODES.has(numeric) &&
+          getVoiceEngine() !== 'GOOGLE'
+        ) {
+          setVoiceEngine('GOOGLE');
+          pushDebug('↻ a tentar o motor Google');
+        }
         handleVoiceError();
       },
       onEnd: () => {

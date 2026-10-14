@@ -259,16 +259,49 @@ export const attachVoice = (handlers: VoiceHandlers): (() => void) => {
   };
 };
 
+// `@react-native-community/voice` aceita opções extra no `start`; usamos
+// RECOGNIZER_ENGINE para fixar o motor Google quando o motor padrão do
+// aparelho recusa o idioma (erro 11/12 - LANGUAGE_NOT_SUPPORTED/UNAVAILABLE) ou
+// entra em estado inválido (erro 5 - ERROR_CLIENT).
+let enginePreference: 'GOOGLE' | null = null;
+
+export const setVoiceEngine = (engine: 'GOOGLE' | null): void => {
+  enginePreference = engine;
+};
+
+export const getVoiceEngine = (): 'GOOGLE' | null => enginePreference;
+
 export const startListening = async (): Promise<boolean> => {
   const granted = await requestMicPermission();
   if (!granted) {
     return false;
   }
   try {
-    await Voice.start(VOICE_LANG_MAP[voiceLang]);
+    if (enginePreference) {
+      await Voice.start(VOICE_LANG_MAP[voiceLang], {
+        RECOGNIZER_ENGINE: enginePreference,
+      });
+    } else {
+      await Voice.start(VOICE_LANG_MAP[voiceLang]);
+    }
     return true;
   } catch {
     return false;
+  }
+};
+
+// Lista dos serviços de reconhecimento instalados no aparelho (Android). Serve
+// para diagnosticar o erro 11 (idioma): se o motor padrão não for o Google,
+// fixá-lo via RECOGNIZER_ENGINE resolve.
+export const listVoiceServices = async (): Promise<string[]> => {
+  if (Platform.OS !== 'android') {
+    return [];
+  }
+  try {
+    const services = await Voice.getSpeechRecognitionServices();
+    return Array.isArray(services) ? services : [];
+  } catch {
+    return [];
   }
 };
 
