@@ -677,6 +677,17 @@ export type CrashReport = {
  * sozinho. O reporter também não trata o fracasso — se não há rede no arranque
  * seguinte, o relatório fica na fila para a próxima vez.
  */
+/**
+ * O PostgREST recusou o insert porque a coluna não existe (PGRST204) — ou o
+ * Postgres, com 42703. É diferente de uma política de RLS (42501) ou de rede: é
+ * o único caso em que repetir o insert sem o campo opcional é seguro, e por
+ * isso se distingue em vez de se repetir às cegas.
+ */
+const isMissingColumn = (error: { code?: string; message?: string }): boolean =>
+  error.code === 'PGRST204' ||
+  error.code === '42703' ||
+  /could not find the .* column|column .* does not exist/i.test(error.message ?? '');
+
 export const pushCrashReport = async (
   userId: string,
   report: CrashReport,
@@ -701,11 +712,34 @@ export const pushCrashReport = async (
       }),
       15000,
     );
-    if (error) {
-      noteCloudError('crash', error.message);
+    if (!error) return true;
+    // O `sensor_log` (ideia #63) entra por um `alter table` no `crashes.sql`.
+    // Enquanto esse `alter` não estiver aplicado na nuvem, o PostgREST recusa a
+    // linha inteira por causa de um campo opcional — e um campo opcional não
+    // pode custar o relatório: sem ele, o crash ainda chega. A repetição só
+    // acontece quando o erro é mesmo a coluna em falta, para não mascarar uma
+    // RLS ou a rede, que é o que o `#97` verifica em produção.
+    if (isMissingColumn(error)) {
+      const { error: semLog } = await withTimeout(
+        client.from('crashes').insert({
+          user_id: userId,
+          message: report.message,
+          stack: report.stack,
+          fingerprint: report.fingerprint,
+          app_version: report.appVersion,
+          version_code: report.versionCode,
+          happened_at: report.happenedAt,
+          reported_at: new Date().toISOString(),
+          expires_at: report.expiresAt,
+        }),
+        15000,
+      );
+      if (!semLog) return true;
+      noteCloudError('crash', semLog.message);
       return false;
     }
-    return true;
+    noteCloudError('crash', error.message);
+    return false;
   } catch (error) {
     noteCloudError('crash', error);
     return false;

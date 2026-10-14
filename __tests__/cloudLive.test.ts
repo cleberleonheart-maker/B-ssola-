@@ -5,9 +5,9 @@ type UpsertResult = {
   error: { message: string } | null;
 };
 
-const loadCloud = (result: UpsertResult) => {
+const loadCloud = (result: UpsertResult, insertMock?: jest.Mock) => {
   const upsert = jest.fn().mockResolvedValue(result);
-  const insert = jest.fn().mockResolvedValue(result);
+  const insert = insertMock ?? jest.fn().mockResolvedValue(result);
   // O `delete` do supabase-js e um encadeamento: cada `eq` devolve o proprio
   // builder, senao a segunda comparacao rebenta em `undefined` e o teste passa
   // a testar outra coisa sem dar conta.
@@ -112,6 +112,63 @@ describe('pushLivePosition', () => {
       'login anonimo: Anonymous sign-ins are disabled',
     );
     warn.mockRestore();
+  });
+});
+
+/**
+ * O relatório de crash (#56) e o relato de problema (#63). O `sensor_log` do
+ * relato entra por um `alter table` no `crashes.sql`: enquanto esse `alter` não
+ * estiver aplicado na nuvem, o PostgREST recusa a linha inteira por causa de um
+ * campo opcional. Um campo opcional não pode custar o relatório — o insert
+ * repete sem ele, mas só quando o erro é mesmo a coluna em falta.
+ */
+describe('pushCrashReport', () => {
+  beforeEach(() => {
+    jest.resetModules();
+  });
+
+  afterEach(() => {
+    jest.dontMock('@react-native-async-storage/async-storage');
+    jest.dontMock('@supabase/supabase-js');
+    jest.resetModules();
+  });
+
+  const report = {
+    message: 'boom',
+    stack: 'Error: boom',
+    fingerprint: 'aaaa0000',
+    appVersion: '7.44',
+    versionCode: 175,
+    happenedAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 90 * 864e5).toISOString(),
+    sensorLog: 'ax=0,ay=0,az=9.8',
+  };
+
+  it('repete o insert sem sensor_log quando a coluna ainda não existe', async () => {
+    const insert = jest
+      .fn()
+      .mockResolvedValueOnce({
+        error: { code: 'PGRST204', message: "Could not find the 'sensor_log' column" },
+      })
+      .mockResolvedValueOnce({ error: null });
+    const { cloud } = loadCloud({ error: null }, insert);
+
+    await expect(cloud.pushCrashReport('user-1', report)).resolves.toBe(true);
+
+    // A primeira tentativa leva o log; a segunda, sem ele, é a que chega.
+    expect(insert).toHaveBeenCalledTimes(2);
+    expect(insert.mock.calls[0][0]).toHaveProperty('sensor_log', 'ax=0,ay=0,az=9.8');
+    expect(insert.mock.calls[1][0]).not.toHaveProperty('sensor_log');
+  });
+
+  it('não repete quando o erro é de RLS: repetir não resolveria', async () => {
+    const insert = jest.fn().mockResolvedValue({
+      error: { code: '42501', message: 'new row violates row-level security policy' },
+    });
+    const { cloud } = loadCloud({ error: null }, insert);
+
+    await expect(cloud.pushCrashReport('user-1', report)).resolves.toBe(false);
+    expect(insert).toHaveBeenCalledTimes(1);
   });
 });
 

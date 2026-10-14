@@ -54,6 +54,16 @@ const corpoTabela = sql.slice(sql.indexOf('create table'), sql.indexOf(');'));
 const colunas = [...corpoTabela.matchAll(/^\s{2}(\w+)\s+(text|integer|timestamptz|bigint)/gm)].map(
   m => ({ nome: m[1], tipo: m[2] }),
 );
+
+// Colunas que entram por `alter table ... add column if not exists` — o caminho
+// que o `crashes.sql` usa para a tabela que já existe ganhar colunas novas sem
+// migração à mão, como o `sensor_log` da #63. Ler só o `create table` acusava de
+// falsa uma coluna que o SQL cria mesmo, e o cruzamento abaixo (o único que
+// apanha um `cloud.ts` a enviar um campo que a tabela não tem) ficava a morder
+// o próprio SQL que a acrescenta.
+for (const m of sql.matchAll(/add column if not exists\s+(\w+)/gi)) {
+  if (!colunas.some(c => c.nome === m[1])) colunas.push({ nome: m[1], tipo: 'alter' });
+}
 const nomesColuna = colunas.map(c => c.nome);
 
 for (const c of colunas) {
