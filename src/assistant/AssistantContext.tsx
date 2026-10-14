@@ -163,6 +163,7 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
   const commandRetriesRef = useRef(0);
   const voiceModeRef = useRef<VoiceMode>('none');
   const wakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unmuteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toggleWakeRef = useRef<() => void>(() => {});
   const actionHandlerRef = useRef<(action: AssistantAction) => void>(() => {});
@@ -250,14 +251,22 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const clearSettleTimer = useCallback(() => {
+    if (settleTimerRef.current) {
+      clearTimeout(settleTimerRef.current);
+      settleTimerRef.current = null;
+    }
+  }, []);
+
   const stopSession = useCallback(async () => {
     sessionActiveRef.current = false;
     voiceModeRef.current = 'none';
     awaitingCommandRef.current = false;
     commandRetriesRef.current = 0;
+    clearSettleTimer();
     await destroyVoice();
     setListening(false);
-  }, []);
+  }, [clearSettleTimer]);
 
   const beginSession = useCallback(
     async (mode: Exclude<VoiceMode, 'none' | 'manual'>) => {
@@ -409,6 +418,8 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
 
   const handleTranscription = useCallback(
     (text: string) => {
+      clearSettleTimer();
+      sessionActiveRef.current = false;
       const mode = voiceModeRef.current;
       if (!text) {
         return;
@@ -431,7 +442,7 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       }
       sendRef.current(text);
     },
-    [clearWakeTimer, wakeDetected],
+    [clearSettleTimer, clearWakeTimer, wakeDetected],
   );
 
   const endCommandListening = useCallback(() => {
@@ -465,24 +476,39 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [beginSession, clearWakeTimer, endCommandListening]);
 
+  // No Android, `onSpeechEnd` (a fonte do `onEnd`) dispara quando a pessoa PARA
+  // de falar, ANTES de o resultado final chegar. Tratar isso como fim de sessão
+  // e já reagendar um novo `start` interrompia o reconhecimento a meio (o
+  // seguinte `startListening` cancela/reinicia a sessão que ainda ia entregar
+  // `onSpeechResults`) e caía em ERROR_CLIENT(5) / NO_MATCH(7) /
+  // SERVER_DISCONNECTED(10) / LANGUAGE_NOT_SUPPORTED(11). Aqui só mexemos no
+  // estado de escuta; quem decide o próximo passo é `onSpeechResults`
+  // (`handleTranscription`) ou `onSpeechError` (`handleVoiceError`). O timer de
+  // folga é a rede de segurança para o caso raro de o reconhecedor nunca
+  // responder (aí sim repetimos como antes).
   const handleVoiceEnd = useCallback(() => {
-    sessionActiveRef.current = false;
     setListening(false);
-    if (awaitingCommandRef.current) {
-      endCommandListening();
-      return;
-    }
-    voiceModeRef.current = wakeOnRef.current ? 'wake' : 'none';
-    if (wakeOnRef.current && appActiveRef.current) {
-      scheduleWakeCycle();
-    }
-  }, [endCommandListening, scheduleWakeCycle]);
+    clearSettleTimer();
+    settleTimerRef.current = setTimeout(() => {
+      settleTimerRef.current = null;
+      sessionActiveRef.current = false;
+      if (awaitingCommandRef.current) {
+        endCommandListening();
+        return;
+      }
+      voiceModeRef.current = wakeOnRef.current ? 'wake' : 'none';
+      if (wakeOnRef.current && appActiveRef.current) {
+        scheduleWakeCycle();
+      }
+    }, 2500);
+  }, [clearSettleTimer, endCommandListening, scheduleWakeCycle]);
 
   const handleVoiceError = useCallback(() => {
+    clearSettleTimer();
     sessionActiveRef.current = false;
     setListening(false);
     fallbackFromCommand();
-  }, [fallbackFromCommand]);
+  }, [clearSettleTimer, fallbackFromCommand]);
 
   const toggleWake = useCallback(() => {
     // efeitos fora do updater do setState: se o updater for re-invocado
@@ -662,11 +688,13 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       detach();
       appSub.remove();
       clearWakeTimer();
+      clearSettleTimer();
       clearUnmuteTimer();
       stopSession();
     };
   }, [
     beginSession,
+    clearSettleTimer,
     clearWakeTimer,
     clearUnmuteTimer,
     handleTranscription,
