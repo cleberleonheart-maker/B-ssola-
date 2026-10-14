@@ -27,4 +27,14 @@ describe('manifest de voz', () => {
     // Dentro do <application> o aapt reclama e o elemento e ignorado.
     expect(idxApplication).toBeGreaterThan(idxQueries);
   });
+
+  it('nenhum comentario XML contem "--"', () => {
+    // Um "--" dentro de um comentario e XML invalido: o aapt rebenta no build
+    // (SAXParseException) e o erro so aparece no CI, minutos depois. Custa
+    // pouco apanhar aqui.
+    const comentarios = manifest.match(/<!--[\s\S]*?-->/g) ?? [];
+    for (const c of comentarios) {
+      expect(c.slice(4, -3)).not.toContain('--');
+    }
+  });
 });

@@ -28,7 +28,7 @@
     <!-- Android 11+ (API 30) esconde servicos de terceiros por omissao. Sem esta
          declaracao o SpeechRecognizer.isRecognitionAvailable() devolve false, a
          Kefera conclui que nao ha voz e nunca abre o microfone pela palavra de
-         ativacao -- so o comando escrito funciona. Declarar o servico de
+         ativacao, e so o comando escrito funciona. Declarar o servico de
          reconhecimento devolve-lhe visibilidade. -->
     <queries>
         <intent>
