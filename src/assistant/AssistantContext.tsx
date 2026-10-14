@@ -400,6 +400,15 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       if (!appActiveRef.current) {
         return;
       }
+      // O TTS pode segurar o foco de áudio por um instante depois de terminar.
+      // O fluxo automático (com o "Estou aqui" antes) falhava com erro 5 ao
+      // abrir a escuta do comando, enquanto o 🎤 manual — sem TTS antes —
+      // funcionava sempre. Libertamos o motor e damos uma folga antes de ouvir.
+      await stopSpeaking();
+      await new Promise<void>(resolve => setTimeout(resolve, 700));
+      if (!appActiveRef.current) {
+        return;
+      }
       if (inlineCommand) {
         // comando já veio na frase de ativação: não reabre o microfone
         awaitingCommandRef.current = false;
@@ -415,7 +424,6 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
     },
     [beginSession, clearWakeTimer, scheduleWakeCycle, t],
   );
-
   const handleTranscription = useCallback(
     (text: string) => {
       clearSettleTimer();
@@ -426,6 +434,16 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       }
       if (mode === 'wake') {
         if (!isWakeWord(text)) {
+          // Estávamos à espera do comando mas a sessão já voltou para a
+          // ativação: em vez de descartar em silêncio (o utilizador falava e
+          // não acontecia nada), tratamos o que foi dito como o comando.
+          if (awaitingCommandRef.current) {
+            commandRetriesRef.current = 0;
+            awaitingCommandRef.current = false;
+            clearWakeTimer();
+            voiceModeRef.current = 'none';
+            sendRef.current(text);
+          }
           return;
         }
         // "Kefera, qual a minha latitude?" desperta E executa o comando
