@@ -277,6 +277,13 @@ export const startListening = async (): Promise<boolean> => {
     return false;
   }
   try {
+    // Abre SEMPRE um reconhecedor novo. Reutilizar a mesma instância entre a
+    // palavra de ativação e o comando mostrou-se frágil no Android: o comando
+    // caía com erro 5/7/10/11. Um reconhecedor fresco abre bem — é o que o
+    // botão 🎤 fazia (a sessão anterior já estava destruída). A pequena espera
+    // dá tempo ao serviço de voz para libertar a sessão antiga.
+    await destroyVoice();
+    await new Promise<void>(resolve => setTimeout(resolve, 250));
     if (enginePreference) {
       await Voice.start(VOICE_LANG_MAP[voiceLang], {
         RECOGNIZER_ENGINE: enginePreference,
