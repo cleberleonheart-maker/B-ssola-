@@ -79,6 +79,14 @@ describe('bug 11: wake word does not swallow the command', () => {
     expect(isWakeWord('Kefera, qual a minha latitude?')).toBe(true);
     expect(isWakeWord('qual a hora')).toBe(false);
   });
+  it('detects the wake word on every call (regex nao pode ser stateful)', () => {
+    // Sem uma frase que "falhe" pelo meio: com a flag global em `.test()`, o
+    // lastIndex avancava e a chamada seguinte dava falso. Chamar varias vezes
+    // seguidas tem de dar sempre verdadeiro.
+    for (let i = 0; i < 5; i += 1) {
+      expect(isWakeWord('Kefera')).toBe(true);
+    }
+  });
   it('extracts the remainder of the sentence', () => {
     expect(stripWakeWord('Kefera, qual a minha latitude?')).toBe('qual a minha latitude');
     expect(stripWakeWord('kefera')).toBe('');

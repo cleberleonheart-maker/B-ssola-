@@ -38,10 +38,13 @@ const WhatsNewModal = ({ visible, onClose, lastSeen = null }: Props) => {
       transparent
       animationType="fade"
       onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      <View style={styles.backdrop}>
         <Pressable
-          style={[styles.card, { backgroundColor: colors.background }]}
-          onPress={() => {}}>
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityLabel={t('wn_close')}
+        />
+        <View style={[styles.card, { backgroundColor: colors.background }]}>
           <View style={[styles.badge, { backgroundColor: colors.primary }]}>
             <Text style={styles.badgeText}>✨</Text>
           </View>
@@ -116,8 +119,8 @@ const WhatsNewModal = ({ visible, onClose, lastSeen = null }: Props) => {
               {t('wn_close')}
             </Text>
           </Pressable>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 };

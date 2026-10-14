@@ -25,6 +25,17 @@
     <uses-feature android:name="android.hardware.sensor.compass" android:required="true" />
     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="true" />
 
+    <!-- Android 11+ (API 30) esconde servicos de terceiros por omissao. Sem esta
+         declaracao o SpeechRecognizer.isRecognitionAvailable() devolve false, a
+         Kefera conclui que nao ha voz e nunca abre o microfone pela palavra de
+         ativacao -- so o comando escrito funciona. Declarar o servico de
+         reconhecimento devolve-lhe visibilidade. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"

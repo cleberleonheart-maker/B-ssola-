@@ -276,16 +276,21 @@ export const destroyVoice = async (): Promise<void> => {
   }
 };
 
-const WAKE_VARIANTS =
-  /\b(keferas|kefera|quefera|kefera|kefega|keyfera)\b/g;
+// Duas expressões de propósito: `.test()` com a flag global é stateful (avança
+// `lastIndex` entre chamadas), o que fazia a palavra de ativação casar uma vez
+// sim e outra não -- "chamo e ela não responde" a cada duas tentativas. O teste
+// usa a versão sem `g` (sem estado); o `replace` do strip usa a global.
+const WAKE_WORD_PATTERN = '(keferas|kefera|quefera|kefega|keyfera)';
+const WAKE_TEST = new RegExp(`\\b${WAKE_WORD_PATTERN}\\b`);
+const WAKE_GLOBAL = new RegExp(`\\b${WAKE_WORD_PATTERN}\\b`, 'g');
 
 export const isWakeWord = (normalizedText: string): boolean =>
-  WAKE_VARIANTS.test(normalizeWakeText(normalizedText));
+  WAKE_TEST.test(normalizeWakeText(normalizedText));
 
 // remove a palavra de ativação do resto da frase, para que
 // "kefera, qual a minha latitude?" execute o comando em vez de só despertar
 export const stripWakeWord = (normalizedText: string): string =>
-  normalizeWakeText(normalizedText).replace(WAKE_VARIANTS, ' ').replace(/\s+/g, ' ').trim();
+  normalizeWakeText(normalizedText).replace(WAKE_GLOBAL, ' ').replace(/\s+/g, ' ').trim();
 
 export const normalizeWakeText = (text: string): string =>
   text
