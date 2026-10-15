@@ -50,11 +50,13 @@ const parseVoiceErrorCode = (raw: string): number | null => {
   return match ? Number(match[1]) : null;
 };
 
-// 5 = ERROR_CLIENT, 10 = ERROR_SERVER_DISCONNECTED, 11 =
-// ERROR_LANGUAGE_NOT_SUPPORTED, 12 = ERROR_LANGUAGE_UNAVAILABLE: o motor padrão
-// do aparelho a recusar/cortar a sessão. O motor Google costuma aceitar (ver
-// listVoiceServices). O 7 (NO_MATCH) fica de fora: é só "não ouvi nada".
-const VOICE_ENGINE_FALLBACK_CODES = new Set([5, 10, 11, 12]);
+// 11 = ERROR_LANGUAGE_NOT_SUPPORTED, 12 = ERROR_LANGUAGE_UNAVAILABLE: o motor
+// padrão do aparelho não tem o idioma; aí vale fixar o motor Google. Erros
+// passageiros (5 = ERROR_CLIENT, 10 = ERROR_SERVER_DISCONNECTED, 7 = NO_MATCH)
+// NÃO entram aqui: trocar de motor por causa deles e de forma permanente piorava
+// tudo — no aparelho do usuário, depois de um erro 10, todo start passou a usar
+// o motor Google e a palavra de ativação deixou de ser reconhecida (erro 7).
+const VOICE_ENGINE_FALLBACK_CODES = new Set([11, 12]);
 
 type AssistantApi = {
   ready: boolean;
@@ -697,7 +699,7 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       },
       onStateChange: () => {},
       onError: code => {
-        pushDebug(`⚠️ voz erro: ${code}`);
+        pushDebug(`⚠️ voz erro: ${code} (${voiceModeRef.current})`);
         const numeric = parseVoiceErrorCode(code);
         if (
           numeric !== null &&

@@ -265,9 +265,6 @@ export const attachVoice = (handlers: VoiceHandlers): (() => void) => {
 // entra em estado inválido (erro 5 - ERROR_CLIENT).
 let enginePreference: 'GOOGLE' | null = null;
 
-// Ver `startListening`: evita abrir uma escuta enquanto a anterior abre.
-let starting = false;
-
 export const setVoiceEngine = (engine: 'GOOGLE' | null): void => {
   enginePreference = engine;
 };
@@ -275,22 +272,15 @@ export const setVoiceEngine = (engine: 'GOOGLE' | null): void => {
 export const getVoiceEngine = (): 'GOOGLE' | null => enginePreference;
 
 export const startListening = async (): Promise<boolean> => {
-  // Impede dois starts sobrepostos: abrir uma escuta enquanto a anterior ainda
-  // está a fechar devolve ERROR_CLIENT (5) no Android.
-  if (starting) {
-    return false;
-  }
-  starting = true;
   try {
     const granted = await requestMicPermission();
     if (!granted) {
       return false;
     }
-    // Abre SEMPRE um reconhecedor novo. Reutilizar a mesma instância entre a
+    // Abre um reconhecedor novo por sessão. Reutilizar a mesma instância entre a
     // palavra de ativação e o comando mostrou-se frágil no Android: o comando
-    // caía com erro 5/7/10/11. Um reconhecedor fresco abre bem — é o que o
-    // botão 🎤 fazia (a sessão anterior já estava destruída). A pequena espera
-    // dá tempo ao serviço de voz para libertar a sessão antiga.
+    // caía com erro 7/10. Um reconhecedor fresco entra num estado limpo — é o
+    // que o botão 🎤 fazia (a sessão anterior já estava destruída).
     await destroyVoice();
     await new Promise<void>(resolve => setTimeout(resolve, 250));
     if (enginePreference) {
@@ -303,8 +293,6 @@ export const startListening = async (): Promise<boolean> => {
     return true;
   } catch {
     return false;
-  } finally {
-    starting = false;
   }
 };
 
