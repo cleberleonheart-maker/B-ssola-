@@ -244,7 +244,7 @@ export const getCloudAccessToken = async (): Promise<string | null> => {
  * Apaga a conta e os dados na nuvem (ideia #101).
  *
  * O servidor recebe o pedido pela RPC `delete_my_account` (SCRIPT SQL, não a
- * anon key): apaga as linhas das seis tabelas e depois o utilizador em
+ * anon key): apaga as linhas das sete tabelas e depois o utilizador em
  * `auth.users`. A RLS por si só não chegava — apagar o utilizador não é REST,
  * e o cliente do Supabase não tem forma de se remover a si próprio.
  *
@@ -502,6 +502,52 @@ export const pushNotes = async (
 export const fetchCloudNotes = async (
   userId: string,
 ): Promise<CloudRecord[]> => fetchRecords('notes', userId);
+
+export const pushWaypoints = async (
+  userId: string,
+  items: { id: string; data: unknown }[],
+): Promise<boolean> => pushRecords('waypoints', userId, items);
+
+export const fetchCloudWaypoints = async (
+  userId: string,
+): Promise<CloudRecord[]> => fetchRecords('waypoints', userId);
+
+/**
+ * Apaga da nuvem as linhas cujo `id` está na lista (ideia #18).
+ *
+ * O upsert do sync só acrescenta e sobrescreve: nunca apaga. Sem isto, um ponto
+ * apagado no aparelho voltava no `fetch` seguinte — a política de DELETE já
+ * existia nas tabelas, faltava quem a usasse. A RLS limita ao próprio `user_id`
+ * de qualquer forma; o `eq` é a mesma rede de segurança dos outros métodos.
+ *
+ * Devolve `false` em falha ou rede em baixo: quem chama mantém a "lápide" (ver
+ * `cloudSync`) para tentar outra vez, em vez de a apagar e ressuscitar a linha.
+ */
+export const deleteCloudRecords = async (
+  table: string,
+  userId: string,
+  ids: string[],
+): Promise<boolean> => {
+  if (!client) {
+    return false;
+  }
+  if (ids.length === 0) {
+    return true;
+  }
+  try {
+    const { error } = await withTimeout(
+      client.from(table).delete().eq('user_id', userId).in('id', ids),
+    );
+    if (error) {
+      noteCloudError(`delete ${table}`, error.message);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    noteCloudError(`delete ${table}`, error);
+    return false;
+  }
+};
 
 export const fetchLatestAppVersion = async (): Promise<AppVersion | null> => {
   if (!client) {

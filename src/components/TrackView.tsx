@@ -350,9 +350,13 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
             startedAt: track.startedAt,
             endedAt: track.endedAt,
             points: track.points,
+            pois: track.pois,
             distance: track.distance,
             eleGain: track.eleGain,
             eleLoss: track.eleLoss,
+            maxAlt: track.maxAlt,
+            minAlt: track.minAlt,
+            maxSpeedKmh: track.maxSpeedKmh,
           },
         },
       ]);

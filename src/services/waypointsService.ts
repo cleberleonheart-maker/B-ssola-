@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { noteDeleted } from './syncTombstones';
 
 export type Waypoint = {
   id: string;
@@ -31,6 +32,9 @@ export const removeWaypoint = async (id: string) => {
   const list = await loadWaypoints();
   const next = list.filter(w => w.id !== id);
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  // Deixa a lápide para o sync apagar a linha na nuvem (ideia #18): sem ela, o
+  // ponto apagado aqui voltava no próximo pull.
+  await noteDeleted('waypoints', id);
   return next;
 };
 

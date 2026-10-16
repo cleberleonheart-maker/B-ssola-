@@ -139,16 +139,19 @@
 ## Ideias novas (23/09/2026)
 - [ ] **17. AR sobre a câmera real** — marcar sol/lua/destino com o fundo da câmera
       viva (a camada de marcadores do `CameraARView` já existe; falta unir os dois).
-- [ ] **18. Backup e sincronização de notas/waypoints** — revisar o `cloud.ts`
-      (`Supabase`): garantir que caderneta e pontos realmente sincronizam por usuário,
-      com tratamento de conflito e aviso de offline.
-      **Estado a 06/10/2026 — só metade existe.** O que há: `pushNotes` (chamado pelo
-      `FieldNotesSheet` ao gravar) e `pushTracks` (chamado pelo `TrackView` ao guardar).
-      O que falta: `fetchCloudNotes` e `fetchCloudTracks` existem **sem nenhum chamador**
-      — ou seja, a escrita para a nuvem acontece e a leitura nunca; `waypointsService` não
-      fala com a nuvem nenhuma; não há detenção de conflito nem aviso de offline. Trocar
-      de telemóvel continua a perder os waypoints, e as notas de uma sessão anterior só
-      existem onde foram escritas.
+- [x] **18. Backup e sincronização de notas/waypoints** — ✅ feito. A escrita
+      para a nuvem existia sem leitura (`fetchCloudNotes`/`fetchCloudTracks` não
+      tinham chamador) e os waypoints não falhavam com a nuvem de modo nenhum.
+      Agora há um ciclo pull → merge → push no `cloudSync.ts`, igual para
+      pontos, anotações e trilhas: junta por `id` (o local ganha no empate; o
+      que só está na nuvem entra — é o que recupera um aparelho novo), grava o
+      resultado e sobe só o que mudou. Os apagados deixam lápide
+      (`syncTombstones.ts`, 90 dias) que o sync apaga na nuvem, para um ponto
+      apagado não ressuscitar no arranque seguinte. Nova tabela `waypoints` no
+      `rls.sql` (e no `delete_my_account`). O arranque do `CompassScreen` corre
+      o sync em segundo plano; guardar/apagar um ponto repete-o; o painel de
+      Configurações mostra o estado (ok / offline / falha). Testes em
+      `__tests__/cloudSync.test.ts`.
 - [x] **19. Nível em graus** — ✅ feito: a leitura de bolha mostra agora
       `Pitch N° · Roll N°` no lugar do `X/Y` adimensional. Usa
       `pitchRollDeg(accel)` (novo, `utils/compass.ts`): pitch do eixo Y, roll

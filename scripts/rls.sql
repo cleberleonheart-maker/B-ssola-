@@ -114,6 +114,45 @@ on notes for delete
 using (user_id::text = auth.uid()::text);
 
 -- =====...=============================================================
+-- waypoints: pontos guardados
+-- =====...=============================================================
+-- O app faz upsert com onConflict('id') em {user_id, id, data, updated_at}.
+-- Mesma forma de `tracks`/`notes`: o waypoint inteiro viaja em `data` e a
+-- tabela guarda so a chave. E a tabela que faltava para o #18 — sem ela trocar
+-- de telemovel perdia os pontos, que so viviam no AsyncStorage.
+create table if not exists public.waypoints (
+  user_id text not null,
+  id text not null,
+  data jsonb,
+  updated_at timestamptz not null default now(),
+  constraint waypoints_pkey primary key (id)
+);
+create index if not exists waypoints_user_id_idx on public.waypoints (user_id);
+
+alter table waypoints enable row level security;
+
+drop policy if exists "own_select_waypoints" on waypoints;
+create policy "own_select_waypoints"
+on waypoints for select
+using (user_id::text = auth.uid()::text);
+
+drop policy if exists "own_insert_waypoints" on waypoints;
+create policy "own_insert_waypoints"
+on waypoints for insert
+with check (user_id::text = auth.uid()::text);
+
+drop policy if exists "own_update_waypoints" on waypoints;
+create policy "own_update_waypoints"
+on waypoints for update
+using (user_id::text = auth.uid()::text)
+with check (user_id::text = auth.uid()::text);
+
+drop policy if exists "own_delete_waypoints" on waypoints;
+create policy "own_delete_waypoints"
+on waypoints for delete
+using (user_id::text = auth.uid()::text);
+
+-- =====...=============================================================
 -- app_version: leitura publica (o app consulta sem login);
 -- gravacao fica so com service_role (bypassa RLS).
 -- =====...=============================================================

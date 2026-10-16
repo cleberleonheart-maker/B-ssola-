@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { cloudStatus } from '../../services/cloud';
+import { cloudSyncStatus } from '../../services/cloudSync';
 import { pendingCrashes } from '../../services/crashReporter';
 import { useThemeColors } from '../../theme/ThemeContext';
 import {
@@ -53,6 +54,17 @@ const CloudSection = () => {
         : t('cloud_off')
       : t('cloud_no_creds');
 
+  const sync = cloudSyncStatus();
+  const syncTexto = sync
+    ? `${formatWhen(sync.at)} · ${
+        sync.state === 'ok'
+          ? t('cloud_data_sync_ok')
+          : sync.state === 'offline'
+            ? t('cloud_data_sync_offline')
+            : t('cloud_data_sync_fail')
+      }`
+    : t('cloud_data_sync_pending');
+
   return (
     <>
       <SectionLabel label={t('set_section_cloud')} />
@@ -75,6 +87,21 @@ const CloudSection = () => {
               status.lastSyncAt !== null
                 ? formatWhen(status.lastSyncAt)
                 : t('cloud_no_sync')
+            }
+          />
+        </GroupRow>
+
+        <GroupRow divider>
+          <IconChip icon="🔄" />
+          <RowBody
+            label={t('cloud_data_sync')}
+            sub={syncTexto}
+            subColor={
+              sync?.state === 'ok'
+                ? colors.success
+                : sync?.state === 'fail'
+                  ? colors.danger
+                  : colors.textMuted
             }
           />
         </GroupRow>

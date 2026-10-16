@@ -74,6 +74,7 @@ describe('o verificador da nuvem', () => {
       'virgin_memory',
       'tracks',
       'notes',
+      'waypoints',
       'crashes',
     ];
     expect(tabelasDaNuvem().sort()).toEqual([...esperadas].sort());

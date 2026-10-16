@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { noteDeleted } from './syncTombstones';
 
 export type FieldNote = {
   id: string;
@@ -34,6 +35,8 @@ export const deleteNote = async (id: string) => {
   const list = await loadNotes();
   const next = list.filter(n => n.id !== id);
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  // Lápide para o sync apagar a linha na nuvem (ideia #18).
+  await noteDeleted('notes', id);
   return next;
 };
 

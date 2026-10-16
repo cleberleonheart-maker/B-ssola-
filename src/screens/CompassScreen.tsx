@@ -102,6 +102,7 @@ import {
 } from '../services/preferencesService';
 import { setKeepScreenOn } from '../services/keepAwake';
 import { buildBackup, applyBackup, type BackupMode } from '../services/backupService';
+import { syncAllCollections, syncWaypoints } from '../services/cloudSync';
 import {
   addDistance,
   flushOdometer,
@@ -328,6 +329,12 @@ const CompassScreen = () => {
     loadAppMode().then(setAppModeState);
     loadDisplayMode().then(setDisplayModeState);
     loadWaypoints().then(setWaypoints);
+    // Sincronização com a nuvem (ideia #18): puxa o que existe noutro aparelho,
+    // junta com o local e sobe o que mudou. Corre em segundo plano e não
+    // bloqueia o arranque; sem rede, o `setWaypoints` leva a lista local.
+    syncAllCollections()
+      .then(result => setWaypoints(result.waypoints))
+      .catch(() => {});
     loadVoiceGuide().then(setVoiceGuide);
     loadVirtualWp().then(id => {
       setVirtualWpId(id);
@@ -878,6 +885,8 @@ const CompassScreen = () => {
       };
       const next = await saveWaypoint(wp);
       setWaypoints(next);
+      // Sobe o ponto novo e junta o que a nuvem tenha entretanto (ideia #18).
+      syncWaypoints().then(setWaypoints).catch(() => {});
     },
     [location],
   );
@@ -894,6 +903,7 @@ const CompassScreen = () => {
       };
       const next = await saveWaypoint(entry);
       setWaypoints(next);
+      syncWaypoints().then(setWaypoints).catch(() => {});
     },
     [],
   );
@@ -901,6 +911,8 @@ const CompassScreen = () => {
   const deleteWaypoint = useCallback(async (id: string) => {
     const next = await removeWaypoint(id);
     setWaypoints(next);
+    // `removeWaypoint` deixou a lápide; o sync apaga a linha na nuvem (ideia #18).
+    syncWaypoints().then(setWaypoints).catch(() => {});
     setActiveWpId(current => (current === id ? null : current));
     setVirtualWpId(current => {
       if (current === id) {

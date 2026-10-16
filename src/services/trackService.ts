@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { haversine } from '../utils/geo';
+import { noteDeleted } from './syncTombstones';
 
 export type TrackPoint = {
   lat: number;
@@ -117,6 +118,8 @@ export const deleteTrack = async (id: string) => {
   const list = await loadTracks();
   const next = list.filter(tr => tr.id !== id);
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  // Lápide para o sync apagar a linha na nuvem (ideia #18).
+  await noteDeleted('tracks', id);
   return next;
 };
 

@@ -56,6 +56,7 @@ const TABELAS = [
   'virgin_memory',
   'tracks',
   'notes',
+  'waypoints',
   'crashes',
 ];
 const FUNCOES = [

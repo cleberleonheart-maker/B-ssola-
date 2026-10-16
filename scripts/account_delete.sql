@@ -42,6 +42,7 @@ begin
   delete from public.virgin_memory where user_id = meu_id;
   delete from public.tracks where user_id = meu_id;
   delete from public.notes where user_id = meu_id;
+  delete from public.waypoints where user_id = meu_id;
   delete from public.crashes where user_id = meu_id;
   delete from public.live_points where user_id = meu_id;
   delete from public.live_shares where user_id = meu_id;
