@@ -381,6 +381,17 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     backup_invalid: 'Não foi possível ler esse backup.',
     backup_error: 'Erro ao restaurar: {error}',
     backup_notes_hint: 'Observação: as fotos da caderneta não são exportadas (somente texto e coordenadas).',
+    backup_preview_title: 'O que vai ser importado:',
+    backup_preview_waypoints: '{n} ponto(s)',
+    backup_preview_tracks: '{n} trilha(s)',
+    backup_preview_notes: '{n} anotação(ões)',
+    backup_preview_settings:
+      'Declinação, calibrações e preferências também são aplicadas nos dois modos.',
+    backup_merge: 'Mesclar',
+    backup_replace: 'Substituir',
+    backup_merge_confirm:
+      'Mesclar junta os itens do backup aos que já estão no aparelho, sem apagar nada. Continuar?',
+    backup_back: 'Voltar',
     backup_unsupported_version:
       'Este backup vem de uma versão do app que não reconhece este formato (formato {version}). Atualize o app e tente de novo.',
     set_sound_sensors_sub: 'Bipes de proximidade: detector de metais, nível e EMF',
@@ -1374,6 +1385,17 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     backup_invalid: 'Could not read that backup.',
     backup_error: 'Restore error: {error}',
     backup_notes_hint: 'Note: fieldbook photos are not exported (only text and coordinates).',
+    backup_preview_title: 'What will be imported:',
+    backup_preview_waypoints: '{n} waypoint(s)',
+    backup_preview_tracks: '{n} track(s)',
+    backup_preview_notes: '{n} note(s)',
+    backup_preview_settings:
+      'Declination, calibrations and preferences are also applied in both modes.',
+    backup_merge: 'Merge',
+    backup_replace: 'Replace',
+    backup_merge_confirm:
+      'Merging adds the backup items to the ones already on this device, without deleting anything. Continue?',
+    backup_back: 'Back',
     backup_unsupported_version:
       'This backup comes from an app version that uses a format this build does not read (format {version}). Update the app and try again.',
     set_sound_sensors_sub: 'Proximity beeps: metal detector, level and EMF',
@@ -2365,6 +2387,17 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     backup_invalid: 'No pudimos leer ese respaldo.',
     backup_error: 'Error al restaurar: {error}',
     backup_notes_hint: 'Nota: las fotos de la libreta no se exportan (solo el texto y las coordenadas).',
+    backup_preview_title: 'Lo que se va a importar:',
+    backup_preview_waypoints: '{n} punto(s)',
+    backup_preview_tracks: '{n} ruta(s)',
+    backup_preview_notes: '{n} anotación(es)',
+    backup_preview_settings:
+      'La declinación, las calibraciones y las preferencias también se aplican en ambos modos.',
+    backup_merge: 'Combinar',
+    backup_replace: 'Reemplazar',
+    backup_merge_confirm:
+      'Combinar une los elementos del respaldo con los que ya están en el dispositivo, sin borrar nada. ¿Continuar?',
+    backup_back: 'Volver',
     backup_unsupported_version:
       'Este respaldo viene de una versión de la app cuyo formato esta compilación no lee (formato {version}). Actualiza la app e inténtalo de nuevo.',
     set_sound_sensors_sub: 'Bips de proximidad: detector de metales, nivel y EMF',

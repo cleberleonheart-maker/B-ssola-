@@ -101,7 +101,7 @@ import {
   type DisplayMode,
 } from '../services/preferencesService';
 import { setKeepScreenOn } from '../services/keepAwake';
-import { buildBackup, applyBackup } from '../services/backupService';
+import { buildBackup, applyBackup, type BackupMode } from '../services/backupService';
 import {
   addDistance,
   flushOdometer,
@@ -448,8 +448,8 @@ const CompassScreen = () => {
   }, []);
 
   const handleApplyBackup = useCallback(
-    async (json: string): Promise<string | null> => {
-      const result = await applyBackup(json);
+    async (json: string, mode: BackupMode): Promise<string | null> => {
+      const result = await applyBackup(json, { mode });
       if (!result.ok) {
         return result.error === 'write_failed'
           ? `write_failed:${result.detail ?? ''}`

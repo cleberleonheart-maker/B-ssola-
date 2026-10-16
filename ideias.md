@@ -711,10 +711,16 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       no "Reativar"), a escuta volta sozinha se o wake estava ligado. O prazo é
       reposto a cada escolha. É temporário e só em memória: reiniciar o app
       reativa a voz. Testes em `__tests__/keferaMute.test.ts`.
-- [ ] **70. ♻️ Importar backup com pré-visualização** — além de exportar (#38),
-      importar um ZIP/JSON com **preview**: "Vai importar: 3 waypoints, 1 trilha,
-      declinação, calibrações. Substituir ou mesclar?". Evita sobrescrever dados
-      bons por engano.
+- [x] **70. ♻️ Importar backup com pré-visualização** — ✅ feito. `inspectBackup`
+      (síncrono, sem gravar nada) lê o envelope e devolve o resumo; o
+      `ImportDialog` passou a ter dois passos — colar o JSON e depois ver
+      "O que vai ser importado" (pontos, trilhas, anotações) com **Substituir**
+      ou **Mesclar**. `applyBackup(raw, { mode })` ganhou o modo `merge`, que
+      junta as coleções por `id` sem apagar o que já estava (o item do backup
+      ganha quando o `id` coincide); o padrão continua a ser `replace`. As
+      preferências de valor único (declinação, calibrações, ajustes) são
+      aplicadas nos dois modos, porque não há como juntá-las. Testes em
+      `__tests__/backupService.test.ts`.
 
 ### Fechado no commit `2d8b204` (7 bugs P0/P1)
 - [x] **71. 📦 Backup aceito sem `fileVersion` válido** — `applyBackup` exigia só

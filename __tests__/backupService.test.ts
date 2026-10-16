@@ -3,8 +3,54 @@ import {
   applyBackup,
   BACKUP_FILE_VERSION,
   buildBackup,
+  inspectBackup,
 } from '../src/services/backupService';
-import { loadWaypoints } from '../src/services/waypointsService';
+import {
+  loadWaypoints,
+  saveWaypoint,
+  type Waypoint,
+} from '../src/services/waypointsService';
+import { loadTracks, saveTrack, type RecordedTrack } from '../src/services/trackService';
+import { loadNotes, saveNote, type FieldNote } from '../src/services/notesService';
+
+const wp = (id: string, name: string): Waypoint => ({
+  id,
+  name,
+  latitude: 1,
+  longitude: 2,
+  altitude: null,
+  createdAt: 1,
+});
+
+const track = (id: string, name: string): RecordedTrack => ({
+  id,
+  name,
+  startedAt: 1,
+  endedAt: 2,
+  points: [
+    { lat: 1, lon: 1, alt: null, ts: 1 },
+    { lat: 1.001, lon: 1.001, alt: null, ts: 2000 },
+  ],
+  pois: [],
+  distance: 0,
+  eleGain: 0,
+  eleLoss: 0,
+  maxAlt: null,
+  minAlt: null,
+  maxSpeedKmh: 0,
+});
+
+const note = (id: string, text: string): FieldNote => ({
+  id,
+  text,
+  lat: 1,
+  lon: 2,
+  alt: null,
+  at: 1,
+  photoPath: null,
+  heading: null,
+  cloudSynced: false,
+});
 
 /**
  * Validação do envelope do backup.
@@ -158,5 +204,129 @@ describe('buildBackup + applyBackup', () => {
 
     expect(parsed.fileVersion).toBe(BACKUP_FILE_VERSION);
     await expect(applyBackup(raw)).resolves.toEqual({ ok: true });
+  });
+});
+
+/**
+ * Pré-visualização (ideia #70): o `inspectBackup` lê o arquivo sem gravar e
+ * devolve o que ele traz, para o diálogo perguntar Substituir ou Mesclar antes
+ * de tocar em nada.
+ */
+describe('inspectBackup — pré-visualização sem escrita', () => {
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+    jest.clearAllMocks();
+  });
+
+  it('conta pontos, trilhas e anotações do backup', () => {
+    const raw = envelope({
+      data: {
+        waypoints: [wp('w1', 'A'), wp('w2', 'B')],
+        tracks: [track('t1', 'Ida')],
+        notes: [note('n1', 'Pedra'), note('n2', 'Rio'), note('n3', 'Fim')],
+      },
+    });
+
+    const result = inspectBackup(raw);
+    expect(result).toEqual({
+      ok: true,
+      summary: { waypoints: 2, tracks: 1, notes: 3 },
+      data: expect.any(Object),
+    });
+  });
+
+  it('não escreve nada no aparelho', async () => {
+    const raw = envelope({ data: { waypoints: [wp('w1', 'A')] } });
+    inspectBackup(raw);
+    expect(await loadWaypoints()).toHaveLength(0);
+  });
+
+  it('devolve os mesmos erros que o applyBackup recusaria', () => {
+    expect(inspectBackup('{ quebrado')).toEqual({ ok: false, error: 'invalid' });
+    expect(inspectBackup(envelope({ app: 'outro' }))).toEqual({
+      ok: false,
+      error: 'invalid',
+    });
+    expect(inspectBackup(envelope({ fileVersion: 99 }))).toEqual({
+      ok: false,
+      error: 'unsupported_version',
+    });
+  });
+
+  it('conta zero quando o backup não traz coleções', () => {
+    expect(inspectBackup(envelope({ data: {} }))).toEqual({
+      ok: true,
+      summary: { waypoints: 0, tracks: 0, notes: 0 },
+      data: expect.any(Object),
+    });
+  });
+});
+
+/**
+ * Mesclar x Substituir (ideia #70). O modo padrão continua a ser `replace`
+ * (substitui tudo), e `merge` é a novidade: junta por id sem apagar o que já
+ * estava — é o que impede um arquivo trocado de levar os dados bons.
+ */
+describe('applyBackup — mesclar vs substituir', () => {
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+    jest.clearAllMocks();
+  });
+
+  it('substituir (padrão) descarta o que já existia', async () => {
+    await saveWaypoint(wp('local', 'Local'));
+    await expect(
+      applyBackup(envelope({ data: { waypoints: [wp('novo', 'Novo')] } })),
+    ).resolves.toEqual({ ok: true });
+
+    const names = (await loadWaypoints()).map(w => w.name);
+    expect(names).toEqual(['Novo']);
+  });
+
+  it('mesclar junta pontos novos sem perder os atuais', async () => {
+    await saveWaypoint(wp('local', 'Local'));
+    await applyBackup(
+      envelope({ data: { waypoints: [wp('novo', 'Novo')] } }),
+      { mode: 'merge' },
+    );
+
+    const names = (await loadWaypoints()).map(w => w.name).sort();
+    expect(names).toEqual(['Local', 'Novo']);
+  });
+
+  it('mesclar deixa o item do backup ganhar quando o id coincide', async () => {
+    await saveWaypoint(wp('x', 'Nome antigo'));
+    await applyBackup(
+      envelope({ data: { waypoints: [wp('x', 'Nome do backup')] } }),
+      { mode: 'merge' },
+    );
+
+    const list = await loadWaypoints();
+    expect(list).toHaveLength(1);
+    expect(list[0].name).toBe('Nome do backup');
+  });
+
+  it('mesclar também junta trilhas e anotações', async () => {
+    await saveTrack(track('t-local', 'Trilha local'));
+    await saveNote(note('n-local', 'Nota local'));
+
+    await applyBackup(
+      envelope({
+        data: {
+          tracks: [track('t-backup', 'Trilha do backup')],
+          notes: [note('n-backup', 'Nota do backup')],
+        },
+      }),
+      { mode: 'merge' },
+    );
+
+    expect((await loadTracks()).map(t => t.name).sort()).toEqual([
+      'Trilha do backup',
+      'Trilha local',
+    ]);
+    expect((await loadNotes()).map(n => n.text).sort()).toEqual([
+      'Nota do backup',
+      'Nota local',
+    ]);
   });
 });

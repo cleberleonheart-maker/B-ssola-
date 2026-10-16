@@ -344,4 +344,53 @@ restoreButtonText: {
   fontSize: 14,
   fontWeight: '800',
 },
+mergeButton: {
+  paddingHorizontal: spacing.lg,
+  paddingVertical: spacing.sm,
+  borderRadius: radius.md,
+  borderWidth: 1,
+  marginLeft: spacing.sm,
+},
+mergeButtonText: {
+  fontSize: 14,
+  fontWeight: '800',
+},
+previewBox: {
+  borderWidth: 1,
+  borderRadius: radius.md,
+  paddingHorizontal: spacing.md,
+  paddingVertical: spacing.xs,
+  marginTop: spacing.sm,
+},
+previewRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingVertical: spacing.xs,
+},
+previewIcon: {
+  fontSize: 16,
+  width: 26,
+},
+previewLabel: {
+  fontSize: 14,
+  fontWeight: '600',
+  flexShrink: 1,
+},
+previewHint: {
+  fontSize: 11,
+  marginTop: spacing.sm,
+  lineHeight: 15,
+},
+backButton: {
+  position: 'absolute',
+  left: spacing.lg,
+  bottom: spacing.lg,
+  padding: spacing.sm,
+},
+backButtonText: {
+  fontSize: 13,
+  fontWeight: '700',
+  textTransform: 'uppercase',
+  letterSpacing: 0.6,
+},
 });

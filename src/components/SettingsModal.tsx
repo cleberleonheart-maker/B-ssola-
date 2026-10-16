@@ -18,7 +18,7 @@ import type { AppMode } from '../services/preferencesService';
 import type { Declination } from '../utils/declination';
 import type { UnitSystem } from '../utils/units';
 import { loadLockPin } from '../services/preferencesService';
-import { BACKUP_FILE_VERSION } from '../services/backupService';
+import { BACKUP_FILE_VERSION, type BackupMode } from '../services/backupService';
 import { APP_VERSION, APP_VERSION_CODE } from '../version.generated';
 import { checkForUpdate, type AvailableUpdate } from '../services/versionService';
 import { loadSoundPref, saveSoundPref } from '../services/sound';
@@ -68,7 +68,7 @@ type Props = {
   onVerifyPin: (pin: string) => Promise<boolean>;
   onSetPin: (pin: string | null) => Promise<void>;
   onExportBackup: () => Promise<void>;
-  onApplyBackup: (json: string) => Promise<string | null>;
+  onApplyBackup: (json: string, mode: BackupMode) => Promise<string | null>;
 };
 
 const LOCATION_MODES = (
@@ -283,9 +283,9 @@ const SettingsModal = ({
     }
   };
 
-  const handleRestore = async () => {
+  const handleRestore = async (mode: BackupMode) => {
     if (!importText.trim()) return;
-    const errorKey = await onApplyBackup(importText);
+    const errorKey = await onApplyBackup(importText, mode);
     if (errorKey == null) {
       setImportVisible(false);
       setImportText('');

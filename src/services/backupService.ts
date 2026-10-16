@@ -139,10 +139,37 @@ export type BackupResult =
   | { ok: true }
   | { ok: false; error: BackupError; detail?: string };
 
+/**
+ * `replace` aplica o backup por cima dos dados atuais (o comportamento de
+ * sempre). `merge` junta as coleções (pontos, trilhas, anotações) sem apagar o
+ * que já cá está: a ideia #70 — importar sem perder por engano o que já era
+ * bom. As preferências de valor único (declinação, calibrações, ajustes) não
+ * têm como se "juntar", por isso são aplicadas nos dois modos.
+ */
+export type BackupMode = 'replace' | 'merge';
+
+/** O que o backup traz, para a pré-visualização antes de aplicar (#70). */
+export type BackupSummary = {
+  waypoints: number;
+  tracks: number;
+  notes: number;
+};
+
+export type BackupInspection =
+  | { ok: true; summary: BackupSummary; data: BackupData }
+  | { ok: false; error: BackupError };
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
-export const applyBackup = async (raw: string): Promise<BackupResult> => {
+/**
+ * Valida o envelope e devolve o `data` já tipado. Partilhado por
+ * `inspectBackup` e `applyBackup` para que a pré-visualização e a aplicação
+ * nunca discordem sobre o que é um backup válido.
+ */
+const parseEnvelope = (
+  raw: string,
+): { ok: true; data: Partial<BackupData> } | { ok: false; error: BackupError } => {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -161,17 +188,76 @@ export const applyBackup = async (raw: string): Promise<BackupResult> => {
   if (!isRecord(parsed.data)) {
     return { ok: false, error: 'invalid' };
   }
-  const data = parsed.data as Partial<BackupData>;
+  return { ok: true, data: parsed.data as Partial<BackupData> };
+};
+
+/**
+ * Lê o backup sem gravar nada: devolve o resumo para o ecrã de
+ * pré-visualização (quantos pontos, trilhas e anotações vêm) ou o erro pelo
+ * qual seria recusado. Síncrono de propósito — é só leitura.
+ */
+export const inspectBackup = (raw: string): BackupInspection => {
+  const parsed = parseEnvelope(raw);
+  if (!parsed.ok) {
+    return { ok: false, error: parsed.error };
+  }
+  const data = parsed.data;
+  return {
+    ok: true,
+    summary: {
+      waypoints: Array.isArray(data.waypoints) ? data.waypoints.length : 0,
+      tracks: Array.isArray(data.tracks) ? data.tracks.length : 0,
+      notes: Array.isArray(data.notes) ? data.notes.length : 0,
+    },
+    data: data as BackupData,
+  };
+};
+
+/**
+ * Junta duas listas por `id`, preservando a ordem do que já existe e deixando
+ * o item do backup ganhar quando o `id` coincide (quem restaura quer o valor
+ * que trouxe, não o que estava). Itens novos entram no fim.
+ */
+const mergeById = <T extends { id: string }>(current: T[], incoming: T[]): T[] => {
+  const byId = new Map<string, T>();
+  for (const item of current) {
+    byId.set(item.id, item);
+  }
+  for (const item of incoming) {
+    byId.set(item.id, item);
+  }
+  return [...byId.values()];
+};
+
+export const applyBackup = async (
+  raw: string,
+  options: { mode?: BackupMode } = {},
+): Promise<BackupResult> => {
+  const parsed = parseEnvelope(raw);
+  if (!parsed.ok) {
+    return { ok: false, error: parsed.error };
+  }
+  const data = parsed.data;
+  const mode = options.mode ?? 'replace';
 
   try {
     if (Array.isArray(data.waypoints)) {
-      await replaceWaypoints(data.waypoints as Waypoint[]);
+      const incoming = data.waypoints as Waypoint[];
+      await replaceWaypoints(
+        mode === 'merge' ? mergeById(await loadWaypoints(), incoming) : incoming,
+      );
     }
     if (Array.isArray(data.tracks)) {
-      await replaceTracks(data.tracks as RecordedTrack[]);
+      const incoming = data.tracks as RecordedTrack[];
+      await replaceTracks(
+        mode === 'merge' ? mergeById(await loadTracks(), incoming) : incoming,
+      );
     }
     if (Array.isArray(data.notes)) {
-      await replaceNotes(data.notes as FieldNote[]);
+      const incoming = data.notes as FieldNote[];
+      await replaceNotes(
+        mode === 'merge' ? mergeById(await loadNotes(), incoming) : incoming,
+      );
     }
     if (isRecord(data.declination)) {
       await saveDeclination(data.declination as Declination);
