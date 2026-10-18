@@ -84,15 +84,23 @@ const withTimeout = <T,>(
   ms = 6000,
 ): Promise<T> =>
   new Promise<T>((resolve, reject) => {
-    const id = setTimeout(() => reject(new Error('cloud_timeout')), ms);
+    let settled = false;
+    const id = setTimeout(() => {
+      settled = true;
+      reject(new Error('cloud_timeout'));
+    }, ms);
     Promise.resolve(promise).then(
       value => {
         clearTimeout(id);
-        if (!respostaComErro(value)) lastSyncAt = Date.now();
+        // Após o timeout o chamador já viu falhar; a resposta atrasada não
+        // pode contar como sincronização bem-sucedida.
+        if (!settled && !respostaComErro(value)) lastSyncAt = Date.now();
+        settled = true;
         resolve(value);
       },
       error => {
         clearTimeout(id);
+        settled = true;
         reject(error);
       },
     );

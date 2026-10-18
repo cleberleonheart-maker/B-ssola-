@@ -28,6 +28,7 @@ import {
 } from '../services/calibrationService';
 import { solarPosition } from '../utils/astro';
 import { normalizeHeading, circularMeanHeading } from '../utils/compass';
+import { hasLocationFix } from '../utils/geo';
 
 const CAL_INTERVAL = 100;
 const MIN_SAMPLES = 100;
@@ -86,7 +87,7 @@ const CalibrationModal = ({
     };
   }, []);
 
-  const hasFix = latitude !== 0 || longitude !== 0;
+  const hasFix = hasLocationFix({ latitude, longitude });
 
   const sunLive = useMemo(() => {
     if (!hasFix) return null;

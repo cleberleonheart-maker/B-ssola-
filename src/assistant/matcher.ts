@@ -78,8 +78,10 @@ const matchEntries = (
   }
 
   if (entry.type === 'star') {
-    // exige ao menos um token, exceto quando o curinga é o último item do
-    // padrão ("quantas trilhas *"), onde casar vazio é o comportamento válido
+    // O curinga pode casar zero tokens em qualquer posição: "qual odometro"
+    // tem de casar "qual * odometro" tanto quanto "qual o odometro". O preço
+    // é um padrão com curinga poder casar antes de um mais específico — a
+    // ordem do catálogo resolve os empates.
     const minTokens = pos;
     for (let k = input.length; k >= minTokens; k -= 1) {
       const r = matchEntries(entries, input, k, epos + 1, wildcards);
@@ -127,8 +129,6 @@ const FILLER = new Set([
   'hey',
   'me',
   'diz',
-  'me diz',
-  'me fala',
   'fala',
   'pra',
   'pro',

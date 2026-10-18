@@ -242,7 +242,7 @@ const ModeView = (props: Props) => {
         </View>
       ) : displayMode === 'track' ? (
         <View style={styles.trackArea}>
-          <TrackView active location={location} heading={heading} mils={useMils} />
+          <TrackView location={location} heading={heading} mils={useMils} />
         </View>
       ) : displayMode === 'map' ? (
         <View style={styles.trackArea}>

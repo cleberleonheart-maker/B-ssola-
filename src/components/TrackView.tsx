@@ -10,7 +10,7 @@ import {
 import { useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
-import { formatDistance, haversine, initialBearing, normalizeAzimuth } from '../utils/geo';
+import { formatDistance, haversine, initialBearing, normalizeAzimuth, hasLocationFix } from '../utils/geo';
 import { altitudeValue, altitudeUnit } from '../utils/units';
 import {
   distanceToTrackPath,
@@ -65,7 +65,6 @@ const PREVIEW_VIEWPORT = {
 };
 
 type Props = {
-  active: boolean;
   location: LocationFix;
   heading?: number;
   mils?: boolean;
@@ -73,7 +72,7 @@ type Props = {
 
 type DrawPoint = { x: number; y: number; alt: number | null };
 
-const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
+const TrackView = ({ location, heading = 0, mils = false }: Props) => {
   const colors = useThemeColors();
   const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -96,13 +95,6 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
   useEffect(() => {
     loadTracks().then(setSaved);
   }, []);
-
-  useEffect(() => {
-    if (!active) {
-      return;
-    }
-    return () => {};
-  }, [active]);
 
   const start = useCallback(() => {
     if (!location || (location.latitude === 0 && location.longitude === 0)) {
@@ -129,7 +121,7 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
     }, 1000);
   }, [location]);
 
-  const hasFix = location.latitude !== 0 || location.longitude !== 0;
+  const hasFix = hasLocationFix(location);
 
   const addPoi = useCallback(
     (note: string, photoPath: string | null) => {
@@ -183,8 +175,15 @@ const TrackView = ({ active, location, heading = 0, mils = false }: Props) => {
     setPois([]);
     setRecording(false);
     setElapsed(0);
-    flushOdometer().catch(() => {});
   }, []);
+
+  // Evita vazar o intervalo e perder a gravação ao desmontar (ex.: trocar de
+  // modo): `stop()` salva a trilha em andamento em vez de descartá-la.
+  useEffect(() => {
+    return () => {
+      stop();
+    };
+  }, [stop]);
 
   const discard = useCallback(() => {
     if (timerRef.current) {

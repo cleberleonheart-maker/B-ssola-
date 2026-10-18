@@ -236,18 +236,6 @@ const CameraARView = ({
   }, [hasPermission, canRequestPermission, requestPermission]);
 
   useEffect(() => {
-    let alive = true;
-    loadFov()
-      .then(v => {
-        if (alive) setFov(v);
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  useEffect(() => {
     if (cameraDevice !== undefined) {
       setPreviewLive(false);
     }

@@ -4,6 +4,8 @@ import { matches } from '../src/assistant/matcher';
 import { spokenToExpr } from '../src/assistant/skills';
 import { stripWakeWord, isWakeWord } from '../src/assistant/voice';
 import { cloneMemory, DEFAULT_MEMORY, pushHistory } from '../src/assistant/memory';
+import { KeferaEngine } from '../src/assistant/engine';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { moonPhase } from '../src/utils/astro';
 import { normalizeHeading } from '../src/utils/compass';
 import { verticalAngle } from '../src/components/HeightView';
@@ -318,5 +320,26 @@ describe('bug 20: o viewer ficava sem rumo quando o GPS nao devolve bearing', ()
 
   it('ignora um bearing do GPS invalido e cai na reserva', () => {
     expect(h(NaN, 187)).toBe(187);
+  });
+});
+
+describe('bug 21: perguntar o nome nao grava fato vazio', () => {
+  it('responde "nao sei" sem criar facts.nome', async () => {
+    await AsyncStorage.clear();
+    const engine = new KeferaEngine();
+    await engine.init();
+    const res = await engine.handle('como me chamo');
+    expect(res.text).toBeTruthy();
+    expect('nome' in engine.getMemory().facts).toBe(false);
+  });
+
+  it('continua a guardar e a lembrar o nome quando declarado', async () => {
+    await AsyncStorage.clear();
+    const engine = new KeferaEngine();
+    await engine.init();
+    await engine.handle('me chamo Ana');
+    expect(engine.getMemory().facts.nome).toBe('ana');
+    const res = await engine.handle('como me chamo');
+    expect(res.text).toMatch(/ana/i);
   });
 });

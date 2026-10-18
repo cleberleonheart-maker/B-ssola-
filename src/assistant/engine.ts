@@ -91,6 +91,11 @@ export class KeferaEngine {
 
     const fact = this.parseFact(normalized, t);
     if (fact) {
+      if ('reply' in fact) {
+        // consulta sem escrita (ex.: "como me chamo?" sem nome salvo):
+        // responder sem gravar fato vazio na memória
+        return this.response(fact.reply, 'memory');
+      }
       this.memory.facts[fact.key] = fact.value;
       this.persist();
       return this.response(fact.message, 'fact');
@@ -118,19 +123,19 @@ export class KeferaEngine {
   private parseFact(
     normalized: string,
     t: Translator,
-  ): { key: string; value: string; message: string } | null {
+  ):
+    | { key: string; value: string; message: string }
+    | { reply: string }
+    | null {
     const queryRe =
       /^(?:como (?:eu )?me chamo|qual e o meu nome|qual o meu nome|quem sou eu|voce sabe meu nome)$/;
     const q = normalized.match(queryRe);
     if (q) {
       const name = this.memory.facts.nome;
-      return name
-        ? { key: 'nome', value: name, message: t('as_name_known', { name }) }
-        : {
-            key: 'nome',
-            value: name || '',
-            message: t('as_name_unknown'),
-          };
+      if (name) {
+        return { key: 'nome', value: name, message: t('as_name_known', { name }) };
+      }
+      return { reply: t('as_name_unknown') };
     }
 
     const addRe = /^(?:meu nome e|me chamo|chamo-me|me chame de|pode me chamar de) (.+)$/;

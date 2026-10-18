@@ -107,6 +107,7 @@ import {
   addDistance,
   flushOdometer,
   getTotals,
+  resetToday,
   type DayTotal,
 } from '../services/odometerService';
 import {
@@ -130,6 +131,7 @@ import {
   initialBearing,
   formatDistance,
   elevationAngle,
+  hasLocationFix,
 } from '../utils/geo';
 import {
   solarPosition,
@@ -850,6 +852,12 @@ const CompassScreen = () => {
   const resetOdometer = useCallback(() => {
     distTotalRef.current = 0;
     setOdometer(0);
+    // Zera também o total diário persistido — é dele que vêm o modo
+    // Odômetro, o painel "quanto andei hoje" e as respostas do assistente.
+    resetToday()
+      .then(() => getTotals())
+      .then(setOdoHistory)
+      .catch(() => {});
   }, []);
 
   const openCalibration = useCallback(() => {
@@ -999,8 +1007,7 @@ const CompassScreen = () => {
     if (!virtualWpId) return null;
     const wp = waypoints.find(w => w.id === virtualWpId);
     if (!wp) return null;
-    const hasPos = location.latitude !== 0 || location.longitude !== 0;
-    if (!hasPos) {
+    if (!hasLocationFix(location)) {
       return { name: wp.name, bearing: 0, distance: 0, elevation: null };
     }
     const distance = haversine(
@@ -1029,9 +1036,7 @@ const CompassScreen = () => {
   }, [
     virtualWpId,
     waypoints,
-    location.latitude,
-    location.longitude,
-    location.altitude,
+    location,
     declination.enabled,
     declination.degrees,
   ]);
@@ -1040,8 +1045,7 @@ const CompassScreen = () => {
   const fullView = displayMode === 'compass' || displayMode === 'level';
   const showPanels = launcherVisible || fullView;
 
-  const hasFix =
-    location.latitude !== 0 || location.longitude !== 0 || location.provider !== null;
+  const hasFix = hasLocationFix(location);
 
   // A conferência pelo Sol só é possível com GPS e Sol acima do horizonte.
   // Sem esta checagem o banner voltaria sempre para quem abre o app de
@@ -1229,12 +1233,12 @@ const CompassScreen = () => {
   }, [waypoints, location.latitude, location.longitude]);
 
   useEffect(() => {
-    const hasLocationFix = location.latitude !== 0 || location.longitude !== 0;
+    const hasLocation = hasLocationFix(location);
     assistant.setContextData({
       heading,
       cardinal: cardinal.full,
-      latitude: hasLocationFix ? location.latitude : null,
-      longitude: hasLocationFix ? location.longitude : null,
+      latitude: hasLocation ? location.latitude : null,
+      longitude: hasLocation ? location.longitude : null,
       accuracy: location.accuracy,
       altitude: location.altitude,
       speed: location.speed,

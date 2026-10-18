@@ -82,6 +82,16 @@ export const flushOdometer = async (): Promise<void> => {
   }
 };
 
+/** Zera o total persistido do dia atual (botão "zerar odômetro"). */
+export const resetToday = async (): Promise<void> => {
+  const map = await loadCache();
+  const key = dayKey(Date.now());
+  if (map[key]) {
+    delete map[key];
+    await persist();
+  }
+};
+
 export const getTotals = async (): Promise<{
   today: number;
   week: number;

@@ -454,8 +454,11 @@ const odometerSkill: Skill = {
   id: 'odometer',
   patterns: ['qual * odometro', 'quanto eu andei', '* distancia percorrida'],
   run: (ctx, _n, _tokens, _wildcards, t) => {
-    if (ctx.odometer > 0) {
-      return t('as_odo', { distance: formatDistance(ctx.odometer) });
+    // O total diário persistido é a fonte da verdade (sobrevive a reinícios);
+    // o odômetro de sessão entra só como fallback antes do primeiro refresh.
+    const total = ctx.todayDistance ?? ctx.odometer;
+    if (total > 0) {
+      return t('as_odo', { distance: formatDistance(total) });
     }
     return t('as_odo_zero');
   },

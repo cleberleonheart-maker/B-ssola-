@@ -8,6 +8,18 @@ export const normalizeAzimuth = (deg: number) => {
   return value < 0 ? value + 360 : value;
 };
 
+/**
+ * Há posição real? `(0, 0)` é o "null island" — o valor inicial antes do
+ * primeiro fix — e nunca é um sítio onde o usuário esteja. Definição única:
+ * antes existiam variantes que incluíam `provider`, e a tela principal dizia
+ * "tem fix" enquanto os componentes filhos (trilha, SOS, mapa) diziam o
+ * contrário para a mesma localização.
+ */
+export const hasLocationFix = (loc: {
+  latitude: number;
+  longitude: number;
+}): boolean => loc.latitude !== 0 || loc.longitude !== 0;
+
 export const haversine = (
   lat1: number,
   lon1: number,

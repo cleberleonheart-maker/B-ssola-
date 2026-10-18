@@ -4,7 +4,7 @@ import { useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import { cardinalOf, formatAzimuth, formatCoord } from '../utils/compass';
-import { formatDistance, haversine } from '../utils/geo';
+import { formatDistance, haversine, hasLocationFix } from '../utils/geo';
 import { formatAccuracy } from '../utils/units';
 import {
   niceScaleBar,
@@ -64,7 +64,7 @@ const MiniMapView = ({ active, location, heading }: Props) => {
   const [crumbs, setCrumbs] = useState<GeoPoint[]>([]);
   const lastRef = useRef<{ lat: number; lon: number; ts: number } | null>(null);
 
-  const hasFix = location.latitude !== 0 || location.longitude !== 0;
+  const hasFix = hasLocationFix(location);
 
   /**
    * O breadcrumb só aceita um ponto novo quando a pessoa andou `MIN_STEP_METERS`

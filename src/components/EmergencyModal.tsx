@@ -39,6 +39,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import { cardinalOf, formatCoord, formatTime } from '../utils/compass';
+import { hasLocationFix } from '../utils/geo';
 import { formatAltitude, formatAccuracy } from '../utils/units';
 import type { LocationFix } from '../services/locationService';
 
@@ -56,7 +57,7 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
 
   // "Sem fix" é latitude E longitude zeradas; usar `&&` desabilitaria o SOS
   // para quem está exatamente no equador (latitude 0).
-  const hasFix = location.latitude !== 0 || location.longitude !== 0;
+  const hasFix = hasLocationFix(location);
   const locationRef = useRef(location);
   const headingRef = useRef(heading);
 
