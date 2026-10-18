@@ -308,7 +308,8 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       sessionActiveRef.current = true;
       voiceModeRef.current = mode;
       setListening(true);
-      const started = await startListening();
+      // Comando abre reconhecedor novo; ativação reusa (ver startListening).
+      const started = await startListening(mode === 'command');
       if (!started) {
         pushDebug(`⚠️ escuta não iniciou (${mode})`);
         sessionActiveRef.current = false;
@@ -604,7 +605,7 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       );
       return;
     }
-    const granted = await startListening();
+    const granted = await startListening(true);
     if (granted) {
       sessionActiveRef.current = true;
       voiceModeRef.current = 'manual';

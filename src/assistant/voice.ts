@@ -271,18 +271,21 @@ export const setVoiceEngine = (engine: 'GOOGLE' | null): void => {
 
 export const getVoiceEngine = (): 'GOOGLE' | null => enginePreference;
 
-export const startListening = async (): Promise<boolean> => {
+// `fresh=true` abre um reconhecedor totalmente novo (destrói o anterior). É o
+// caminho do comando e do botão 🎤, que já funcionavam: aí queremos um estado
+// limpo. Nos ciclos da palavra de ativação deixamos `fresh=false` para REUSAR o
+// reconhecedor: recriar a cada ciclo (~300 ms de micrófone morto + desgaste do
+// serviço) fazia o "Kefera" cair em NO_MATCH (erro 7).
+export const startListening = async (fresh = false): Promise<boolean> => {
   try {
     const granted = await requestMicPermission();
     if (!granted) {
       return false;
     }
-    // Abre um reconhecedor novo por sessão. Reutilizar a mesma instância entre a
-    // palavra de ativação e o comando mostrou-se frágil no Android: o comando
-    // caía com erro 7/10. Um reconhecedor fresco entra num estado limpo — é o
-    // que o botão 🎤 fazia (a sessão anterior já estava destruída).
-    await destroyVoice();
-    await new Promise<void>(resolve => setTimeout(resolve, 250));
+    if (fresh) {
+      await destroyVoice();
+      await new Promise<void>(resolve => setTimeout(resolve, 200));
+    }
     if (enginePreference) {
       await Voice.start(VOICE_LANG_MAP[voiceLang], {
         RECOGNIZER_ENGINE: enginePreference,
