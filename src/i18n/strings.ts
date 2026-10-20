@@ -917,6 +917,7 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
 
     as_voice_unavailable_title: 'Voz indisponível',
     as_voice_unavailable_body: 'Este aparelho não tem reconhecimento de voz disponível. Você ainda pode digitar para conversar.',
+    as_voice_fix_desc: 'Melhor resposta ao wake: recupera melhor do erro 5 e faz um retry no comando quando fala rápido.',
     as_mic_unavailable_title: 'Microfone indisponível',
     as_mic_unavailable_body: 'Não consegui acessar o microfone. Verifique a permissão nas configurações do sistema.',
     as_cal_done: 'Calibrado com sucesso!',
