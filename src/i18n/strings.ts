@@ -1932,6 +1932,7 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
 
     as_voice_unavailable_title: 'Voice unavailable',
     as_voice_unavailable_body: 'This device has no speech recognition available. You can still type to chat.',
+    as_voice_fix_desc: 'Better wake response: recovers better from error 5 and retries once on command when speaking fast.',
     as_mic_unavailable_title: 'Microphone unavailable',
     as_mic_unavailable_body: 'I could not access the microphone. Check the permission in system settings.',
     as_cal_done: 'Calibrated successfully!',
@@ -2947,6 +2948,7 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
 
     as_voice_unavailable_title: 'Voz no disponible',
     as_voice_unavailable_body: 'Este dispositivo no tiene reconocimiento de voz. Aún puedes escribir para conversar.',
+    as_voice_fix_desc: 'Mejor respuesta al despertar: se recupera mejor del error 5 y reintenta una vez el comando si hablas rápido.',
     as_mic_unavailable_title: 'Micrófono no disponible',
     as_mic_unavailable_body: 'No pude acceder al micrófono. Revisa el permiso en los ajustes del sistema.',
     as_cal_done: '¡Calibrado con éxito!',
