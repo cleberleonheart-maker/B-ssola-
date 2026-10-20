@@ -551,14 +551,17 @@ foram encontrados de verdade, não ideias soltas.
       o app em segundo plano (afeta GPS e câmera contínuos).
 - [x] **40. 🧭 Melhoria: rumo inverso sempre visível** — mostrar o rumo de volta em tempo
       real (não só no retorno de trilha), útil em navegação de retorno simples.
-- [ ] **41. 🛠️ Gesture de pinch na Visão** — a v7.11 anunciou "pinch (gesto) + botão de
-      zoom", mas só o botão ×1–×6 existe: não há `pinch`/`gesture` em
-      `CameraARView`. O texto da v7.11 está errado; falta de fato o gesto via
-      react-native-gesture-handler (que hoje nem é dependência do projeto).
-      **A mentira está corrigida (v7.32, code 163)**: o `wn_campro_desc` dizia
-      "use pinça" nos três idiomas e era verdade em nenhum — passou a dizer só
-      os botões. A linha continua aberta porque o que falta é o gesto, e isso é
-      dependência nativa nova; com o texto certo, já não é promessa vazia.
+- [x] **41. 🛠️ Gesture de pinch na Visão** — ✅ feito (code 187). A v7.11 anunciou
+      "pinch (gesto) + botão de zoom" e só o botão existia; a v7.32 corrigiu o
+      texto para não prometer o que não havia. O gesto entrou na build 187 sem
+      `react-native-gesture-handler`: o vision-camera 5.2.3 já traz pinça nativa
+      (`enableNativeZoomGesture` + `ScaleGestureDetector` no Android). A única
+      trava era o prop `zoom` (numérico) não poder coexistir com o gesto — o
+      `CameraARView` passou a setar o zoom imperativamente pelo
+      `cameraRef.controller.setZoom` nos botões ×1–×6, e o rótulo lê o zoom
+      real do controller (inclusive o que o pinch moveu) a cada 300 ms. O
+      `wn_campro_desc` voltou a dizer "pinça ou botões" nos três idiomas — e
+      agora é verdade.
 - [x] **42. 🎨 Tema "sol forte"** — ✅ feito: novo tema `sun` (8º), contraste
       máximo para leitura sob o sol: branco puro e preto puro (21:1), bordas
       quase pretas, cores saturadas escuras o suficiente para passarem 4.5:1
@@ -1072,12 +1075,27 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       caminho que falta é o do sistema a matar o processo por memória
       (`adb shell kill -9`, não `force-stop`), que é o que o
       `START_REDELIVER_INTENT` deve suster — está anotado na nota do item.
+      **Script de campo criado**: `scripts/testar-55b.sh` mata o processo via
+      `kill -9` (sem `force-stop`), espera 15 s e confirma se o sistema
+      reergueu o serviço; o critério de sucesso final é o viewer continuar em
+      `● AO VIVO`. Falta correr o script com um aparelho e rastreio ativo para
+      fechar a dívida.
 - [x] **Limpeza de marcas erradas** — #94, #53 e #32 estavam por fazer com o
       código no sítio há várias versões: o `svgNode` do `live.html` tem o `for`
       correcto desde a v7.28, o `changelogBetween` existe desde a v7.27 e os
       mils estão na `CompassScreen` desde a v7.23. Uma lista de dívidas em que
       metade já não é dívida é pior do que nenhuma: faz o próximo duvidar das
       que são.
+
+## ✅ Feitos (code 187)
+- [x] **41. 🤏 Pinça na Visão** — o gesto de zoom por pinça entrou no
+      `CameraARView` pela via nativa do vision-camera 5.2.3
+      (`enableNativeZoomGesture`), sem instalar `react-native-gesture-handler`.
+      A trava era o prop `zoom` (numérico) não poder coexistir com o gesto — o
+      zoom passou a ser imperativo (`cameraRef.controller.setZoom`) nos botões
+      ×1–×6, e o rótulo lê o zoom real do controller a cada 300 ms, portanto
+      acompanha também o que o pinch moveu. O `wn_campro_desc` voltou a dizer
+      "pinça ou botões" nos três idiomas — agora sem mentir.
 
 ## Ideias novas (06/10/2026, 8ª leva)
 Saem do trabalho da retenção de 90 dias (`deleteExpired*`), da revisão do

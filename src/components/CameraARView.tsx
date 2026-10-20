@@ -12,6 +12,7 @@ import {
   useCameraDevices,
   useCameraPermission,
   type CameraDevice,
+  type CameraRef,
   type TargetCameraPosition,
 } from 'react-native-vision-camera';
 import { useThemeColors } from '../theme/ThemeContext';
@@ -87,6 +88,12 @@ const angularDiff = (from: number, to: number): number => {
 
 const CAMERA_ZOOM_STEPS = [1, 1.5, 2, 3, 4, 6] as const;
 
+// rótulo do zoom: ×2 quando inteiro, ×1.5 com uma casa decimal
+const formatZoomLabel = (zoom: number) => {
+  const z = Math.round(zoom * 10) / 10;
+  return z % 1 === 0 ? `×${z}` : `×${z.toFixed(1)}`;
+};
+
 const CameraARView = ({
   heading,
   accel,
@@ -125,6 +132,11 @@ const CameraARView = ({
   const [fov, setFov] = useState(DEFAULT_FOV);
   const fovRef = useRef(DEFAULT_FOV);
   const [zoomIdx, setZoomIdx] = useState(0);
+  // zoom verdadeiro da câmera (inclui o que o pinch move); o zoomIdx é só o
+  // último passo dos botões. Lido do controller a cada 300 ms porque o
+  // gesture nativo do vision-camera não tem callback de mudança.
+  const [displayZoom, setDisplayZoom] = useState(1);
+  const cameraRef = useRef<CameraRef>(null);
   const [torchOn, setTorchOn] = useState(false);
 
   const previewLiveRef = useRef(false);
@@ -142,13 +154,35 @@ const CameraARView = ({
 
   const minZoom = cameraDevice?.minZoom ?? 1;
   const maxZoom = cameraDevice?.maxZoom ?? 8;
-  const effectiveZoom = Math.min(
-    Math.max(CAMERA_ZOOM_STEPS[zoomIdx], minZoom),
-    maxZoom,
-  );
   const cycleZoom = useCallback(() => {
     setZoomIdx(idx => (idx + 1) % CAMERA_ZOOM_STEPS.length);
   }, []);
+
+  // Botão ×1–×6: aplica o passo no controller (o prop `zoom` não pode coexistir
+  // com enableNativeZoomGesture — o vision-camera lança erro). Também reaplica
+  // ao remontar a câmera (retryKey), que volta ao zoom 1.
+  useEffect(() => {
+    if (!showCamera || graphical) {
+      return;
+    }
+    const step = CAMERA_ZOOM_STEPS[zoomIdx];
+    const clamped = Math.min(Math.max(step, minZoom), maxZoom);
+    cameraRef.current?.controller?.setZoom(clamped).catch(() => {});
+  }, [zoomIdx, showCamera, graphical, minZoom, maxZoom, retryKey]);
+
+  // Espelha o zoom real (inclusive o do pinch) no rótulo do botão.
+  useEffect(() => {
+    if (!showCamera || graphical) {
+      return;
+    }
+    const id = setInterval(() => {
+      const z = cameraRef.current?.controller?.zoom;
+      if (typeof z === 'number' && Number.isFinite(z)) {
+        setDisplayZoom(z);
+      }
+    }, 300);
+    return () => clearInterval(id);
+  }, [showCamera, graphical, retryKey]);
 
   useEffect(() => {
     if (active && showCamera) {
@@ -368,13 +402,14 @@ const CameraARView = ({
           style={styles.cameraLayer}>
           <Camera
             key={retryKey}
+            ref={cameraRef}
             device={cameraTarget}
             isActive={active && armed}
             style={StyleSheet.absoluteFill}
             resizeMode="cover"
             implementationMode={previewMode}
             mirrorMode="auto"
-            zoom={effectiveZoom}
+            enableNativeZoomGesture
             torchMode={torchOn ? 'on' : 'off'}
             constraints={[{ binned: true }, { fps: 30 }]}
             onSessionConfigSelected={cfg => {
@@ -545,7 +580,7 @@ const CameraARView = ({
           accessibilityRole="button"
           style={[styles.zoomWrap, { borderColor: colors.accent + '66' }]}>
           <Text style={[styles.zoomText, { color: colors.accent }]}>
-            ×{CAMERA_ZOOM_STEPS[zoomIdx] % 1 === 0 ? CAMERA_ZOOM_STEPS[zoomIdx] : CAMERA_ZOOM_STEPS[zoomIdx].toFixed(1)}
+            {formatZoomLabel(displayZoom)}
           </Text>
         </Pressable>
       )}
