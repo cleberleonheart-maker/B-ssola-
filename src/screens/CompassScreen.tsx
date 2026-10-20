@@ -690,6 +690,9 @@ const CompassScreen = () => {
         if (drop) {
           if (!pressureAlertRef.current) {
             pressureAlertRef.current = true;
+            try {
+              Vibration.vibrate(400);
+            } catch {}
             void showPressureDropNotification(drop.dropHpa, t);
           }
         } else {
@@ -1190,7 +1193,11 @@ const CompassScreen = () => {
       if (arrivedWpRef.current !== activeWpId) {
         arrivedWpRef.current = activeWpId;
         setArrived(true);
-        Vibration.vibrate(500);
+        try {
+          Vibration.vibrate([0, 300, 200, 300]);
+        } catch {
+          Vibration.vibrate(500);
+        }
         if (voiceGuide) {
           speak(t('voice_guide_arrived', { name: activeTarget.name }));
         }

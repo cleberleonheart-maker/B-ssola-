@@ -7,6 +7,8 @@ import {
   StyleSheet,
   Share,
   ScrollView,
+  Clipboard,
+  Alert,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -57,6 +59,14 @@ const CoordModal = ({ visible, onClose, latitude, longitude, altitude }: Props) 
     }).catch(() => {});
   };
 
+  const copy = (value: string) => {
+    if (!value || value === '—') {
+      return;
+    }
+    Clipboard.setString(value);
+    Alert.alert(t('cf_copied_title'), t('cf_copied_msg'));
+  };
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
@@ -72,8 +82,9 @@ const CoordModal = ({ visible, onClose, latitude, longitude, altitude }: Props) 
 
           <ScrollView showsVerticalScrollIndicator={false}>
             {rows.map(row => (
-              <View
+              <Pressable
                 key={row.label}
+                onPress={() => copy(row.value)}
                 style={[styles.row, { borderColor: colors.border }]}>
                 <Text style={[styles.rowLabel, { color: colors.textMuted }]}>
                   {row.label}
@@ -86,7 +97,10 @@ const CoordModal = ({ visible, onClose, latitude, longitude, altitude }: Props) 
                   ]}>
                   {row.value}
                 </Text>
-              </View>
+                <Text style={[styles.copyHint, { color: colors.textMuted }]}>
+                  {t('cf_copy_hint')}
+                </Text>
+              </Pressable>
             ))}
           </ScrollView>
 
@@ -170,6 +184,13 @@ const styles = StyleSheet.create({
   },
   rowMono: {
     fontVariant: ['tabular-nums'],
+    letterSpacing: 0.4,
+  },
+  copyHint: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: spacing.xs,
+    textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
   actions: {

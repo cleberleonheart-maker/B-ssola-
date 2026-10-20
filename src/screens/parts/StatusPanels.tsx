@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import BarometerPanel from '../../components/BarometerPanel';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { useThemeColors } from '../../theme/ThemeContext';
 import type { ColorScheme } from '../../theme/themes';
+import { getBatteryLevel } from '../../services/battery';
 import type { LocationFix, LocationMode } from '../../services/locationService';
 import type { AppMode } from '../../services/preferencesService';
 import type { Declination } from '../../utils/declination';
@@ -63,6 +64,23 @@ const StatusPanels = (props: Props) => {
   const colors: ColorScheme = useThemeColors();
   const { t } = useLanguage();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
+  const [battery, setBattery] = useState<number | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const refresh = async () => {
+      const b = await getBatteryLevel();
+      if (mounted) {
+        setBattery(b);
+      }
+    };
+    refresh();
+    const id = setInterval(refresh, 60000);
+    return () => {
+      mounted = false;
+      clearInterval(id);
+    };
+  }, []);
 
   const {
     showPanels,
@@ -92,6 +110,13 @@ const StatusPanels = (props: Props) => {
     useMils,
     declination,
   } = props;
+
+  const altitudeText =
+    baroAlt != null
+      ? formatAltitude(baroAlt)
+      : location.altitude != null
+      ? formatAltitude(location.altitude)
+      : null;
 
   const providerLabel =
     locationMode === 'satellite'
@@ -127,6 +152,11 @@ const StatusPanels = (props: Props) => {
               })}
             </Text>
           </View>
+          {altitudeText && (
+            <View style={styles.celestialPill}>
+              <Text style={styles.celestialText}>⛰ {altitudeText}</Text>
+            </View>
+          )}
         </View>
       )}
 
@@ -285,6 +315,12 @@ const StatusPanels = (props: Props) => {
                     {declination.enabled ? `${declination.degrees}°` : t('ui_off')}
                   </Text>
                 </View>
+                {battery != null && (
+                  <View style={[styles.coordCell, styles.coordCellDivider, styles.coordRowDivider]}>
+                    <Text style={styles.coordLabel}>{t('ui_battery')}</Text>
+                    <Text style={styles.coordValue}>{`${battery}%`}</Text>
+                  </View>
+                )}
               </View>
             </>
           ) : (
