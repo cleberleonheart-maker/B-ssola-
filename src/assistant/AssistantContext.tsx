@@ -494,7 +494,13 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       if (mode === 'manual') {
+        sessionActiveRef.current = false;
+        clearWakeTimer();
+        voiceModeRef.current = 'none';
         sendRef.current(text);
+        if (wakeOnRef.current && appActiveRef.current) {
+          scheduleWakeCycle();
+        }
         return;
       }
     },
