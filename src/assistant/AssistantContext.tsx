@@ -424,7 +424,23 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       if (awaitingCommandRef.current) {
-        beginSession('command');
+        // Abrir como 'manual' para evitar diferenças de fluxo entre "apertar microfone"
+        // e "Kefera + comando". O modo 'command' tinha lógicas extras que podem
+        // bloquear/responder diferente em alguns aparelhos.
+        awaitingCommandRef.current = false;
+        sessionActiveRef.current = true;
+        voiceModeRef.current = 'manual';
+        setListening(true);
+        const started = await startListening(true);
+        if (!started) {
+          pushDebug('⚠️ escuta não iniciou (wake-command-manual)');
+          sessionActiveRef.current = false;
+          voiceModeRef.current = 'none';
+          setListening(false);
+          if (wakeOnRef.current && appActiveRef.current) {
+            scheduleWakeCycle();
+          }
+        }
       }
     },
     [beginSession, clearSettleTimer, clearWakeTimer, scheduleWakeCycle, t],
