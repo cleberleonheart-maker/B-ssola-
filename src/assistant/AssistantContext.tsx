@@ -22,6 +22,7 @@ import {
   speakAndWait,
   startListening,
   stopSpeaking,
+  stopListening,
   destroyVoice,
   setVoiceLanguage,
   setMuted,
@@ -548,17 +549,41 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
     }, 2500);
   }, [clearSettleTimer, endCommandListening, scheduleWakeCycle]);
 
-  const handleVoiceError = useCallback(() => {
-    setListening(false);
-    // Idem: erro de uma sessão que já não está ativa não deve mexer no fluxo
-    // (senão reabria comando/ativação por cima do que está a acontecer).
-    if (voiceModeRef.current === 'none') {
-      return;
-    }
-    clearSettleTimer();
-    sessionActiveRef.current = false;
-    fallbackFromCommand();
-  }, [clearSettleTimer, fallbackFromCommand]);
+  const handleVoiceError = useCallback(
+    (code?: string) => {
+      setListening(false);
+      // Idem: erro de uma sessão que já não está ativa não deve mexer no fluxo
+      // (senão reabria comando/ativação por cima do que está a acontecer).
+      if (voiceModeRef.current === 'none') {
+        return;
+      }
+      clearSettleTimer();
+      sessionActiveRef.current = false;
+      const numeric = code ? parseVoiceErrorCode(code) : null;
+      // ERROR_CLIENT (5) e ERROR_RECOGNIZER_BUSY (8) deixam a instância instável:
+      // forçamos destruição + nova escuta em modo wake para evitar retry storm
+      if (numeric === 5 || numeric === 8) {
+        if (wakeOnRef.current && appActiveRef.current) {
+          void (async () => {
+            try {
+              await stopListening();
+            } catch {}
+            try {
+              await destroyVoice();
+            } catch {}
+            await new Promise<void>(resolve => setTimeout(resolve, 300));
+            clearWakeTimer();
+            wakeTimerRef.current = setTimeout(() => {
+              beginSession('wake');
+            }, 200);
+          })();
+          return;
+        }
+      }
+      fallbackFromCommand();
+    },
+    [clearSettleTimer, fallbackFromCommand, beginSession, clearWakeTimer],
+  );
 
   const toggleWake = useCallback(() => {
     // efeitos fora do updater do setState: se o updater for re-invocado
@@ -710,7 +735,7 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
           setVoiceEngine('GOOGLE');
           pushDebug('↻ a tentar o motor Google');
         }
-        handleVoiceError();
+        handleVoiceError(code);
       },
       onEnd: () => {
         handleVoiceEnd();
