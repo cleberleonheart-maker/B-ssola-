@@ -9,11 +9,12 @@ import {
   markChangelogSeen,
 } from '../src/services/changelogSeen';
 import { createTranslator, STRINGS } from '../src/i18n/strings';
+import { APP_VERSION_CODE } from '../src/version.generated';
 
 const stringsEn = STRINGS.en;
 
 const t = createTranslator('pt');
-const CURRENT = 187;
+const CURRENT = APP_VERSION_CODE;
 
 const titles = (entries: ChangelogEntry[]) => entries.map(e => e.title);
 
