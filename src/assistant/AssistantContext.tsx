@@ -560,9 +560,9 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       clearSettleTimer();
       sessionActiveRef.current = false;
       const numeric = code ? parseVoiceErrorCode(code) : null;
-      // ERROR_CLIENT (5) e ERROR_RECOGNIZER_BUSY (8) deixam a instância instável:
-      // forçamos destruição + nova escuta em modo wake para evitar retry storm
-      if (numeric === 5 || numeric === 8) {
+      // ERROR_CLIENT (5) deixa a instância instável: forçamos destruição + nova
+      // escuta em modo wake para evitar retry storm com ERROR_NO_MATCH (7)
+      if (numeric === 5) {
         if (wakeOnRef.current && appActiveRef.current) {
           void (async () => {
             try {
@@ -571,12 +571,23 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
             try {
               await destroyVoice();
             } catch {}
-            await new Promise<void>(resolve => setTimeout(resolve, 300));
+            await new Promise<void>(resolve => setTimeout(resolve, 350));
             clearWakeTimer();
             wakeTimerRef.current = setTimeout(() => {
               beginSession('wake');
-            }, 200);
+            }, 250);
           })();
+          return;
+        }
+      }
+      // ERROR_NO_MATCH (7) no modo wake não é erro crítico: apenas reiniciar
+      // silenciosamente sem recriar instância toda vez
+      if (numeric === 7) {
+        if (wakeOnRef.current && appActiveRef.current) {
+          clearWakeTimer();
+          wakeTimerRef.current = setTimeout(() => {
+            beginSession('wake');
+          }, 200);
           return;
         }
       }
