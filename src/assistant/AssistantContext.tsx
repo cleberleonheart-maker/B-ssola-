@@ -443,7 +443,7 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     },
-    [beginSession, clearSettleTimer, clearWakeTimer, scheduleWakeCycle, t],
+    [clearSettleTimer, clearWakeTimer, scheduleWakeCycle, t, pushDebug],
   );
   const handleTranscription = useCallback(
     (text: string) => {
