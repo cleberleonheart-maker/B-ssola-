@@ -12,6 +12,17 @@ import { verticalAngle } from '../src/components/HeightView';
 import { simplifyPath } from '../src/services/trackService';
 import { resolveLiveHeading } from '../src/services/liveShareService';
 
+// `loadMemory`/`saveMemory` falam com a nuvem; aqui só queremos os bugs do
+// motor local. Sem este mock o `init()` do bug 21 pendura 5 s na rede e o
+// `persist()` fire-and-forget loga DEPOIS do teardown — o Jest congela o
+// console, imprime "Cannot log after tests are done" e sai com exit code 1
+// mesmo com todos os testes verdes.
+jest.mock('../src/services/cloud', () => ({
+  ensureCloudUser: jest.fn(async () => null),
+  fetchCloudMemory: jest.fn(async () => null),
+  pushCloudMemory: jest.fn(async () => undefined),
+}));
+
 type Vec = { x: number; y: number; z: number };
 
 describe('bug 1: decimal separator survives normalization', () => {
