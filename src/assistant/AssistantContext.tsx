@@ -98,7 +98,7 @@ type VoiceMode = 'none' | 'manual' | 'wake' | 'command';
 
 const MAX_COMMAND_RETRIES = 5;
 
-const detectWakeCommand = (text: string): 'on' | 'off' | null => {
+export const detectWakeCommand = (text: string): 'on' | 'off' | null => {
   const n = normalizeText(text);
   const target =
     '(?:a )?(?:kefera|escuta por voz da kefera|escuta por voz|escuta)';
@@ -173,14 +173,17 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
 
   const send = useCallback(
     async (text: string) => {
-      const clean = text.trim();
-      if (!clean) {
+      const raw = text.trim();
+      if (!raw) {
         return;
       }
-      setMessages(prev => [...prev, createMessage('user', clean, false)]);
 
-      const wakeCmd = detectWakeCommand(clean);
+      // "ativa/desativa kefera" contém a palavra de ativação mas é um comando
+      // por si só: decidir antes de a tirar, senão "ativar kefera" viraria
+      // "ativar" e deixaria de casar.
+      const wakeCmd = detectWakeCommand(raw);
       if (wakeCmd) {
+        setMessages(prev => [...prev, createMessage('user', raw, false)]);
         // 'on' é idempotente: pedir para ativar quando já está ativa não
         // pode desligar a escuta
         const next = wakeCmd === 'off' ? false : true;
@@ -194,6 +197,18 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
         speak(phrase);
         return;
       }
+
+      // Fora do modo 'wake' a palavra de ativação nem sempre é removida antes
+      // de chegar aqui (ex.: o wake-command abre como 'manual' e o
+      // reconhecedor devolve a frase inteira "kefera, qual a minha
+      // localização"). Sem a tirar, o motor procura por "kefera qual a minha
+      // localização" e não casa nenhum comando — a Kefera fica só no "ouvi".
+      // Só se aplica se sobrar comando: uma frase só com a wake word não é um
+      // pedido e mantém o texto original.
+      const stripped = stripWakeWord(raw);
+      const clean = stripped || raw;
+
+      setMessages(prev => [...prev, createMessage('user', clean, false)]);
 
       const engine = engineRef.current;
       if (!engine) {
