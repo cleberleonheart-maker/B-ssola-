@@ -12,6 +12,7 @@ import type { ColorScheme } from '../theme/themes';
 import TrendChart from './TrendChart';
 import { useRepetitiveBeep, soundAvailable } from '../services/sound';
 import { dominantAxis, type AxisValues } from '../utils/emf';
+import { applyCalibration, type MagCalibration } from '../services/calibrationService';
 
 const SAMPLE_INTERVAL = 200;
 const FILTER_ALPHA = 0.82;
@@ -27,9 +28,19 @@ type Props = {
   active: boolean;
   hasFix: boolean;
   onAdd: (name: string) => void;
+  /**
+   * Calibração magnética da bússola (hard/soft-iron). Sem ela a magnitude crua
+   * carrega o offset do aparelho — um ferro que anda com o telemóvel — e as
+   * leituras variam conforme a orientação, não só conforme a fonte. Aplicada,
+   * a magnitude é comparável entre direções e a diferença para o ambiente diz
+   * algo sobre o campo, não sobre como se segura o aparelho.
+   */
+  calibration: MagCalibration | null;
+  /** Abre a tela de calibração, para quem ainda não tem uma. */
+  onCalibrate: () => void;
 };
 
-const EmfReaderView = ({ active, hasFix, onAdd }: Props) => {
+const EmfReaderView = ({ active, hasFix, onAdd, calibration, onCalibrate }: Props) => {
   const colors = useThemeColors();
   const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -56,6 +67,11 @@ const EmfReaderView = ({ active, hasFix, onAdd }: Props) => {
   const historyRef = useRef<number[]>([]);
   const axesRef = useRef({ x: 0, y: 0, z: 0, init: false });
   const frozenRef = useRef(false);
+  // O subscribe captura o closure de quando foi feito (o efeito só depende de
+  // `active`), por isso a calibração chega por ref: trocá-la não reabre o
+  // sensor, e a leitura seguinte já usa a nova.
+  const calibrationRef = useRef<MagCalibration | null>(calibration);
+  calibrationRef.current = calibration;
 
   useEffect(() => {
     frozenRef.current = false;
@@ -73,8 +89,9 @@ const EmfReaderView = ({ active, hasFix, onAdd }: Props) => {
     setAxes(null);
     setUpdateIntervalForType(SensorTypes.magnetometer, SAMPLE_INTERVAL);
     subRef.current = magnetometer.subscribe({
-      next: ({ x, y, z }: { x: number; y: number; z: number }) => {
+      next: (sample: { x: number; y: number; z: number }) => {
         if (frozenRef.current) return;
+        const { x, y, z } = applyCalibration(sample, calibrationRef.current);
         const raw = Math.sqrt(x * x + y * y + z * z);
         const ema =
           filteredRef.current === 0
@@ -237,6 +254,18 @@ const EmfReaderView = ({ active, hasFix, onAdd }: Props) => {
               {levelLabel}
             </Text>
           </View>
+
+          <Pressable
+            onPress={onCalibrate}
+            style={[styles.calChip, { borderColor: colors.border }]}>
+            <Text
+              style={[
+                styles.calChipText,
+                { color: calibration ? colors.textMuted : colors.warning },
+              ]}>
+              {calibration ? t('emf_cal_on') : t('emf_cal_off')}
+            </Text>
+          </Pressable>
 
           {frozen && (
             <Text style={[styles.frozenText, { color: colors.accent }]}>
@@ -461,6 +490,17 @@ const createStyles = (_colors: ColorScheme) =>
       fontWeight: '800',
       textTransform: 'uppercase',
       letterSpacing: 1,
+    },
+    calChip: {
+      marginTop: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 6,
+      borderRadius: radius.full,
+      borderWidth: 1,
+    },
+    calChipText: {
+      fontSize: 12,
+      fontWeight: '700',
     },
     track: {
       width: '100%',

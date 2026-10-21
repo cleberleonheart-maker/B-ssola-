@@ -25,6 +25,7 @@ import { useThemeColors } from '../../theme/ThemeContext';
 import type { ColorScheme } from '../../theme/themes';
 import type { LocationFix } from '../../services/locationService';
 import type { DisplayMode } from '../../services/preferencesService';
+import type { MagCalibration } from '../../services/calibrationService';
 import type { Declination } from '../../utils/declination';
 import type { CelestialPoint } from '../../utils/astro';
 import { cardinalOf, formatAzimuth } from '../../utils/compass';
@@ -87,6 +88,8 @@ type Props = {
   hasFix: boolean;
   declination: Declination;
   calibrationApplied: boolean;
+  calibration: MagCalibration | null;
+  onOpenCalibration: () => void;
   onAddWaypoint: (name: string) => void;
   onAddRemoteWaypoint: (wp: {
     name: string;
@@ -124,6 +127,8 @@ const ModeView = (props: Props) => {
     hasFix,
     declination,
     calibrationApplied,
+    calibration,
+    onOpenCalibration,
     onAddWaypoint,
     onAddRemoteWaypoint,
     statusPanels,
@@ -191,7 +196,13 @@ const ModeView = (props: Props) => {
         </View>
       ) : displayMode === 'emf' ? (
         <View style={styles.arArea}>
-          <EmfReaderView active hasFix={hasFix} onAdd={onAddWaypoint} />
+          <EmfReaderView
+            active
+            hasFix={hasFix}
+            onAdd={onAddWaypoint}
+            calibration={calibration}
+            onCalibrate={onOpenCalibration}
+          />
         </View>
       ) : displayMode === 'theodolite' ? (
         <View style={styles.arArea}>

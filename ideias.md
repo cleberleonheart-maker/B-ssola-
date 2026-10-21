@@ -508,8 +508,14 @@ foram encontrados de verdade, não ideias soltas.
       continua recebendo o modal de sempre — o banner é para quem já tem calibração.
 
 ## Ideias novas (23/09/2026, 3ª leva — melhorias em modos existentes)
-- [ ] **28. Teodolito com altura direta** — usar a distância do waypoint ativo/marco na
-      fórmula de altura (sem digitar) + média de N leituras para estabilizar o ângulo.
+- [x] **28. Teodolito com altura direta** — ✅ feito. A distância do waypoint
+      ativo já entrava sozinha na fórmula (`HeightView` mostra o chip "usar
+      alvo"); faltava a média de N leituras. Agora cada captura (topo ou base)
+      é a média das últimas ~15 leituras do `verticalAngle`, o que come o tremor
+      da mão — sem ela, dois ângulos tremidos perto de 0° fazem a diferença de
+      tangentes saltar dezenas de metros. Fórmula e média puras em
+      `utils/height.ts` (`heightFromAngles`, `meanAngle`), testadas em
+      `height.test.ts`.
 - [ ] **29. SOS com contexto** — incluir % de bateria e operadora/rede no alerta
       (adianta a ideia #8).
 - [x] **30. Aviso de desvio de rota** — ✅ feito na v7.37: no retorno pela trilha,
@@ -582,8 +588,14 @@ foram encontrados de verdade, não ideias soltas.
       azimute do sol naquele horário/local (didático, combina Sol + bússola).
 
 ## Ideias novas (23/09/2026, 5ª leva — EMF)
-- [ ] **46. 🧲 EMF com calibração magnética** — aplicar o hard/soft-iron da calibração
-      da bússola no cálculo da magnitude (hoje usa o magnetômetro cru).
+- [x] **46. 🧲 EMF com calibração magnética** — ✅ feito. O `EmfReaderView` passa
+      cada amostra pelo `applyCalibration` (hard/soft-iron) antes de calcular a
+      magnitude e as componentes X/Y/Z: sem isso o offset do próprio aparelho
+      entrava na leitura e ela variava com a orientação, não só com a fonte. A
+      calibração chega por prop do `CompassScreen` (novo state que espelha o
+      `calibrationRef`) e é lida por ref dentro do sensor, para trocar a
+      calibração sem reabrir o magnetômetro. Um chip mostra se está aplicada e,
+      se não estiver, abre a tela de calibração num toque.
 - [x] **47. 🧭 EMF: direção da fonte** — ✅ feito: três pastilhas X/Y/Z com as
       componentes filtradas (EMA) e a dominante destacada. Com linha de base
       ("🍃 Ambiente") o dominante é o eixo que mais se afastou do ambiente —

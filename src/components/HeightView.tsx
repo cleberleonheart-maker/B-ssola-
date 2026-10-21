@@ -4,6 +4,7 @@ import { useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import { formatDistance } from '../utils/geo';
+import { heightFromAngles, meanAngle } from '../utils/height';
 
 type Props = {
   accel: { x: number; y: number; z: number };
@@ -11,6 +12,11 @@ type Props = {
 };
 
 const DIST_STEPS = [5, 1, 0.1];
+
+// Leituras que entram na média de cada captura (~250 ms a 60 Hz): curto o
+// bastante para acompanhar o gesto de apontar, longo o bastante para comer o
+// tremor da mão.
+const CAPTURE_N = 15;
 
 // Elevação do aparelho em relação ao horizonte, em graus. Positivo = apontando
 // para cima, negativo = apontando para baixo.
@@ -80,9 +86,25 @@ const HeightView = ({ accel, targetDistance }: Props) => {
 
   const live = verticalAngle(accel, landscape);
 
+  /**
+   * Uma captura é a média das últimas N leituras, e não a de agora.
+   *
+   * Mirar um topo à mão nunca é imóvel: capturar o instantâneo é capturar o
+   * tremor, e a altura sai de uma diferença de tangentes — dois ângulos
+   * tremidos perto de 0° fazem o resultado saltar dezenas de metros. Só as
+   * leituras desde o toque entram; o buffer é limpo em cada captura para a
+   * média do topo não arrastar as do base.
+   */
+  const samplesRef = useRef<number[]>([]);
+  useEffect(() => {
+    samplesRef.current = [...samplesRef.current.slice(-(CAPTURE_N - 1)), live];
+  }, [live]);
+
   const capture = (which: 'top' | 'base') => {
-    if (which === 'top') setTop(live);
-    else setBase(live);
+    const mean = meanAngle(samplesRef.current);
+    if (which === 'top') setTop(mean);
+    else setBase(mean);
+    samplesRef.current = [];
   };
 
   const clear = () => {
@@ -99,14 +121,14 @@ const HeightView = ({ accel, targetDistance }: Props) => {
 
   const usingTarget = targetDistance != null && targetDistance > 0;
 
-  const height =
+  const height = heightFromAngles(top, base, distance);
+  const rawHeight =
     top !== null && base !== null && distance > 0
       ? distance *
-        (Math.tan(((top ?? 0) * Math.PI) / 180) -
-          Math.tan(((base ?? 0) * Math.PI) / 180))
+        (Math.tan((top * Math.PI) / 180) - Math.tan((base * Math.PI) / 180))
       : null;
-  const validHeight = height !== null && height >= 0;
-  const displayHeight = validHeight ? height : null;
+  const validHeight = height !== null;
+  const displayHeight = height;
 
   const adjustDist = (delta: number) => {
     manualRef.current = true;
@@ -135,7 +157,7 @@ const HeightView = ({ accel, targetDistance }: Props) => {
         {t('ht_result')}
       </Text>
 
-      {top !== null && base !== null && !validHeight && height !== null && (
+      {top !== null && base !== null && !validHeight && rawHeight !== null && (
         <Text style={[styles.inverted, { color: colors.warning }]}>
           {t('ht_inverted')}
         </Text>

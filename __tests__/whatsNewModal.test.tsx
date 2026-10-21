@@ -5,6 +5,7 @@ import { ThemeProvider } from '../src/theme/ThemeContext';
 import { LanguageProvider } from '../src/i18n/LanguageContext';
 import WhatsNewModal from '../src/components/WhatsNewModal';
 import { createTranslator } from '../src/i18n/strings';
+import { changelogBetween } from '../src/services/changelog';
 import { APP_VERSION, APP_VERSION_CODE } from '../src/version.generated';
 
 /** O build instalado. Todo o resto é relativo a ele: escrever o número à mão
@@ -80,12 +81,12 @@ describe('WhatsNewModal', () => {
     const r = await render(null);
     expect(r.root.findAllByType(Modal)).toHaveLength(1);
     // As novidades do build atual aparecem todas.
-    expect(texts(r)).toContain(t('as_voice_fix2_desc'));
+    expect(texts(r)).toContain(t('wn_heightavg_desc'));
   });
 
   it('sem última versão vista, mostra só a atual e sem cabeçalho de build', async () => {
     const shown = texts(await render(null));
-    expect(shown).toContain(t('as_voice_fix2_desc'));
+    expect(shown).toContain(t('wn_heightavg_desc'));
     expect(shown).toContain(t('wn_title', { version: APP_VERSION }));
     expect(shown).not.toContain(t('wn_build_label', { code: CURRENT }));
   });
@@ -109,10 +110,12 @@ describe('WhatsNewModal', () => {
 
   it('no acumulado, cada build aparece com seu número', async () => {
     const shown = texts(await render(151));
-    for (const code of Array.from(
-      { length: CURRENT - 151 },
-      (_, i) => CURRENT - i,
-    )) {
+    // Os grupos não são necessariamente contíguos: um build cujo título já
+    // apareceu num build mais novo é omitido. O que importa é que o modal
+    // mostra um cabeçalho para cada grupo que o serviço devolve.
+    const codes = changelogBetween(151, CURRENT, t).map(b => b.code);
+    expect(codes[0]).toBe(CURRENT);
+    for (const code of codes) {
       expect(shown).toContain(t('wn_build_label', { code }));
     }
   });
@@ -124,7 +127,7 @@ describe('WhatsNewModal', () => {
 
   it('a mesma versão vista não abre o modal com nada de novo', async () => {
     const shown = texts(await render(CURRENT));
-    expect(shown).toContain(t('as_voice_fix2_desc'));
+    expect(shown).toContain(t('wn_heightavg_desc'));
     expect(shown).not.toContain(t('wn_title_since', { code: CURRENT }));
   });
 

@@ -53,8 +53,14 @@ describe('changelogBetween — o que acumula', () => {
 
   it('acumula várias versões, da mais nova para a mais antiga', () => {
     const builds = changelogBetween(151, CURRENT, t);
-    const expected = Array.from({ length: CURRENT - 151 }, (_, i) => CURRENT - i);
-    expect(builds.map(b => b.code)).toEqual(expected);
+    const codes = builds.map(b => b.code);
+    expect(codes[0]).toBe(CURRENT);
+    expect(codes).toEqual([...codes].sort((a, b) => b - a));
+    expect(new Set(codes).size).toBe(codes.length);
+    // Um build cujas entradas repetem por completo um título mais novo é
+    // omitido, por isso o intervalo não é necessariamente contíguo.
+    expect(codes.every(code => code > 151 && code <= CURRENT)).toBe(true);
+    expect(codes.length).toBeGreaterThan(10);
   });
 
   it('o grupo mais novo é sempre a versão que está instalada', () => {
@@ -179,12 +185,16 @@ describe('última versão vista', () => {
 
   it('o que está gravado decide o que o modal mostra', async () => {
     // A partir de 151 até CURRENT inclusive: o número de grupos depende de
-    // quantos builds existem no dicionário, e escrevê-lo à mão parte a cada
-    // release. O que interessa é que o que está gravado é o ponto de partida.
+    // quantos builds existem no dicionário e de quantos sobrevivem à remoção de
+    // títulos repetidos, por isso não se fixa à mão. O que interessa é que o que
+    // está gravado é o ponto de partida: tudo o que vem depois entra, e o 151
+    // (já visto) fica de fora.
     await markChangelogSeen(151);
     const desde151 = changelogBetween(await loadChangelogSeen(), CURRENT, t);
     expect(desde151[0].code).toBe(CURRENT);
-    expect(desde151).toHaveLength(CURRENT - 151);
+    expect(desde151.map(b => b.code)).not.toContain(151);
+    expect(desde151.every(b => b.code > 151 && b.code <= CURRENT)).toBe(true);
+    expect(desde151.length).toBeGreaterThan(0);
   });
 
   it('valor corrompido vira null em vez de NaN no meio do cálculo', async () => {

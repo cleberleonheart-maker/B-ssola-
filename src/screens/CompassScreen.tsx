@@ -216,6 +216,10 @@ const CompassScreen = () => {
   const alertsCheckedRef = useRef(false);
   const notifiedAlertsRef = useRef(new Set<string>());
   const [calibrated, setCalibrated] = useState(false);
+  // Mesmo objeto do `calibrationRef`, mas em state: o sensor de EMF lê pela
+  // ref (não reabre o magnetômetro) e a tela precisa do valor para re-renderizar
+  // quando a calibração muda.
+  const [calibration, setCalibration] = useState<MagCalibration | null>(null);
   const calibrationRef = useRef<MagCalibration | null>(null);
   const calPromptedRef = useRef(false);
   const [location, setLocation] = useState<LocationFix>({
@@ -322,6 +326,7 @@ const CompassScreen = () => {
   useEffect(() => {
     loadCalibration().then(cal => {
       calibrationRef.current = cal;
+      setCalibration(cal);
       setCalibrated(cal !== null);
     });
     loadDeclination().then(decl => {
@@ -870,6 +875,7 @@ const CompassScreen = () => {
 
   const handleCalibrationSave = useCallback((cal: MagCalibration | null) => {
     calibrationRef.current = cal;
+    setCalibration(cal);
     setCalibrated(cal !== null);
   }, []);
 
@@ -1520,6 +1526,8 @@ const CompassScreen = () => {
           hasFix={hasFix}
           declination={declination}
           calibrationApplied={calibrated}
+          calibration={calibration}
+          onOpenCalibration={openCalibration}
           onAddWaypoint={addWaypoint}
           onAddRemoteWaypoint={addRemoteWaypoint}
           statusPanels={statusPanels}
