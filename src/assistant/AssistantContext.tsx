@@ -482,11 +482,20 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       if (!text) {
         return;
       }
+      // Comandos de ativar/desativar kefera são tratados direto, sem preview
+      if (detectWakeCommand(text)) {
+        sendRef.current(text);
+        return;
+      }
       const mode = voiceModeRef.current;
-      // Resultado de uma sessão que já não está à espera (ex.: chegou depois de
-      // pararmos/destruirmos o reconhecedor). Antes isto caía no `send` final e
-      // a Kefera executava lixo ou um comando repetido.
+      // Se chegou por voz mas modo já é 'none', ainda mostra preview (#66)
       if (mode === 'none') {
+        pendingVoiceRef.current = text;
+        setPendingVoiceConfirm(text);
+        setOpen(true);
+        if (wakeOnRef.current && appActiveRef.current) {
+          scheduleWakeCycle();
+        }
         return;
       }
       clearSettleTimer();
