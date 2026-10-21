@@ -36,6 +36,7 @@ const UNIT_SYSTEM_KEY = '@bussola/unitSystem';
 const CADENCE_BPM_KEY = '@bussola/cadenceBpm';
 const CADENCE_MODE_KEY = '@bussola/cadenceMode';
 const KEEP_AWAKE_KEY = '@bussola/keepAwake';
+const TILT_INVERTED_KEY = '@bussola/tiltInverted';
 
 export const CADENCE_BPM = { min: 90, max: 160, step: 5, fallback: 120 } as const;
 
@@ -152,6 +153,18 @@ export const loadVoiceGuide = async (): Promise<boolean> => {
 
 export const saveVoiceGuide = async (enabled: boolean) => {
   await AsyncStorage.setItem(VOICE_GUIDE_KEY, enabled ? '1' : '0');
+};
+
+export const loadTiltInverted = async (): Promise<boolean> => {
+  try {
+    return (await AsyncStorage.getItem(TILT_INVERTED_KEY)) === '1';
+  } catch {
+    return false;
+  }
+};
+
+export const saveTiltInverted = async (inverted: boolean) => {
+  await AsyncStorage.setItem(TILT_INVERTED_KEY, inverted ? '1' : '0');
 };
 
 export const loadWindCal = async (): Promise<WindCal> => {

@@ -1,4 +1,10 @@
-import { heightFromAngles, meanAngle } from '../src/utils/height';
+import {
+  heightFromAngles,
+  meanAngle,
+  isInvertedConvention,
+  applyConvention,
+  CONVENTION_THRESHOLD,
+} from '../src/utils/height';
 
 describe('meanAngle', () => {
   it('devolve a média aritmética', () => {
@@ -54,5 +60,29 @@ describe('heightFromAngles', () => {
 
   it('base e topo na mesma altura dá zero, não null', () => {
     expect(heightFromAngles(20, 20, 10)).toBeCloseTo(0, 6);
+  });
+});
+
+describe('tilt convention auto-detection (#65)', () => {
+  it('reconhece convenção invertida ao apontar o topo ao céu com ângulo negativo', () => {
+    expect(isInvertedConvention(-70)).toBe(true);
+    expect(isInvertedConvention(CONVENTION_THRESHOLD)).toBe(true);
+  });
+
+  it('não inverte quando apontar para cima já dá positivo', () => {
+    expect(isInvertedConvention(45)).toBe(false);
+    expect(isInvertedConvention(0)).toBe(false);
+    expect(isInvertedConvention(-30)).toBe(false);
+  });
+
+  it('ignora valores não finitos', () => {
+    expect(isInvertedConvention(NaN)).toBe(false);
+    expect(isInvertedConvention(Infinity)).toBe(false);
+  });
+
+  it('aplica a correção trocando o sinal', () => {
+    expect(applyConvention(-60, true)).toBeCloseTo(60, 6);
+    expect(applyConvention(30, false)).toBeCloseTo(30, 6);
+    expect(applyConvention(-5, true)).toBeCloseTo(5, 6);
   });
 });

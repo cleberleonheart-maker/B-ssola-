@@ -186,6 +186,9 @@ const AssistantModal = () => {
     mutedUntil,
     muteFor,
     unmute,
+    pendingVoiceConfirm,
+    confirmVoice,
+    cancelVoice,
   } = useAssistant();
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
@@ -423,41 +426,78 @@ const AssistantModal = () => {
             </View>
           )}
 
-          <View style={styles.inputRow}>
-            <Pressable
-              onPress={handleMic}
-              disabled={!voiceSupported || !ready}
-              style={[
-                styles.micButton,
-                listening && styles.micButtonActive,
-                (!voiceSupported || !ready) && styles.micButtonDisabled,
-              ]}>
-              <Text style={styles.micIcon}>{listening ? '🔴' : '🎤'}</Text>
-            </Pressable>
-            <TextInput
-              style={styles.input}
-              value={input}
-              onChangeText={setInput}
-              placeholder={
-                listening
-                  ? t('as_input_listening')
-                  : t('as_input_placeholder')
-              }
-              placeholderTextColor={colors.textMuted}
-              multiline
-              onSubmitEditing={handleSend}
-              returnKeyType="send"
-            />
-            <Pressable
-              onPress={handleSend}
-              disabled={!input.trim()}
-              style={[
-                styles.sendButton,
-                !input.trim() && styles.sendButtonDisabled,
-              ]}>
-              <Text style={styles.sendIcon}>➤</Text>
-            </Pressable>
-          </View>
+          {pendingVoiceConfirm ? (
+            <View style={[styles.previewBox, { borderColor: colors.primary }]}>
+              <Text style={[styles.previewTitle, { color: colors.textMuted }]}>
+                {t('as_voice_preview_title')}
+              </Text>
+              <Text style={[styles.previewText, { color: colors.text }]}>
+                {pendingVoiceConfirm}
+              </Text>
+              <View style={styles.previewRow}>
+                <Pressable
+                  onPress={confirmVoice}
+                  style={[styles.previewBtn, { backgroundColor: colors.primary }]}>
+                  <Text style={[styles.previewBtnText, { color: colors.background }]}>
+                    {t('as_voice_preview_ok')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    cancelVoice();
+                    setInput(pendingVoiceConfirm);
+                  }}
+                  style={[styles.previewBtn, { borderColor: colors.border }]}>
+                  <Text style={[styles.previewBtnText, { color: colors.text }]}>
+                    {t('as_voice_preview_edit')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={cancelVoice}
+                  style={[styles.previewBtn, { borderColor: colors.border }]}>
+                  <Text style={[styles.previewBtnText, { color: colors.text }]}>
+                    {t('as_voice_preview_cancel')}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.inputRow}>
+              <Pressable
+                onPress={handleMic}
+                disabled={!voiceSupported || !ready}
+                style={[
+                  styles.micButton,
+                  listening && styles.micButtonActive,
+                  (!voiceSupported || !ready) && styles.micButtonDisabled,
+                ]}>
+                <Text style={styles.micIcon}>{listening ? '🔴' : '🎤'}</Text>
+              </Pressable>
+              <TextInput
+                style={styles.input}
+                value={input}
+                onChangeText={setInput}
+                placeholder={
+                  listening
+                    ? t('as_input_listening')
+                    : t('as_input_placeholder')
+                }
+                placeholderTextColor={colors.textMuted}
+                multiline
+                onSubmitEditing={handleSend}
+                returnKeyType="send"
+              />
+              <Pressable
+                onPress={handleSend}
+                disabled={!input.trim()}
+                style={[
+                  styles.sendButton,
+                  !input.trim() && styles.sendButtonDisabled,
+                ]}>
+                <Text style={styles.sendIcon}>➤</Text>
+              </Pressable>
+            </View>
+          )}
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -888,6 +928,44 @@ const createStyles = (colors: {
       fontSize: 16,
       color: colors.surface,
       fontWeight: '900',
+    },
+    previewBox: {
+      marginHorizontal: spacing.md,
+      marginBottom: spacing.sm,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      backgroundColor: colors.surface,
+      padding: spacing.md,
+      gap: spacing.sm,
+    },
+    previewTitle: {
+      fontSize: 11,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
+    previewText: {
+      fontSize: 14,
+      fontWeight: '600',
+      lineHeight: 20,
+    },
+    previewRow: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      flexWrap: 'wrap',
+    },
+    previewBtn: {
+      flex: 1,
+      minWidth: 80,
+      alignItems: 'center',
+      paddingVertical: spacing.sm,
+      borderRadius: radius.full,
+      borderWidth: 1,
+      borderColor: 'transparent',
+    },
+    previewBtnText: {
+      fontSize: 13,
+      fontWeight: '800',
     },
   });
 

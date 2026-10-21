@@ -15,6 +15,32 @@ export const meanAngle = (angles: number[]): number => {
 };
 
 /**
+ * Limite, em graus, para a auto-detecção da convenção de inclinação (#65).
+ *
+ * Mirar o topo para o céu tem de dar um ângulo claramente positivo. Um valor
+ * abaixo de −45° não é "apontou um pouco para baixo" — é o sensor a devolver o
+ * sinal trocado (a nota de campo descreve o `verticalAngle` a dar negativo a
+ * subir em algum hardware). A folga de 45° existe para o gesto real, nunca
+ * perfeitamente vertical, não disparar a correção por engano.
+ */
+export const CONVENTION_THRESHOLD = -45;
+
+/**
+ * Diz se a leitura "topo para o céu" revela a convenção de inclinação
+ * invertida. `skyAngle` é o `verticalAngle` cru capturado ao apontar o topo do
+ * aparelho para cima.
+ */
+export const isInvertedConvention = (skyAngle: number): boolean =>
+  Number.isFinite(skyAngle) && skyAngle <= CONVENTION_THRESHOLD;
+
+/**
+ * Aplica a convenção à leitura crua. A correção só troca o sinal: a
+ * magnitude é a mesma, o que muda é o sentido (subir deixa de marcar negativo).
+ */
+export const applyConvention = (rawAngle: number, inverted: boolean): number =>
+  inverted ? -rawAngle : rawAngle;
+
+/**
  * Altura de um objeto por dois ângulos verticais e a distância horizontal.
  *
  * `top` e `base` em graus (positivo = apontando para cima), `distance` em

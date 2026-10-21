@@ -78,6 +78,10 @@ type AssistantApi = {
   clear: () => void;
   setContextData: (partial: Partial<AssistantContextData>) => void;
   setActionHandler: (fn: (action: AssistantAction) => void) => void;
+  /** Pré-visualização do que a Kefera ouviu (#66). */
+  pendingVoiceConfirm: string | null;
+  confirmVoice: () => void;
+  cancelVoice: () => void;
 };
 
 const AssistantContext = createContext<AssistantApi | null>(null);
@@ -132,12 +136,10 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
   const [mutedUntil, setMutedUntil] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [pendingVoiceConfirm, setPendingVoiceConfirm] = useState<string | null>(null);
+  const pendingVoiceRef = useRef<string | null>(null);
 
-  // DIAGNÓSTICO TEMPORÁRIO (remover depois): mostra na conversa o que o
-  // reconhecedor de voz ouve e os erros que devolve, para descobrir por que a
-  // pergunta não chega ao motor. `coalesce` troca a mesma linha em vez de
-  // encher a conversa com cada resultado parcial.
-  const debugMsgIdRef = useRef<string | null>(null);
+    const debugMsgIdRef = useRef<string | null>(null);
   const pushDebug = useCallback((text: string, coalesce = false) => {
     setMessages(prev => {
       if (coalesce && debugMsgIdRef.current) {
@@ -158,6 +160,19 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
 
   const sendRef = useRef<(text: string) => Promise<void>>(async () => {});
   const initPromiseRef = useRef<Promise<void> | null>(null);
+
+  const confirmVoice = useCallback(() => {
+    const txt = pendingVoiceRef.current;
+    if (!txt) return;
+    pendingVoiceRef.current = null;
+    setPendingVoiceConfirm(null);
+    void sendRef.current(txt);
+  }, []);
+
+  const cancelVoice = useCallback(() => {
+    pendingVoiceRef.current = null;
+    setPendingVoiceConfirm(null);
+  }, []);
 
   const wakeOnRef = useRef(false);
   const appActiveRef = useRef(true);
@@ -484,7 +499,10 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
             awaitingCommandRef.current = false;
             clearWakeTimer();
             voiceModeRef.current = 'none';
-            sendRef.current(text);
+            // Pré-visualizar antes de executar (#66)
+            pendingVoiceRef.current = text;
+            setPendingVoiceConfirm(text);
+            setOpen(true);
             if (wakeOnRef.current && appActiveRef.current) {
               scheduleWakeCycle();
             }
@@ -500,9 +518,10 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
         awaitingCommandRef.current = false;
         clearWakeTimer();
         voiceModeRef.current = 'none';
-        sendRef.current(text);
-        // Retoma a escuta da palavra de ativação sem depender do `onEnd` que
-        // ainda vem a seguir (esse é agora ignorado, porque o modo é 'none').
+        // Pré-visualizar antes de executar (#66)
+        pendingVoiceRef.current = text;
+        setPendingVoiceConfirm(text);
+        setOpen(true);
         if (wakeOnRef.current && appActiveRef.current) {
           scheduleWakeCycle();
         }
@@ -512,7 +531,10 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
         sessionActiveRef.current = false;
         clearWakeTimer();
         voiceModeRef.current = 'none';
-        sendRef.current(text);
+        // Pré-visualizar antes de executar (#66)
+        pendingVoiceRef.current = text;
+        setPendingVoiceConfirm(text);
+        setOpen(true);
         if (wakeOnRef.current && appActiveRef.current) {
           scheduleWakeCycle();
         }
@@ -783,12 +805,11 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
 
     const detach = attachVoice({
       onResult: text => {
-        pushDebug(`🎧 ouvi: ${text}`);
+        // Debug temporário removido com #66 — agora mostramos pré-visualização
+        // no modal para o usuário confirmar.
         handleTranscription(text);
       },
-      onPartial: text => {
-        pushDebug(`🎧 ...${text}`, true);
-      },
+      onPartial: () => {},
       onStateChange: () => {},
       onError: code => {
         pushDebug(`⚠️ voz erro: ${code} (${voiceModeRef.current})`);
@@ -864,6 +885,9 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       clear,
       setContextData,
       setActionHandler,
+      pendingVoiceConfirm,
+      confirmVoice,
+      cancelVoice,
     }),
     [
       ready,
@@ -875,7 +899,7 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       muteFor,
       unmute,
       open,
-      handleSetOpen,
+      setOpen,
       toggleVoice,
       messages,
       send,
@@ -883,6 +907,9 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       clear,
       setContextData,
       setActionHandler,
+      pendingVoiceConfirm,
+      confirmVoice,
+      cancelVoice,
     ],
   );
 

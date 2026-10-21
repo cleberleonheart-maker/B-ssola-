@@ -41,6 +41,7 @@ import { spacing, radius } from '../theme/colors';
 import { cardinalOf, formatCoord, formatTime } from '../utils/compass';
 import { hasLocationFix } from '../utils/geo';
 import { formatAltitude, formatAccuracy } from '../utils/units';
+import { getBatteryLevel } from '../services/battery';
 import type { LocationFix } from '../services/locationService';
 
 type Props = {
@@ -60,6 +61,27 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
   const hasFix = hasLocationFix(location);
   const locationRef = useRef(location);
   const headingRef = useRef(heading);
+
+  /**
+   * Bateria no alerta (#29): quem recebe um SOS precisa de saber se o aparelho
+   * de quem pediu ajuda está a chegar ao fim — muda o que fazer com a
+   * informação. Lida na montagem e a cada minuto; um valor nulo (iOS, ou
+   * aparelho sem a API) simplesmente não entra no texto.
+   */
+  const [battery, setBattery] = useState<number | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    const refresh = async () => {
+      const level = await getBatteryLevel();
+      if (mounted) setBattery(level);
+    };
+    refresh();
+    const id = setInterval(refresh, 60000);
+    return () => {
+      mounted = false;
+      clearInterval(id);
+    };
+  }, []);
 
   useEffect(() => {
     locationRef.current = location;
@@ -90,11 +112,14 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
       rawLines.push(`• ${t('em_altitude')}: ${formatAltitude(location.altitude)}`);
     }
     rawLines.push(`• ${t('em_heading')}: ${Math.round(heading)}° ${cardinalOf(heading).full}`);
+    if (battery != null) {
+      rawLines.push(`• ${t('em_battery')}: ${battery}%`);
+    }
     if (location.updatedAt) {
       rawLines.push(`• ${formatTime(location.updatedAt)}`);
     }
     return rawLines.join('\n');
-  }, [t, location, heading, place, hasFix]);
+  }, [t, location, heading, place, hasFix, battery]);
 
   const share = async () => {
     if (!hasFix) return;
@@ -343,7 +368,7 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
                     location.altitude != null
                       ? `${t('em_altitude')}: ${formatAltitude(location.altitude)}`
                       : null,
-                    null,
+                    battery != null ? `🔋 ${battery}%` : null,
                   ]
                     .filter(Boolean)
                     .join(' · ')}

@@ -4,7 +4,13 @@ import { useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import { formatDistance } from '../utils/geo';
-import { heightFromAngles, meanAngle } from '../utils/height';
+import {
+  heightFromAngles,
+  meanAngle,
+  isInvertedConvention,
+  applyConvention,
+} from '../utils/height';
+import { loadTiltInverted, saveTiltInverted } from '../services/preferencesService';
 
 type Props = {
   accel: { x: number; y: number; z: number };
@@ -61,6 +67,25 @@ const HeightView = ({ accel, targetDistance }: Props) => {
   const [base, setBase] = useState<number | null>(null);
   const [distance, setDistance] = useState(10);
   const manualRef = useRef(false);
+
+  /**
+   * Convenção de inclinação do aparelho (#65).
+   *
+   * Algum hardware devolve `verticalAngle` com o sinal trocado: subir marca
+   * negativo, e a altura sai invertida. Em vez de assumir, a tela descobre pelo
+   * gesto: apontar o topo para o céu e ver o resultado afundar em valores
+   * negativos é prova suficiente. A correção guarda-se e sobrevive ao fechar.
+   */
+  const [inverted, setInverted] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    void loadTiltInverted().then(v => {
+      if (mounted) setInverted(v);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
   const [landscape, setLandscape] = useState(
     (() => {
       const { width, height } = Dimensions.get('window');
@@ -84,7 +109,22 @@ const HeightView = ({ accel, targetDistance }: Props) => {
     }
   }, [targetDistance]);
 
-  const live = verticalAngle(accel, landscape);
+  const rawLive = verticalAngle(accel, landscape);
+  const live = applyConvention(rawLive, inverted);
+
+  // O gesto de prova: apontar o topo ao céu dá ângulo claramente negativo no
+  // sensor invertido. Só se oferece a correção enquanto não estiver corrigido.
+  const suggestFix = !inverted && isInvertedConvention(rawLive);
+
+  const fixConvention = () => {
+    setInverted(true);
+    void saveTiltInverted(true);
+  };
+
+  const undoConvention = () => {
+    setInverted(false);
+    void saveTiltInverted(false);
+  };
 
   /**
    * Uma captura é a média das últimas N leituras, e não a de agora.
@@ -161,6 +201,30 @@ const HeightView = ({ accel, targetDistance }: Props) => {
         <Text style={[styles.inverted, { color: colors.warning }]}>
           {t('ht_inverted')}
         </Text>
+      )}
+
+      {suggestFix && (
+        <Pressable
+          onPress={fixConvention}
+          style={[styles.conventionButton, { borderColor: colors.warning }]}>
+          <Text style={[styles.conventionText, { color: colors.warning }]}>
+            🧭 {t('ht_fix_convention')}
+          </Text>
+        </Pressable>
+      )}
+
+      {inverted && (
+        <View
+          style={[styles.conventionBanner, { backgroundColor: colors.surfaceAlt }]}>
+          <Text style={[styles.conventionText, { color: colors.textMuted }]}>
+            {t('ht_convention_fixed')}
+          </Text>
+          <Pressable onPress={undoConvention}>
+            <Text style={[styles.conventionUndo, { color: colors.primary }]}>
+              {t('ht_convention_undo')}
+            </Text>
+          </Pressable>
+        </View>
       )}
 
       <View style={styles.captureRow}>
@@ -318,6 +382,30 @@ const createStyles = (_colors: {
       fontWeight: '700',
       marginTop: spacing.sm,
       textAlign: 'center',
+    },
+    conventionButton: {
+      marginTop: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      borderRadius: radius.full,
+      borderWidth: 1,
+    },
+    conventionBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginTop: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      borderRadius: radius.full,
+    },
+    conventionText: {
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    conventionUndo: {
+      fontSize: 12,
+      fontWeight: '800',
     },
     captureRow: {
       flexDirection: 'row',
