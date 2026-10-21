@@ -445,10 +445,12 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       if (inlineCommand) {
-        // comando já veio na frase de ativação: não reabre o microfone
+        // comando já veio na frase de ativação: mostrar pré-visualização (#66)
         awaitingCommandRef.current = false;
-        await sendRef.current(inlineCommand);
-        if (wakeOnRef.current) {
+        pendingVoiceRef.current = inlineCommand;
+        setPendingVoiceConfirm(inlineCommand);
+        setOpen(true);
+        if (wakeOnRef.current && appActiveRef.current) {
           scheduleWakeCycle();
         }
         return;
