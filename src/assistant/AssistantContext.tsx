@@ -508,6 +508,17 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
             if (wakeOnRef.current && appActiveRef.current) {
               scheduleWakeCycle();
             }
+            return;
+          }
+          // Se chegou aqui sem estar à espera explicitamente, ainda assim
+          // mostra pré-visualização para o fluxo wake não ficar silencioso.
+          clearWakeTimer();
+          voiceModeRef.current = 'none';
+          pendingVoiceRef.current = text;
+          setPendingVoiceConfirm(text);
+          setOpen(true);
+          if (wakeOnRef.current && appActiveRef.current) {
+            scheduleWakeCycle();
           }
           return;
         }
