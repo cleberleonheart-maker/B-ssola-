@@ -888,7 +888,6 @@ export const AssistantProvider = ({ children }: { children: ReactNode }) => {
       pendingVoiceConfirm,
       confirmVoice,
       cancelVoice,
-      setOpen: handleSetOpen,
     }),
     [
       ready,
