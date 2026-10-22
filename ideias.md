@@ -542,8 +542,9 @@ foram encontrados de verdade, não ideias soltas.
       (complemento da triangulação #27, usando teodolito + AR).
 - [x] **34. 🗺️ Atalho de volta (linha reta)** — na trilha, além do retorno pelo trajeto,
       mostrar o rumo direto ao início ("em linha reta") para encurtar quando dá.
-- [ ] **35. 🔲 QR de localização** — gerar QR com as coordenadas para outro aparelho
-      escanear e navegar até ali (boneco de rastreio offline).
+- [x] **35. 🔲 QR de localização** — feito (v7.65). Gerar QR com as coordenadas
+      (`geo:`) para outro aparelho ler/abrir em mapa. Tipo "compartilhar sem redes
+      sociais". Adicionado ao modal de coordenadas com botões copiar/compartilhar.
 - [ ] **36. 🌡️ Heatmap "onde estive"** — registrar posições ao longo do dia e desenhar um
       mapa de calor do dia/semana (junta GPS + trilhas salvas).
 - [ ] **37. 🔗 GPX por link** — além do arquivo, gerar link curto da trilha salva na
