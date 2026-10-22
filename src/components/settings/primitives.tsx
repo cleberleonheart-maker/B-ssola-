@@ -14,6 +14,18 @@ export const SectionLabel = ({ label }: { label: string }) => {
   );
 };
 
+/**
+ * Sub-rótulo dentro de uma secção: o que vem depois do rótulo da secção, para
+ * distinguir partes de um mesmo assunto ("Tema" e "Idioma" dentro de
+ * "Aparência") sem parecer outra secção.
+ */
+export const Caption = ({ label }: { label: string }) => {
+  const colors = useThemeColors();
+  return (
+    <Text style={[styles.caption, { color: colors.textMuted }]}>{label}</Text>
+  );
+};
+
 export const GroupCard = ({ children }: { children: React.ReactNode }) => {
   const colors = useThemeColors();
   return (

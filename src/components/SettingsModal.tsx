@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
   View,
@@ -6,13 +6,13 @@ import {
   Pressable,
   ScrollView,
   Alert,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ScrollViewInstance,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
-import { LANGS } from '../i18n/strings';
-import type { Translator } from '../i18n/strings';
-import type { ThemeName } from '../theme/themes';
-import { THEME_AUTO_MODES, type ThemeAutoMode } from '../theme/themeAuto';
 import type { LocationMode } from '../services/locationService';
 import type { AppMode } from '../services/preferencesService';
 import type { Declination } from '../utils/declination';
@@ -21,25 +21,25 @@ import { loadLockPin } from '../services/preferencesService';
 import { BACKUP_FILE_VERSION, type BackupMode } from '../services/backupService';
 import { APP_VERSION, APP_VERSION_CODE } from '../version.generated';
 import { checkForUpdate, type AvailableUpdate } from '../services/versionService';
-import { loadSoundPref, saveSoundPref } from '../services/sound';
+import { loadSoundPref, saveSoundPref, soundAvailable } from '../services/sound';
 import UpdateAvailableModal from './UpdateAvailableModal';
 import WhatsNewModal from './WhatsNewModal';
+import SettingsIndex from './settings/SettingsIndex';
+import { SETTINGS_SECTIONS, type SettingsSectionId } from './settings/sections';
+import AppearanceSection from './settings/AppearanceSection';
+import UsageSection from './settings/UsageSection';
 import CompassSection from './settings/CompassSection';
+import VoiceSection from './settings/VoiceSection';
+import DataSection from './settings/DataSection';
 import CloudSection from './settings/CloudSection';
 import ShareHistorySection from './settings/ShareHistorySection';
 import AccountSection from './settings/AccountSection';
-import DataSection from './settings/DataSection';
+import SecuritySection, { type PinFlowKind } from './settings/SecuritySection';
+import AppSection from './settings/AppSection';
 import ImportDialog from './settings/ImportDialog';
 import PinDialog from './settings/PinDialog';
-import SecuritySection, { type PinFlowKind } from './settings/SecuritySection';
 import ReportProblemDialog from './settings/ReportProblemDialog';
-import {
-  ChevronRow,
-  GridOption,
-  GroupCard,
-  RadioRow,
-  SectionLabel,
-} from './settings/primitives';
+import { Caption } from './settings/primitives';
 import { styles } from './settings/styles';
 
 type Props = {
@@ -71,46 +71,10 @@ type Props = {
   onApplyBackup: (json: string, mode: BackupMode) => Promise<string | null>;
 };
 
-const LOCATION_MODES = (
-  t: Translator,
-): { key: LocationMode; label: string; sub: string; icon: string }[] => [
-  { key: 'satellite', label: t('set_loc_satellite'), sub: t('set_loc_satellite_sub'), icon: '🛰' },
-  { key: 'network', label: t('set_loc_network'), sub: t('set_loc_network_sub'), icon: '📶' },
-  { key: 'tower', label: t('set_loc_tower'), sub: t('set_loc_tower_sub'), icon: '📡' },
-];
-
-const APP_MODES = (
-  t: Translator,
-): { key: AppMode; label: string; sub: string; icon: string }[] => [
-  { key: 'full', label: t('set_mode_full'), sub: t('set_mode_full_sub'), icon: '🧭' },
-  { key: 'minimal', label: t('set_mode_minimal'), sub: t('set_mode_minimal_sub'), icon: '◐' },
-  { key: 'adventure', label: t('set_mode_adventure'), sub: t('set_mode_adventure_sub'), icon: '⛰' },
-];
-
-const THEME_LABEL_KEYS: Record<string, string> = {
-  light: 'ui_theme_light',
-  sun: 'ui_theme_sun',
-  dark: 'ui_theme_dark',
-  space: 'ui_theme_space',
-  minimal: 'ui_theme_minimal',
-  adventure: 'ui_theme_adventure',
-  neon: 'ui_theme_neon',
-  night: 'ui_theme_night',
-};
-
-// As três estratégias do tema automático (ideia #15).
-const THEME_AUTO_LABEL: Record<ThemeAutoMode, string> = {
-  scheduleLight: 'theme_auto_sched_light',
-  scheduleSun: 'theme_auto_sched_sun',
-  sunReal: 'theme_auto_sunreal',
-};
-const THEME_AUTO_SUB: Record<ThemeAutoMode, string> = {
-  scheduleLight: 'theme_auto_sched_light_sub',
-  scheduleSun: 'theme_auto_sched_sun_sub',
-  sunReal: 'theme_auto_sunreal_sub',
-};
-
 type PinFlow = PinFlowKind | null;
+
+/** Distância, em píxeis, entre o topo do conteúdo e a secção que se quer ler. */
+const SECTION_SLACK = 12;
 
 const SettingsModal = ({
   visible,
@@ -140,16 +104,8 @@ const SettingsModal = ({
   onExportBackup,
   onApplyBackup,
 }: Props) => {
-  const { colors, preference, autoMode, setTheme, setAutoMode, themeOptions } = useTheme();
-  const { t, lang, setLang } = useLanguage();
-  const locationModes = LOCATION_MODES(t);
-  const appModes = APP_MODES(t);
-  const autoModes = THEME_AUTO_MODES.map(key => ({
-    key,
-    icon: key === 'scheduleSun' ? '🔆' : key === 'sunReal' ? '🌅' : '☀️',
-    label: t(THEME_AUTO_LABEL[key]),
-    sub: t(THEME_AUTO_SUB[key]),
-  }));
+  const { colors } = useTheme();
+  const { t } = useLanguage();
 
   const [update, setUpdate] = useState<AvailableUpdate | null>(null);
   const [checking, setChecking] = useState(false);
@@ -163,6 +119,51 @@ const SettingsModal = ({
   const [importText, setImportText] = useState('');
   const [exporting, setExporting] = useState(false);
   const [hasPin, setHasPin] = useState(false);
+
+  // Onde está cada secção no conteúdo, para o índice saltar para ela.
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  const offsets = useRef<Record<string, number>>({});
+  const [activeSection, setActiveSection] = useState<SettingsSectionId>('aparencia');
+
+  const sections = useMemo(
+    () =>
+      SETTINGS_SECTIONS.map(section => ({
+        id: section.id,
+        label: t(section.labelKey),
+        icon: section.icon,
+      })),
+    [t],
+  );
+
+  const mark = useCallback(
+    (id: SettingsSectionId) => (event: LayoutChangeEvent) => {
+      offsets.current[id] = event.nativeEvent.layout.y;
+    },
+    [],
+  );
+
+  const jumpTo = useCallback((id: string) => {
+    const y = offsets.current[id];
+    if (y == null) return;
+    setActiveSection(id as SettingsSectionId);
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - SECTION_SLACK), animated: true });
+  }, []);
+
+  // A ficha marcada é a última secção que já passou do topo do ecrã: é a que
+  // está a ser lida. O `setState` devolve o valor antigo quando não mudou, e
+  // o React não redesenha por causa disso.
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const y = event.nativeEvent.contentOffset.y + SECTION_SLACK * 4;
+      let current: SettingsSectionId = 'aparencia';
+      for (const section of SETTINGS_SECTIONS) {
+        const offset = offsets.current[section.id];
+        if (offset != null && offset <= y) current = section.id;
+      }
+      setActiveSection(prev => (prev === current ? prev : current));
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!visible) return;
@@ -221,6 +222,7 @@ const SettingsModal = ({
       if (digits === flow.first) {
         await onSetPin(digits);
         closePinFlow();
+        setHasPin(true);
         Alert.alert(t('lock_title'), t('lock_pin_created'));
       } else {
         setPinFlow({ kind: 'change', step: 'enter', first: '' });
@@ -340,6 +342,7 @@ const SettingsModal = ({
     }
     setChecking(false);
   };
+
   return (
     <Modal
       visible={visible}
@@ -364,136 +367,90 @@ const SettingsModal = ({
             </Pressable>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <SectionLabel label={t('set_section_theme')} />
-            <View style={styles.gridRow}>
-              <GridOption
-                selected={preference === 'auto'}
-                onPress={() => setTheme('auto')}
-                label={t('ui_theme_auto')}
-              />
-              {themeOptions.map(option => (
-                <GridOption
-                  key={option.key}
-                  selected={preference === option.key}
-                  onPress={() => setTheme(option.key as ThemeName)}
-                  swatch
-                  label={t(THEME_LABEL_KEYS[option.key] ?? 'ui_theme_dark')}
-                />
-              ))}
+          <SettingsIndex
+            sections={sections}
+            active={activeSection}
+            onSelect={jumpTo}
+          />
+
+          <ScrollView
+            ref={scrollRef}
+            style={styles.scroll}
+            showsVerticalScrollIndicator={false}
+            scrollEventThrottle={32}
+            onScroll={handleScroll}>
+            <View onLayout={mark('aparencia')}>
+              <AppearanceSection />
             </View>
 
-            {preference === 'auto' && (
-              <>
-                <Text style={[styles.autoHint, { color: colors.textMuted }]}>
-                  {t('set_theme_auto_hint')}
-                </Text>
-                <GroupCard>
-                  {autoModes.map((mode, i) => (
-                    <RadioRow
-                      key={mode.key}
-                      divider={i > 0}
-                      icon={mode.icon}
-                      label={mode.label}
-                      sub={mode.sub}
-                      selected={autoMode === mode.key}
-                      onPress={() => setAutoMode(mode.key)}
-                    />
-                  ))}
-                </GroupCard>
-              </>
-            )}
-
-            <SectionLabel label={t('set_section_lang')} />
-            <View style={styles.gridRow}>
-              {LANGS.map(langOption => (
-                <GridOption
-                  key={langOption.key}
-                  selected={lang === langOption.key}
-                  onPress={() => setLang(langOption.key)}
-                  label={langOption.label}
-                />
-              ))}
+            <View onLayout={mark('utilizacao')}>
+              <UsageSection
+                appMode={appMode}
+                onSelectAppMode={onSelectAppMode}
+                locationMode={locationMode}
+                onSelectMode={onSelectMode}
+                keepAwake={keepAwake}
+                onToggleKeepAwake={onToggleKeepAwake}
+              />
             </View>
 
-            <SectionLabel label={t('set_section_mode')} />
-            <GroupCard>
-              {appModes.map((mode, i) => (
-                <RadioRow
-                  key={mode.key}
-                  divider={i > 0}
-                  icon={mode.icon}
-                  label={mode.label}
-                  sub={mode.sub}
-                  selected={appMode === mode.key}
-                  onPress={() => onSelectAppMode(mode.key)}
-                />
-              ))}
-            </GroupCard>
-
-            <SectionLabel label={t('set_section_loc')} />
-            <GroupCard>
-              {locationModes.map((mode, i) => (
-                <RadioRow
-                  key={mode.key}
-                  divider={i > 0}
-                  icon={mode.icon}
-                  label={mode.label}
-                  sub={mode.sub}
-                  selected={locationMode === mode.key}
-                  onPress={() => onSelectMode(mode.key)}
-                />
-              ))}
-            </GroupCard>
-
-            <CompassSection
-              calibrated={calibrated}
-              onOpenCalibration={onOpenCalibration}
-              declination={declination}
-              onSetDeclination={onSetDeclination}
-              declinationSuggest={declinationSuggest}
-              voiceGuide={voiceGuide}
-              onToggleVoiceGuide={onToggleVoiceGuide}
-              soundOn={soundOn}
-              onToggleSound={toggleSound}
-              mils={mils}
-              onToggleMils={onToggleMils}
-              unitSystem={unitSystem}
-              onToggleUnitSystem={onToggleUnitSystem}
-              keepAwake={keepAwake}
-              onToggleKeepAwake={onToggleKeepAwake}
-              onOpenWaypoints={onOpenWaypoints}
-              onShareLocation={onShareLocation}
-              arStatus={arStatus}
-              onCheckUpdate={handleCheckUpdate}
-              checking={checking}
-              onOpenWhatsNew={() => setWhatsNewVisible(true)}
-            />
-
-            <SecuritySection hasPin={hasPin} onStartFlow={startPinFlow} />
-
-            <DataSection
-              exporting={exporting}
-              onExport={handleExport}
-              onOpenImport={() => setImportVisible(true)}
-            />
-
-            <CloudSection />
-
-            <ShareHistorySection />
-
-            <AccountSection />
-
-            <SectionLabel label={t('set_section_help')} />
-            <GroupCard>
-              <ChevronRow
-                icon="📝"
-                label={t('set_report_problem')}
-                sub={t('set_report_problem_sub')}
-                lines={2}
-                onPress={() => setReportVisible(true)}
+            <View onLayout={mark('busola')}>
+              <CompassSection
+                calibrated={calibrated}
+                onOpenCalibration={onOpenCalibration}
+                declination={declination}
+                onSetDeclination={onSetDeclination}
+                declinationSuggest={declinationSuggest}
+                mils={mils}
+                onToggleMils={onToggleMils}
+                unitSystem={unitSystem}
+                onToggleUnitSystem={onToggleUnitSystem}
+                arStatus={arStatus}
               />
-            </GroupCard>
+            </View>
+
+            <View onLayout={mark('voz')}>
+              <VoiceSection
+                voiceGuide={voiceGuide}
+                onToggleVoiceGuide={onToggleVoiceGuide}
+                soundOn={soundOn}
+                onToggleSound={toggleSound}
+                soundAvailable={soundAvailable}
+              />
+            </View>
+
+            <View onLayout={mark('dados')}>
+              <DataSection
+                exporting={exporting}
+                onExport={handleExport}
+                onOpenImport={() => setImportVisible(true)}
+                onOpenWaypoints={onOpenWaypoints}
+                onShareLocation={onShareLocation}
+              />
+              <Caption label={t('set_section_shares')} />
+              <ShareHistorySection showLabel={false} />
+            </View>
+
+            <View onLayout={mark('nuvem')}>
+              <CloudSection />
+            </View>
+
+            <View onLayout={mark('conta')}>
+              <AccountSection />
+            </View>
+
+            <View onLayout={mark('seguranca')}>
+              <SecuritySection hasPin={hasPin} onStartFlow={startPinFlow} />
+            </View>
+
+            <View onLayout={mark('app')}>
+              <AppSection
+                onCheckUpdate={handleCheckUpdate}
+                checking={checking}
+                onOpenWhatsNew={() => setWhatsNewVisible(true)}
+                onOpenReportProblem={() => setReportVisible(true)}
+              />
+            </View>
           </ScrollView>
         </Pressable>
       </Pressable>

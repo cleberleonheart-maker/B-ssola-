@@ -23,6 +23,11 @@ import {
 
 type Estado = 'fechado' | 'a-carregar' | 'aberto' | 'erro';
 
+type Props = {
+  /** O histórico vive dentro da secção "Dados e partilha": o rótulo é do ecrã. */
+  showLabel?: boolean;
+};
+
 /**
  * Histórico de partilhas em Configurações (ideia #100).
  *
@@ -37,7 +42,7 @@ type Estado = 'fechado' | 'a-carregar' | 'aberto' | 'erro';
  * não muda a cada segundo, e um pedido em cada montagem seria mais uma forma
  * de o Configurações ficar lento sem que ninguém tenha pedido.
  */
-const ShareHistorySection = () => {
+const ShareHistorySection = ({ showLabel = true }: Props) => {
   const { t } = useLanguage();
   const colors = useThemeColors();
   const [estado, setEstado] = useState<Estado>('fechado');
@@ -76,7 +81,7 @@ const ShareHistorySection = () => {
 
   return (
     <>
-      <SectionLabel label={t('set_section_shares')} />
+      {showLabel ? <SectionLabel label={t('set_section_shares')} /> : null}
       <GroupCard>
         <ChevronRow
           icon="📡"
