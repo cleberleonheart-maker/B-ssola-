@@ -42,6 +42,7 @@ import { cardinalOf, formatCoord, formatTime } from '../utils/compass';
 import { hasLocationFix } from '../utils/geo';
 import { formatAltitude, formatAccuracy } from '../utils/units';
 import { getBatteryLevel } from '../services/battery';
+import { getNetworkInfo } from '../services/network';
 import type { LocationFix } from '../services/locationService';
 
 type Props = {
@@ -69,11 +70,17 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
    * aparelho sem a API) simplesmente não entra no texto.
    */
   const [battery, setBattery] = useState<number | null>(null);
+  const [network, setNetwork] = useState<{ operator: string | null; type: string | null }>({
+    operator: null,
+    type: null,
+  });
   useEffect(() => {
     let mounted = true;
     const refresh = async () => {
       const level = await getBatteryLevel();
       if (mounted) setBattery(level);
+      const ni = await getNetworkInfo();
+      if (mounted) setNetwork(ni);
     };
     refresh();
     const id = setInterval(refresh, 60000);
@@ -115,11 +122,16 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
     if (battery != null) {
       rawLines.push(`• ${t('em_battery')}: ${battery}%`);
     }
+    if (network.operator) {
+      rawLines.push(`• ${t('em_network')}: ${network.operator}${network.type ? ` (${network.type})` : ''}`);
+    } else if (network.type) {
+      rawLines.push(`• ${t('em_network')}: ${network.type}`);
+    }
     if (location.updatedAt) {
       rawLines.push(`• ${formatTime(location.updatedAt)}`);
     }
     return rawLines.join('\n');
-  }, [t, location, heading, place, hasFix, battery]);
+  }, [t, location, heading, place, hasFix, battery, network]);
 
   const share = async () => {
     if (!hasFix) return;
@@ -369,6 +381,11 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
                       ? `${t('em_altitude')}: ${formatAltitude(location.altitude)}`
                       : null,
                     battery != null ? `🔋 ${battery}%` : null,
+                    network.operator
+                      ? `📶 ${network.operator}${network.type ? ` (${network.type})` : ''}`
+                      : network.type
+                        ? `📶 ${network.type}`
+                        : null,
                   ]
                     .filter(Boolean)
                     .join(' · ')}

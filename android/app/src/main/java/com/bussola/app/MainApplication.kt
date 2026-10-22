@@ -32,6 +32,7 @@ class MainApplication : Application(), ReactApplication {
           add(LiveTrackingPackage())
           add(KeepAwakePackage())
           add(BatteryOptPackage())
+          add(NetworkInfoPackage())
         },
     )
   }

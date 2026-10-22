@@ -516,8 +516,7 @@ foram encontrados de verdade, não ideias soltas.
       tangentes saltar dezenas de metros. Fórmula e média puras em
       `utils/height.ts` (`heightFromAngles`, `meanAngle`), testadas em
       `height.test.ts`.
-- [ ] **29. SOS com contexto** — incluir % de bateria e operadora/rede no alerta
-      (adianta a ideia #8).
+- [x] **29. SOS com contexto** — feito. Alerta de emergência inclui % de bateria e operadora/rede (nativo `NetworkInfo`) no texto e resumo.
 - [x] **30. Aviso de desvio de rota** — ✅ feito na v7.37: no retorno pela trilha,
       a distância ao traço (polilinha, não só vértices) é medida sempre; a mais
       de 30 m entra um banner "⚠️ Fora da rota" com o rumo e a distância até o
