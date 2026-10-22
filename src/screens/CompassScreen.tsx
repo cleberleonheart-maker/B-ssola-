@@ -24,6 +24,7 @@ import SettingsModal from '../components/SettingsModal';
 import WaypointModal from '../components/WaypointModal';
 import AlertsModal from '../components/AlertsModal';
 import EmergencyModal from '../components/EmergencyModal';
+import BatteryOptBanner from '../components/BatteryOptBanner';
 import CoordModal from '../components/CoordModal';
 import {
   fetchCivilAlerts,
@@ -1465,6 +1466,7 @@ const CompassScreen = () => {
           style={styles.homeScroll}
           contentContainerStyle={styles.homeContent}
           showsVerticalScrollIndicator={false}>
+          <BatteryOptBanner />
           <View style={styles.homeHeader}>
             <Text style={styles.homeTitle}>{t('ui_home_launcher')}</Text>
             <View style={styles.statusPill}>

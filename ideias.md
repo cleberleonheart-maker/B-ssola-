@@ -554,8 +554,7 @@ foram encontrados de verdade, não ideias soltas.
       **Feito na v7.17** (JSON, com validação de `fileVersion` reforçada no commit
       `2d8b204`). O **PDF** é o que continua por fazer, e já está coberto pela #44
       (relatório da caderneta) — esta linha fecha pela parte que era exportar/restaurar.
-- [ ] **39. ⚠️ Aviso de bateria do sistema** — alertar se o Android estiver restringindo
-      o app em segundo plano (afeta GPS e câmera contínuos).
+- [x] **39. ⚠️ Aviso de bateria do sistema** — feito. Banner alerta quando o app não está isento de otimização de bateria; oferece "Permitir sem restrição" (direto ao diálogo) ou abrir configurações, com opção de ocultar. Implementado com módulo nativo `BatteryOpt` + `BatteryOptBanner`.
 - [x] **40. 🧭 Melhoria: rumo inverso sempre visível** — mostrar o rumo de volta em tempo
       real (não só no retorno de trilha), útil em navegação de retorno simples.
 - [x] **41. 🛠️ Gesture de pinch na Visão** — ✅ feito (code 187). A v7.11 anunciou

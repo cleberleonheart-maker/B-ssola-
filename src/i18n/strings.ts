@@ -777,6 +777,13 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     cad_start: '▶️ Começar',
     cad_stop: '⏹️ Parar',
     cad_count: '{n} passos',
+
+    batopt_title: 'Otimização de bateria',
+    batopt_desc: 'O Android pode restringir o app em segundo plano e afetar GPS, rastreio ao vivo, trilha e câmera.',
+    batopt_allow: 'Permitir sem restrição',
+    batopt_settings: 'Abrir configurações',
+    batopt_ok: 'Sem restrição aplicada',
+
     cad_hint: 'Um bipe por passo: sincronize o pé com o som e ajuste os batimentos ao seu ritmo.',
     cad_mode_timer: '⏱️ No tempo',
     cad_mode_step: '🦶 No seu passo',
@@ -1829,6 +1836,13 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     cad_start: '▶️ Start',
     cad_stop: '⏹️ Stop',
     cad_count: '{n} steps',
+
+    batopt_title: 'Battery optimization',
+    batopt_desc: 'Android may restrict the app in the background and affect GPS, live tracking, track and camera.',
+    batopt_allow: 'Allow unrestricted',
+    batopt_settings: 'Open settings',
+    batopt_ok: 'Unrestricted applied',
+
     cad_hint: 'One beep per step: match your foot to the sound and set the tempo to your pace.',
     cad_mode_timer: '⏱️ On tempo',
     cad_mode_step: '🦶 On your step',
@@ -2880,6 +2894,13 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     cad_start: '▶️ Empezar',
     cad_stop: '⏹️ Parar',
     cad_count: '{n} pasos',
+
+    batopt_title: 'Optimización de batería',
+    batopt_desc: 'Android puede restringir la app en segundo plano y afectar GPS, seguimiento en vivo, ruta y cámara.',
+    batopt_allow: 'Permitir sin restricción',
+    batopt_settings: 'Abrir ajustes',
+    batopt_ok: 'Sin restricción aplicada',
+
     cad_hint: 'Un pitido por paso: sincroniza el pie con el sonido y ajusta el tempo a tu ritmo.',
     cad_mode_timer: '⏱️ Al ritmo',
     cad_mode_step: '🦶 A su paso',
