@@ -673,23 +673,12 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       acelerômetro e magnetômetro, o eixo dominante, magnitude, se está calibrado
       (hard/soft iron efetivo) e um botão "Confirmar eixo". Fecha a ressalva deixada
       no commit `8dc0c59`: em vez de assumir a convenção de eixos, o **aparelho** diz.
-- [ ] **65. 🧭 Auto-detecção da convenção do teodolito** — ao mirar um ponto fixo e
-      inclinar ~90°, se `verticalAngle` tender a 180° em vez de 0°, inverte
-      silenciosamente com aviso ("Convenção de inclinação corrigida") e permite
-      desfazer num toque. Barato, cobre o caso do usuário sem painel completo.
-
-      **Nota (implementação da 19/12/2026):** a análise sugere que a convenção
-      é mesmo invertida. O fixture de `bugfixes.test.ts` aplica `rotX(rest,
-      +deg)` a `rest={x:0,y:0,z:+9,8}` → `y = −9,8·sen deg, z = +9,8·cos deg` e
-      chama a isto "topo elevado", mas a física documentada do Android (leitura
-      em repouso = reação, aponta para cima) dá `y = +9,8·sen deg` quando o
-      topo sobe — e o próprio repo usa esse pressuposto no `restMS`. Ou seja,
-      em hardware o `verticalAngle` devolve **negativo** ao mirar para cima,
-      invertendo a medição da altura e o ângulo do teodolito. Verificação de
-      10 s em campo: na Visão/Altura, apontar o topo para o céu — se marcar
-      positivo, está certo; se marcar negativo, trocar `-lateral` por
-      `+lateral` em `verticalAngle` (HeightView) corrige, e os tests do
-      `bugfixes.test.ts` passam a rodar com o fixture de sinal trocado.
+- [x] **65. 🧭 Auto-detecção da convenção do teodolito** — feito (v7.62/v7.66). Ao
+      apontar o topo para o céu, se `verticalAngle` for claramente negativo
+      (`≤ -45°`), sugere correção com aviso ("Corrigir inclinação (aponte o topo ao
+      céu)") e aplica inversão com persistência (`@bussola/tiltInverted`), com opção
+      de desfazer. Aplica a Altura e ao Teodolito via `applyConvention`, cobre
+      hardware com convenção invertida sem painel completo.
 - [x] **66. 🎙️ Pré-visualizar o que a Kefera ouviu** — feito (v7.66). Exibe a
       transcrição (com confiança baixa) **antes** de executar: "Ouvi: *marcar
       waypoint*. Executar? Corrigir? Cancelar?". Funciona para ativação com comando
