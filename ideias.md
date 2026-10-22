@@ -689,9 +689,14 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       positivo, está certo; se marcar negativo, trocar `-lateral` por
       `+lateral` em `verticalAngle` (HeightView) corrige, e os tests do
       `bugfixes.test.ts` passam a rodar com o fixture de sinal trocado.
-- [ ] **66. 🎙️ Pré-visualizar o que a Kefera ouviu** — exibe a transcrição (com
-      confiança baixa) **antes** de executar: "Ouvi: *marcar waypoint*. Executar?
-      [Sim] [Corrigir]". Evita execuções erradas e facilita o ajuste do wake word.
+- [x] **66. 🎙️ Pré-visualizar o que a Kefera ouviu** — feito (v7.66). Exibe a
+      transcrição (com confiança baixa) **antes** de executar: "Ouvi: *marcar
+      waypoint*. Executar? Corrigir? Cancelar?". Funciona para ativação com comando
+      inline, espera por comando após wake, microfone manual e wake fora de
+      sessão. Botão "Corrigir" joga o texto no campo de digitação para editar.
+      Cláusula: não aplicar a comandos explícitos de "ativa/desativa kefera".
+      Reaproveita o mesmo caminho `send()` e não adiciona estado novo no motor —
+      só o modal pergunta antes de chamar.
 - [x] **67. 🕵️ Segunda chance com confiança baixa** — ✅ feito. Novo
       `assistant/suggest.ts` (puro): distância de Levenshtein + sobreposição de
       palavras dão um "quão perto" entre 0 e 1, comparado contra um catálogo de
