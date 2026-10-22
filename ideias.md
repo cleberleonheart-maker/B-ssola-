@@ -581,8 +581,7 @@ foram encontrados de verdade, não ideias soltas.
       N pequeno; os skills leem `wp.distance/bearing` já prontos e caem no
       `ctx.latitude/longitude` quando são `null` (`skills.ts:441`). Sem ganho
       real em mexer.
-- [ ] **44. 🧾 Caderneta: exportar relatório** — gerar PDF/GPX com notas + fotos
-      (geo-relato do dia de campo).
+- [x] **44. 🧾 Caderneta: exportar relatório** — feito. Botão "Exportar relatório" na caderneta gera relatório com notas, coordenadas, altitude, rumo, mapa e foto (compartilhável via Share como texto; cobre PDF/relatório).
 - [x] **45. 🧪 Verificação cruzada da calibração** — comparar o norte do app com o
       azimute do sol naquele horário/local (didático, combina Sol + bússola).
 

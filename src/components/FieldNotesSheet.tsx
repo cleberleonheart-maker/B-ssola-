@@ -25,6 +25,7 @@ import {
   type FieldNote,
 } from '../services/notesService';
 import { ensureCloudUser, pushNotes } from '../services/cloud';
+import { exportNotesReport } from '../services/noteReport';
 
 type Props = {
   latitude: number;
@@ -51,6 +52,10 @@ const FieldNotesSheet = ({
   const [photoHeading, setPhotoHeading] = useState<number | null>(null);
   const [photoLoading, setPhotoLoading] = useState(false);
   const [cloudMsg, setCloudMsg] = useState<string | null>(null);
+
+  const exportReport = async () => {
+    await exportNotesReport(notes);
+  };
 
   useEffect(() => {
     loadNotes().then(setNotes);
@@ -143,6 +148,11 @@ const FieldNotesSheet = ({
         <Text style={styles.emoji}>📓</Text>
         <Text style={[styles.title, { color: colors.text }]}>{t('fn_title')}</Text>
         <Text style={[styles.hint, { color: colors.textMuted }]}>{t('fn_hint')}</Text>
+        {notes.length > 0 && (
+          <Pressable onPress={exportReport} style={[styles.reportBtn, { borderColor: colors.border }]}>
+            <Text style={[styles.reportTxt, { color: colors.primary }]}>{t('fn_export_report')}</Text>
+          </Pressable>
+        )}
       </View>
 
       {photoPath ? (
@@ -373,6 +383,17 @@ const createStyles = (colors: {
     },
     empty: {
       textAlign: 'center',
+    },
+    reportBtn: {
+      marginTop: spacing.sm,
+      borderWidth: 1,
+      borderRadius: radius.full,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 6,
+    },
+    reportTxt: {
+      fontSize: 12,
+      fontWeight: '800',
     },
     row: {
       flexDirection: 'row',

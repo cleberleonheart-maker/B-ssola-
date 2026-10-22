@@ -1088,6 +1088,7 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     fn_cloud_disabled: 'Nuvem indisponível agora.',
     fn_cloud_fail: 'Falha ao sincronizar anotações.',
     fn_cloud_ok: 'Sincronizado ✓',
+    fn_export_report: 'Exportar relatório (PDF/Texto)',
   },
 
   en: {
@@ -2147,6 +2148,7 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     fn_cloud_disabled: 'Cloud unavailable right now.',
     fn_cloud_fail: 'Failed to sync notes.',
     fn_cloud_ok: 'Synced ✓',
+    fn_export_report: 'Export report (PDF/Text)',
   },
 
   es: {
@@ -3206,5 +3208,6 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     fn_cloud_disabled: 'Nube no disponible ahora.',
     fn_cloud_fail: 'Fallo al sincronizar las notas.',
     fn_cloud_ok: 'Sincronizado ✓',
+    fn_export_report: 'Exportar informe (PDF/Texto)',
   },
 };
