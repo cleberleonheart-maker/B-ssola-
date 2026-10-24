@@ -84,6 +84,7 @@ export const TriangulationView = ({
   const [error, setError] = useState<string | null>(null);
   const [added, setAdded] = useState(false);
   const [name, setName] = useState('');
+  const [tab, setTab] = useState<'rays' | 'wp'>('rays');
 
   const recordSight = useCallback(() => {
     if (!hasFix) return;
@@ -227,6 +228,8 @@ export const TriangulationView = ({
           {t('tri_reset')}
         </Text>
       </Pressable>
+      </>
+      )}
     </View>
   );
 };

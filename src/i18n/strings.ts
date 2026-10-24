@@ -3211,3 +3211,35 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     fn_export_report: 'Exportar informe (PDF/Texto)',
   },
 };
+    // Sos/Beacons/Queda
+    emerg_contact: 'Contato de emergência',
+    emerg_beacon: 'Beacon de emergência (SMS)',
+    emerg_beacon_enable: 'Enviar beacon por SMS',
+    emerg_beacon_interval: 'Intervalo do beacon (minutos)',
+    emerg_beacon_hint: 'Envia localização/bateria/rede por SMS ao contato salvo.',
+    fall_detect: 'Detecção de queda',
+    fall_detect_enable: 'Ativar detecção de queda',
+    fall_detect_hint: 'Ao detectar queda forte + imobilidade, sugere SOS.',
+    sos_beacon_send: 'Enviar beacon agora',
+    sos_beacon_sent: 'Beacon enviado',
+    sos_beacon_no_contact: 'Sem contato de emergência configurado',
+
+    // Triangulação por marcadores
+    tri_tab_rays: 'Por rumos',
+    tri_tab_wp: 'Por marcadores',
+    tri_wp_title: 'Triangulação por marcadores',
+    tri_wp_hint: 'Mire dois marcos e grave o rumo para estimar posição.',
+    tri_sight1: 'Gravar rumo 1',
+    tri_sight2: 'Gravar rumo 2',
+    tri_calc: 'Calcular posição',
+    tri_add: 'Adicionar como ponto',
+    tri_added: 'Ponto adicionado',
+    tri_reset: 'Reiniciar',
+    tri_parallel: 'Rumos paralelos ou incompatíveis',
+    tri_default_name: 'Ponto triangulado',
+    tri_no_gps: 'Sem GPS',
+
+    // Modo rápido (Kefera)
+    kefera_say_open: 'Abrir modo',
+    kefera_mode_metal: 'detector',
+    kefera_mode_sun: 'sol',

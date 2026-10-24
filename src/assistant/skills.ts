@@ -11,6 +11,7 @@ import type { DisplayMode } from '../services/preferencesService';
 import { getTotals } from '../services/odometerService';
 import { loadTracks, type RecordedTrack } from '../services/trackService';
 import type { AssistantAction, AssistantContextData } from './types';
+import { modeSwitchSkill } from './modeSwitchSkill';
 
 export type SkillOutput =
   | string
@@ -866,6 +867,7 @@ const skills: Skill[] = [
   odometerSkill,
   speedSkill,
   switchModeSkill,
+  modeSwitchSkill,
   modeSkill,
   timeSkill,
   dateSkill,

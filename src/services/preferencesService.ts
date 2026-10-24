@@ -286,3 +286,43 @@ export const saveLockPin = async (pin: string) => {
 export const clearLockPin = async () => {
   await AsyncStorage.removeItem(LOCK_PIN_KEY);
 };
+const EMERG_CONTACT_KEY = '@bussola/emergContact';
+const EMERG_BEACON_ENABLED_KEY = '@bussola/emergBeaconEnabled';
+const EMERG_BEACON_INTERVAL_KEY = '@bussola/emergBeaconInterval';
+
+export const loadEmergencyContact = async (): Promise<string> => {
+  try {
+    return (await AsyncStorage.getItem(EMERG_CONTACT_KEY)) || '';
+  } catch {
+    return '';
+  }
+};
+
+export const saveEmergencyContact = async (v: string) => {
+  await AsyncStorage.setItem(EMERG_CONTACT_KEY, v || '');
+};
+
+export const loadBeaconEnabled = async (): Promise<boolean> => {
+  try {
+    return (await AsyncStorage.getItem(EMERG_BEACON_ENABLED_KEY)) === '1';
+  } catch {
+    return false;
+  }
+};
+
+export const saveBeaconEnabled = async (enabled: boolean) => {
+  await AsyncStorage.setItem(EMERG_BEACON_ENABLED_KEY, enabled ? '1' : '0');
+};
+
+export const loadBeaconInterval = async (): Promise<number> => {
+  try {
+    const raw = Number(await AsyncStorage.getItem(EMERG_BEACON_INTERVAL_KEY));
+    return Number.isFinite(raw) && raw >= 5 ? raw : 30;
+  } catch {
+    return 30;
+  }
+};
+
+export const saveBeaconInterval = async (m: number) => {
+  await AsyncStorage.setItem(EMERG_BEACON_INTERVAL_KEY, String(Math.max(5, Math.round(m))));
+};

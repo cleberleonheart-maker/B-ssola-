@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
 import { useTheme, useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
+import { isBiometricAvailable, authenticateBiometric } from '../services/biometric';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'];
 
@@ -23,6 +24,28 @@ const LockScreen = ({ onUnlock }: Props) => {
   const { t } = useLanguage();
   const [entered, setEntered] = useState('');
   const [error, setError] = useState(false);
+  const [bioAvailable, setBioAvailable] = useState(false);
+
+  useEffect(() => {
+    void isBiometricAvailable().then(setBioAvailable);
+  }, []);
+
+  const doBiometric = useCallback(async () => {
+    const ok = await authenticateBiometric(
+      t('lock_screen_title'),
+      t('lock_screen_sub'),
+      t('lock_clear'),
+    );
+    if (ok) {
+      onUnlock('');
+    }
+  }, [onUnlock, t]);
+
+  useEffect(() => {
+    if (bioAvailable) {
+      void doBiometric();
+    }
+  }, [bioAvailable, doBiometric]);
 
   const press = useCallback(
     (key: string) => {
@@ -79,44 +102,62 @@ const LockScreen = ({ onUnlock }: Props) => {
           </Text>
         )}
 
-        <View style={styles.keypad}>
-          {KEYS.map((key, i) => (
+          <View style={styles.keypad}>
+            {KEYS.map((key, i) => (
+              <Pressable
+                key={`${key}-${i}`}
+                onPress={() => press(key)}
+                disabled={key === ''}
+                style={({ pressed }) => [
+                  styles.key,
+                  {
+                    backgroundColor: pressed
+                      ? colors.surfaceAlt
+                      : theme === 'dark'
+                        ? colors.surface
+                        : '#0000000c',
+                  },
+                  key === '' && styles.keyEmpty,
+                ]}>
+                {key !== '' && (
+                  <Text style={[styles.keyText, { color: colors.text }]}>
+                    {key}
+                  </Text>
+                )}
+              </Pressable>
+            ))}
+            {bioAvailable && (
+              <Pressable
+                onPress={() => {
+                  void doBiometric();
+                }}
+                style={({ pressed }) => [
+                  styles.key,
+                  {
+                    backgroundColor: pressed
+                      ? colors.surfaceAlt
+                      : theme === 'dark'
+                        ? colors.surface
+                        : '#0000000c',
+                  },
+                ]}>
+                <Text style={[styles.keyText, { color: colors.text }]}>👆</Text>
+              </Pressable>
+            )}
             <Pressable
-              key={`${key}-${i}`}
-              onPress={() => press(key)}
-              disabled={key === ''}
+              onPress={() => {
+                setEntered('');
+                setError(false);
+              }}
               style={({ pressed }) => [
-                styles.key,
-                {
-                  backgroundColor: pressed
-                    ? colors.surfaceAlt
-                    : theme === 'dark'
-                      ? colors.surface
-                      : '#0000000c',
-                },
-                key === '' && styles.keyEmpty,
+                styles.clearButton,
+                { opacity: pressed ? 0.6 : 1 },
               ]}>
-              {key !== '' && (
-                <Text style={[styles.keyText, { color: colors.text }]}>
-                  {key}
-                </Text>
-              )}
+              <Text style={[styles.clearText, { color: colors.textMuted }]}>
+                {t('lock_clear')}
+              </Text>
             </Pressable>
-          ))}
-          <Pressable
-            onPress={() => {
-              setEntered('');
-              setError(false);
-            }}
-            style={({ pressed }) => [
-              styles.clearButton,
-              { opacity: pressed ? 0.6 : 1 },
-            ]}>
-            <Text style={[styles.clearText, { color: colors.textMuted }]}>
-              {t('lock_clear')}
-            </Text>
-          </Pressable>
-        </View>
+          </View>
       </View>
     </View>
   );

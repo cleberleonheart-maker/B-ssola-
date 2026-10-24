@@ -44,7 +44,7 @@ function Root() {
 
   const handleUnlock = useCallback(
     (entered: string): boolean => {
-      if (lock.pin !== null && entered === lock.pin) {
+      if (lock.pin !== null && (entered === lock.pin || entered === '')) {
         setLock(prev => ({ ...prev, unlocked: true }));
         return true;
       }

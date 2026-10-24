@@ -33,6 +33,7 @@ class MainApplication : Application(), ReactApplication {
           add(KeepAwakePackage())
           add(BatteryOptPackage())
           add(NetworkInfoPackage())
+          add(BiometricPackage())
         },
     )
   }
