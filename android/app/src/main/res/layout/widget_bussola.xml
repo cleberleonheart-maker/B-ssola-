@@ -71,4 +71,21 @@
             android:fontFamily="sans-serif"
             android:gravity="end" />
     </LinearLayout>
+
+    <!-- Botão do rastreio ao vivo (ideia #105). Quando há sessão a correr, para
+         o serviço sem abrir a app; quando não há, abre a app no SOS, que é
+         onde a sessão e o link são criados. -->
+    <TextView
+        android:id="@+id/widget_share"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/widget_share_button"
+        android:gravity="center"
+        android:paddingVertical="6dp"
+        android:text="@string/widget_share_start"
+        android:textColor="#0B1015"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:fontFamily="sans-serif-medium" />
 </LinearLayout>

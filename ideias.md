@@ -140,8 +140,17 @@
       altura fixa de sempre. Os cardeais N/E/S/O passam a desenhar-se na linha
       do horizonte. Helpers puros (e testados) em `utils/compass.ts`:
       `viewElevationDeg`, `verticalFovDeg`, `markerTopPct`.
-- [ ] **13. Calibração pela Estrela Polar** — usar Polaris para o norte geográfico quando
-      visível.
+- [x] **13. Calibração pela Estrela Polar** — ✅ feito: as definições da bússola
+      ganharam "⭐ Calibrar pela Estrela Polar". `utils/astro.ts` calcula onde
+      está a Polaris (J2000 + precessão IAU 1976, sem nutação: a estrela está
+      a menos de meio grau do polo e desloca-se ~50"/ano); a altitude dela é a
+      latitude e o azimute é o norte verdadeiro. A mira (`utils/polaris.ts` +
+      `PolarisCalibrationModal`) diz quanto falta para virar e para levantar o
+      telefone (com a câmara do eixo −Z, em retrato) e, quando o alvo está no
+      centro, mede a declinação por 3 s de média: `verdadeiro − magnético`,
+      com a convenção "leste positivo" da app. A partir de 44° de latitude a
+      estrela fica alta demais para o telefone e a app diz que não dá — melhor
+      do que um número errado.
 - [ ] **14. Tiles Android** — quick-settings tile para abrir direto num modo.
 - [x] **15. Tema automático** — ✅ feito: opção "Automático" no grid de tema, com
       três estratégias (Claro/Escuro por horário 6h–18h; Sol forte/Noturno por
@@ -1331,10 +1340,13 @@ a nota de cada uma diz o que a distingue da ideia vizinha.
       já dizia "indisponível"; o alarme simplesmente nunca dispara, sem erro.
       12 testes em `pressureAlarm.test.ts` (regra, janelas, futuro/relógio torto,
       throttle e assinatura da série).
-- [ ] **105. 🧭 Partilhar a posição a partir do widget** — o widget mostra
-      rumo, pressão e temperatura, e é só leitura. Um botão nele (ou um atalho
-      no `quick settings`, que é a #14 — aqui é o widget da tela inicial) para
-      arrancar/parar o rastreio é o que um SOS pede: o telemóvel está na mão,
-      a app não. A infra já está toda do lado de dentro — `startLiveShare`,
-      o serviço em primeiro plano e a notificação com "Parar" existem; o que
-      falta é o `WidgetBridge` ganhar uma ação em vez de só texto.
+- [x] **105. 🧭 Partilhar a posição a partir do widget** — ✅ feito: o widget do
+      rumo tem um botão. Com o rastreio a correr, o botão **pára o serviço
+      sem abrir a app** (o mesmo `ACTION_STOP` da notificação, via
+      `PendingIntent.getService`) e o estado do rastreio é escrito nas
+      preferências do widget pelo `WidgetBridge` — o serviço também grava
+      "parado" quando acaba, para o botão não ficar a mentir. Sem sessão a
+      correr, o botão abre a app no ecra de emergência pelo atalho
+      `bussola://sos` (intent-filter no manifesto + `Linking` no JS), que é
+      onde a sessão e o link de partilha são criados: as credenciais vivem no
+      JavaScript e um link novo não se inventa num botão do widget.

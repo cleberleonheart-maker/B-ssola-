@@ -57,6 +57,15 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
+        <!-- Atalho do widget para o SOS (ideia #105): o botão "Partilhar" do
+             widget abre a app já no ecrã de emergência, que é onde a sessão e
+             o link de partilha são criados. -->
+        <intent-filter>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="bussola" android:host="sos" />
+        </intent-filter>
       </activity>
 
       <!-- Mantem o processo em foreground durante o rastreio ao vivo -->

@@ -75,6 +75,67 @@ const raDecFromEcliptic = (eclLon: number, eclLat: number, T: number) => {
   };
 };
 
+/**
+ * Precessão de J2000 para a data (IAU 1976, sem nutação).
+ *
+ * A estrela não está fixa no céu: o polo celeste desloca-se ~50" por ano e
+ * Polaris, que está a menos de meio grau do polo, é a estrela que mais se
+ * move. Para uma bússola de bolso isso seria irrelevante; para uma mira de
+ * calibração, onde se aponta o telefone a uma estrela a um grau do norte
+ * verdadeiro, é a diferença entre "meio grau a mais" e "meio grau a menos".
+ *
+ * A fórmula é a de Meeus (cap. 21): três rotações em torno dos eixos z, y, z.
+ */
+const precess = (ra: number, dec: number, t: number): RaDec => {
+  const zeta = (2306.2181 * t + 0.30188 * t * t + 0.017998 * t ** 3) / 3600;
+  const z = (2306.2181 * t + 1.09468 * t * t + 0.018203 * t ** 3) / 3600;
+  const theta = (2004.3109 * t - 0.42665 * t * t - 0.041833 * t ** 3) / 3600;
+
+  const a = toRad(ra);
+  const d = toRad(dec);
+  const zetaRad = toRad(zeta);
+  const thetaRad = toRad(theta);
+
+  const A = Math.cos(d) * Math.sin(a + zetaRad);
+  const B =
+    Math.cos(thetaRad) * Math.cos(d) * Math.cos(a + zetaRad) -
+    Math.sin(thetaRad) * Math.sin(d);
+  const C =
+    Math.sin(thetaRad) * Math.cos(d) * Math.cos(a + zetaRad) +
+    Math.cos(thetaRad) * Math.sin(d);
+
+  return {
+    rightAscension: wrap360(toDeg(Math.atan2(A, B)) + z),
+    declination: toDeg(Math.asin(Math.max(-1, Math.min(1, C)))),
+  };
+};
+
+/**
+ * Polaris (a estrela polar), em J2000: RA 2h31m49.09s, Dec +89°15'50.8".
+ *
+ * É a estrela perto do polo celeste: a sua altura sobre o horizonte é,
+ * para todos os efeitos, a latitude de quem está a olhar, e o seu azimute é
+ * o norte verdadeiro — é o que permite calibrar a bússola sem tabela de
+ * declinação nenhuma (ideia #13).
+ */
+const POLARIS_J2000: RaDec = {
+  rightAscension: 37.954542,
+  declination: 89.264111,
+};
+
+/**
+ * Onde está a Polaris agora, para quem está em `lat`/`lon`.
+ *
+ * A altura deve ser a latitude e o azimute deve ser o norte (a menos de
+ * meio grau, que é a distância de Polaris ao polo em 2026). É isso que a
+ * mira de calibração usa para saber para onde apontar.
+ */
+export const polarisPosition = (date: Date, lat: number, lon: number) => {
+  const t = toDays(date) / 36525;
+  const rd = precess(POLARIS_J2000.rightAscension, POLARIS_J2000.declination, t);
+  return horizonCoords(rd, date, lat, lon);
+};
+
 export const solarPosition = (date: Date, lat: number, lon: number) => {
   const d = toDays(date);
   const g = toRad(wrap360(357.5291 + 0.98560028 * d));

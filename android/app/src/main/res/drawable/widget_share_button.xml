@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Botão do widget: fundo escuro com o texto claro, para se ler no ecrã
+     principal sem depender do tema do sistema. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#4FC3F7" />
+    <corners android:radius="18dp" />
+</shape>

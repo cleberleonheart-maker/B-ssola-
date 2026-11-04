@@ -21,4 +21,8 @@
     <string name="alerts_channel_name">Alertas civis</string>
     <string name="alerts_channel_desc">Avisos de tempestade e risco da sua região</string>
     <string name="alerts_fallback_text">Alerta meteorológico na sua região.</string>
+    <!-- Widget: botão do rastreio ao vivo (ideia #105). -->
+    <string name="widget_share_start">📡 Partilhar localização</string>
+    <string name="widget_share_stop">🛑 Parar rastreio</string>
+    <string name="widget_share_active">📡 A partilhar a localização</string>
 </resources>

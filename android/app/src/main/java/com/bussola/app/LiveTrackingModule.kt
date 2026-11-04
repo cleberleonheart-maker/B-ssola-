@@ -345,6 +345,10 @@ class LiveTrackingService : Service(), SensorEventListener {
     handler.removeCallbacks(expiryTick)
     stopUpdates()
     ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+    // O widget mostra "Parar" enquanto há sessão a correr. Sem isto, quem
+    // parou o rastreio pelo próprio widget ficava com um botão que já não
+    // fazia nada (ideia #105).
+    WidgetBridgeModule.setShareState(this, false, 0L)
     stopSelf()
   }
 

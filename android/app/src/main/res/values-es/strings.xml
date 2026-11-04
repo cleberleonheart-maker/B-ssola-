@@ -17,4 +17,7 @@
     <string name="alerts_channel_name">Alertas civiles</string>
     <string name="alerts_channel_desc">Avisos de tormenta y riesgo en tu región</string>
     <string name="alerts_fallback_text">Alerta meteorológica en tu región.</string>
+    <string name="widget_share_start">📡 Compartir ubicación</string>
+    <string name="widget_share_stop">🛑 Parar rastreo</string>
+    <string name="widget_share_active">📡 Compartiendo tu ubicación</string>
 </resources>

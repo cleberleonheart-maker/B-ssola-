@@ -8,6 +8,7 @@ import {
   useWindowDimensions,
   Alert,
   AppState,
+  Linking,
   Share,
   Vibration,
   type LayoutChangeEvent,
@@ -20,6 +21,7 @@ import {
   SensorTypes,
 } from 'react-native-sensors';
 import CalibrationModal from '../components/CalibrationModal';
+import PolarisCalibrationModal from '../components/PolarisCalibrationModal';
 import SettingsModal from '../components/SettingsModal';
 import WaypointModal from '../components/WaypointModal';
 import AlertsModal from '../components/AlertsModal';
@@ -227,8 +229,28 @@ const CompassScreen = () => {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [coordVisible, setCoordVisible] = useState(false);
   const [calibrationVisible, setCalibrationVisible] = useState(false);
+  const [polarisVisible, setPolarisVisible] = useState(false);
   const [alertsVisible, setAlertsVisible] = useState(false);
   const [emergencyVisible, setEmergencyVisible] = useState(false);
+
+  /*
+   * Atalho do widget para o SOS (ideia #105): o botão "Partilhar" do widget
+   * abre a app com `bussola://sos`, e a app abre já no ecrã de emergência —
+   * que é onde a sessão e o link de partilha são criados. Sem este tratamento
+   * o atalho abria a app na bússola, e a pessoa teria de ir buscar o SOS.
+   */
+  useEffect(() => {
+    const abrir = (url: string | null | undefined) => {
+      if (url && url.startsWith('bussola://sos')) {
+        setEmergencyVisible(true);
+      }
+    };
+    Linking.getInitialURL()
+      .then(abrir)
+      .catch(() => {});
+    const sub = Linking.addEventListener('url', ({ url }) => abrir(url));
+    return () => sub.remove();
+  }, []);
   const alertsCheckedRef = useRef(false);
   const notifiedAlertsRef = useRef(new Set<string>());
   const [calibrated, setCalibrated] = useState(false);
@@ -1676,6 +1698,7 @@ const CompassScreen = () => {
         onSelectMode={selectMode}
         calibrated={calibrated}
         onOpenCalibration={openCalibration}
+        onOpenPolaris={() => setPolarisVisible(true)}
         appMode={appMode}
         onSelectAppMode={selectAppMode}
         declination={declination}
@@ -1715,6 +1738,16 @@ const CompassScreen = () => {
         longitude={location.longitude}
         declinationEnabled={declination.enabled}
         declinationDegrees={declination.degrees}
+      />
+
+      <PolarisCalibrationModal
+        visible={polarisVisible}
+        onClose={() => setPolarisVisible(false)}
+        onSave={degrees => setDeclination({ enabled: true, degrees })}
+        latitude={location.latitude}
+        longitude={location.longitude}
+        calibration={calibration}
+        currentDegrees={declination.degrees}
       />
 
       <WaypointModal

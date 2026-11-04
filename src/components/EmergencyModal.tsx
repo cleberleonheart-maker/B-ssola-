@@ -43,6 +43,7 @@ import { hasLocationFix } from '../utils/geo';
 import { formatAltitude, formatAccuracy } from '../utils/units';
 import { getBatteryLevel } from '../services/battery';
 import { getNetworkInfo } from '../services/network';
+import { setWidgetShareState } from '../services/widgetService';
 import { loadEmergencyContact } from '../services/preferencesService';
 import {
   buildMessage,
@@ -386,6 +387,9 @@ const EmergencyModal = ({
       }
       const owner = await ensureService(s, true);
       startTicker(s, owner);
+      // O widget passa a dizer "Parar" (ideia #105): quem o tiver no ecrã
+      // principal pode cortar o rastreio sem abrir a app.
+      setWidgetShareState(true, Date.now());
       try {
         await Share.share({
           message:
@@ -409,6 +413,7 @@ const EmergencyModal = ({
       void stopLiveTracking();
       sessionRef.current = null;
       setLiveSession(null);
+      setWidgetShareState(false, 0);
     } finally {
       setLiveBusy(false);
     }

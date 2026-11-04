@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.widget.RemoteViews
 
 class BussolaWidgetProvider : AppWidgetProvider() {
@@ -64,6 +65,7 @@ class BussolaWidgetProvider : AppWidgetProvider() {
         "--°C"
       },
     )
+
     val open = PendingIntent.getActivity(
       context,
       0,
@@ -71,6 +73,54 @@ class BussolaWidgetProvider : AppWidgetProvider() {
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
     views.setOnClickPendingIntent(R.id.widget_heading, open)
+
+    /*
+     * Botão do rastreio ao vivo (ideia #105).
+     *
+     * Com uma sessão a correr, o botão pára o serviço — e pála sem abrir a
+     * app, que é o que um SOS precisa: o telemóvel está na mão e a app
+     * fechada. Sem sessão, o botão abre a app no SOS, que é onde a sessão e
+     * o link de partilha são criados (as credenciais vivem no JavaScript e
+     * um link novo não se inventa no botão).
+     */
+    val sharing = prefs.getBoolean("share_active", false)
+    views.setTextViewText(
+      R.id.widget_share,
+      if (sharing) {
+        context.getString(R.string.widget_share_stop)
+      } else {
+        context.getString(R.string.widget_share_start)
+      },
+    )
+    views.setInt(
+      R.id.widget_share,
+      "setBackgroundResource",
+      if (sharing) R.drawable.widget_share_button_stop else R.drawable.widget_share_button,
+    )
+    views.setOnClickPendingIntent(
+      R.id.widget_share,
+      if (sharing) {
+        PendingIntent.getService(
+          context,
+          2,
+          Intent(context, LiveTrackingService::class.java).setAction(LiveTracking.ACTION_STOP),
+          PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+      } else {
+        PendingIntent.getActivity(
+          context,
+          3,
+          Intent(
+            Intent.ACTION_VIEW,
+            Uri.parse("bussola://sos"),
+            context,
+            MainActivity::class.java,
+          ),
+          PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+      },
+    )
+
     AppWidgetManager.getInstance(context).updateAppWidget(appWidgetId, views)
   }
 

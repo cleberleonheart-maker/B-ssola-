@@ -17,4 +17,7 @@
     <string name="alerts_channel_name">Civil alerts</string>
     <string name="alerts_channel_desc">Storm and risk warnings for your area</string>
     <string name="alerts_fallback_text">Weather alert for your area.</string>
+    <string name="widget_share_start">📡 Share location</string>
+    <string name="widget_share_stop">🛑 Stop tracking</string>
+    <string name="widget_share_active">📡 Sharing your location</string>
 </resources>

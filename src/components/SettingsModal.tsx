@@ -52,6 +52,7 @@ type Props = {
   onSelectMode: (mode: LocationMode) => void;
   calibrated: boolean;
   onOpenCalibration: () => void;
+  onOpenPolaris: () => void;
   appMode: AppMode;
   onSelectAppMode: (mode: AppMode) => void;
   declination: Declination;
@@ -94,6 +95,7 @@ const SettingsModal = ({
   onSelectMode,
   calibrated,
   onOpenCalibration,
+  onOpenPolaris,
   appMode,
   onSelectAppMode,
   declination,
@@ -431,6 +433,7 @@ const SettingsModal = ({
               <CompassSection
                 calibrated={calibrated}
                 onOpenCalibration={onOpenCalibration}
+                onOpenPolaris={onOpenPolaris}
                 declination={declination}
                 onSetDeclination={onSetDeclination}
                 declinationSuggest={declinationSuggest}

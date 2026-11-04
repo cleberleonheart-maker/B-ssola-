@@ -21,6 +21,7 @@ export type Suggest = { city: string; uf: string; decl: number } | null;
 type Props = {
   calibrated: boolean;
   onOpenCalibration: () => void;
+  onOpenPolaris: () => void;
   declination: Declination;
   onSetDeclination: (decl: Declination) => void;
   declinationSuggest: Suggest;
@@ -47,6 +48,7 @@ const CompassSection = (props: Props) => {
   const {
     calibrated,
     onOpenCalibration,
+    onOpenPolaris,
     declination,
     onSetDeclination,
     declinationSuggest,
@@ -127,6 +129,17 @@ const CompassSection = (props: Props) => {
               </Text>
             </Pressable>
           )}
+
+          {/*
+            A tabela de cidades é uma aproximação: quem está a 30 km do
+            ponto de referência fica com a declinação errada em graus. A
+            Estrela Polar mede-a no sitio, à noite, sem tabela nenhuma.
+          */}
+          <Pressable onPress={onOpenPolaris} style={styles.suggestButton}>
+            <Text style={[styles.suggestText, { color: colors.primary }]}>
+              {t('set_polaris')}
+            </Text>
+          </Pressable>
         </GroupRow>
 
         <SwitchRow
