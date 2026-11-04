@@ -34,6 +34,7 @@ import {
 import {
   showAlertNotification,
   showPressureDropNotification,
+  showBeaconNotification,
 } from '../services/notifications';
 import { useThemeColors, useTheme } from '../theme/ThemeContext';
 import { useAssistant } from '../assistant/AssistantContext';
@@ -98,9 +99,22 @@ import {
   clearLockPin,
   loadKeepAwake,
   saveKeepAwake,
+  loadEmergencyContact,
+  saveEmergencyContact,
+  loadBeaconEnabled,
+  saveBeaconEnabled,
+  loadBeaconInterval,
+  saveBeaconInterval,
+  loadBeaconLastSent,
+  saveBeaconLastSent,
+  clearBeaconLastSent,
+  loadFallDetectionEnabled,
+  saveFallDetectionEnabled,
   type AppMode,
   type DisplayMode,
 } from '../services/preferencesService';
+import { startFallDetection, stopFallDetection } from '../services/fallDetection';
+import { startBeaconLoop } from '../services/beaconLoop';
 import { setKeepScreenOn } from '../services/keepAwake';
 import { buildBackup, applyBackup, type BackupMode } from '../services/backupService';
 import { syncAllCollections, syncWaypoints } from '../services/cloudSync';
@@ -308,6 +322,13 @@ const CompassScreen = () => {
   const [virtualWpId, setVirtualWpId] = useState<string | null>(null);
   const [voiceGuide, setVoiceGuide] = useState(false);
   const [keepAwake, setKeepAwake] = useState(false);
+  // Beacon de emergência (ideia #6) e detecção de queda (ideia #7).
+  const [beaconEnabled, setBeaconEnabled] = useState(false);
+  const [emergencyContact, setEmergencyContact] = useState('');
+  const [beaconIntervalMinutes, setBeaconIntervalMinutes] = useState(30);
+  const [fallDetection, setFallDetection] = useState(false);
+  const fallPromptRef = useRef(false);
+  const beaconPromptRef = useRef(false);
   const [arrived, setArrived] = useState(false);
   const arrivedWpRef = useRef<string | null>(null);
   const lastSpokeRef = useRef(0);
@@ -353,6 +374,10 @@ const CompassScreen = () => {
       setUnitSystemState(units);
     });
     loadKeepAwake().then(setKeepAwake);
+    loadEmergencyContact().then(setEmergencyContact);
+    loadBeaconEnabled().then(setBeaconEnabled);
+    loadBeaconInterval().then(setBeaconIntervalMinutes);
+    loadFallDetectionEnabled().then(setFallDetection);
   }, []);
 
   // tela sempre acesa: aplica na janela da Activity sempre que o toggle (ou a
@@ -432,6 +457,107 @@ const CompassScreen = () => {
       return next;
     });
   }, []);
+
+  const toggleBeacon = useCallback((enabled: boolean) => {
+    setBeaconEnabled(enabled);
+    saveBeaconEnabled(enabled).catch(() => {});
+    // Ligar o beacon conta como pedir um aviso: o primeiro não espera o
+    // intervalo inteiro.
+    if (enabled) {
+      clearBeaconLastSent().catch(() => {});
+    }
+  }, []);
+
+  const changeEmergencyContact = useCallback((contact: string) => {
+    setEmergencyContact(contact);
+    saveEmergencyContact(contact).catch(() => {});
+  }, []);
+
+  const changeBeaconInterval = useCallback((minutes: number) => {
+    setBeaconIntervalMinutes(minutes);
+    saveBeaconInterval(minutes).catch(() => {});
+  }, []);
+
+  const toggleFallDetection = useCallback((enabled: boolean) => {
+    setFallDetection(enabled);
+    saveFallDetectionEnabled(enabled).catch(() => {});
+    fallPromptRef.current = false;
+  }, []);
+
+  /**
+   * Detecção de queda (ideia #7).
+   *
+   * O acelerómetro leva um embate e o aparelho fica parado: a app pergunta se
+   * foi queda e oferece o SOS. A pergunta — e não o envio — é a decisão de
+   * quem tem o telemóvel na mão; quem caiu não tem.
+   */
+  useEffect(() => {
+    if (!fallDetection) {
+      stopFallDetection();
+      return;
+    }
+    startFallDetection(() => {
+      if (fallPromptRef.current) return;
+      fallPromptRef.current = true;
+      Alert.alert(t('fall_detect_alert_title'), t('fall_detect_alert_body'), [
+        {
+          text: t('fall_detect_later'),
+          style: 'cancel',
+          onPress: () => {
+            fallPromptRef.current = false;
+          },
+        },
+        {
+          text: t('fall_detect_send_sos'),
+          onPress: () => {
+            fallPromptRef.current = false;
+            setEmergencyVisible(true);
+          },
+        },
+      ]);
+    });
+    return () => {
+      stopFallDetection();
+    };
+  }, [fallDetection, t]);
+
+  /**
+   * Ciclo do beacon (ideia #6).
+   *
+   * Quando chega a hora, o aviso sai por notificação (o telemóvel está
+   * muitas vezes no bolso) e, se a app estiver à frente, também por diálogo,
+   * com o botão que abre o SOS.
+   */
+  useEffect(() => {
+    if (!beaconEnabled || !emergencyContact) return;
+    const stop = startBeaconLoop({
+      intervalMinutes: beaconIntervalMinutes,
+      getLastSentAt: loadBeaconLastSent,
+      markNotified: saveBeaconLastSent,
+      onDue: () => {
+        void showBeaconNotification(t);
+        if (beaconPromptRef.current) return;
+        beaconPromptRef.current = true;
+        Alert.alert(t('beacon_due_title'), t('beacon_due_body'), [
+          {
+            text: t('fall_detect_later'),
+            style: 'cancel',
+            onPress: () => {
+              beaconPromptRef.current = false;
+            },
+          },
+          {
+            text: t('sos_beacon_send'),
+            onPress: () => {
+              beaconPromptRef.current = false;
+              setEmergencyVisible(true);
+            },
+          },
+        ]);
+      },
+    });
+    return stop;
+  }, [beaconEnabled, emergencyContact, beaconIntervalMinutes, t]);
 
   const setDeclination = useCallback((decl: Declination) => {
     declinationRef.current = decl;
@@ -1532,6 +1658,7 @@ const CompassScreen = () => {
           onOpenCalibration={openCalibration}
           onAddWaypoint={addWaypoint}
           onAddRemoteWaypoint={addRemoteWaypoint}
+          waypoints={waypoints}
           statusPanels={statusPanels}
         />
       )}
@@ -1561,6 +1688,14 @@ const CompassScreen = () => {
         onToggleKeepAwake={toggleKeepAwake}
         onVerifyPin={handleVerifyPin}
         onSetPin={handleSetPin}
+        beaconEnabled={beaconEnabled}
+        onToggleBeacon={toggleBeacon}
+        emergencyContact={emergencyContact}
+        onChangeEmergencyContact={changeEmergencyContact}
+        beaconIntervalMinutes={beaconIntervalMinutes}
+        onChangeBeaconInterval={changeBeaconInterval}
+        fallDetection={fallDetection}
+        onToggleFallDetection={toggleFallDetection}
         onExportBackup={handleExportBackup}
         onApplyBackup={handleApplyBackup}
       />
@@ -1612,6 +1747,9 @@ const CompassScreen = () => {
         location={location}
         heading={heading}
         place={place}
+        onBeaconSent={() => {
+          saveBeaconLastSent().catch(() => {});
+        }}
       />
     </SafeAreaView>
   );

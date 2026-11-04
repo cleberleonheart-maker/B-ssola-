@@ -16,9 +16,11 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'];
 
 type Props = {
   onUnlock: (pin: string) => boolean;
+  /** A biometria pode estar desligada nas Configurações. */
+  biometricEnabled?: boolean;
 };
 
-const LockScreen = ({ onUnlock }: Props) => {
+const LockScreen = ({ onUnlock, biometricEnabled = true }: Props) => {
   const { theme } = useTheme();
   const colors = useThemeColors();
   const { t } = useLanguage();
@@ -29,6 +31,8 @@ const LockScreen = ({ onUnlock }: Props) => {
   useEffect(() => {
     void isBiometricAvailable().then(setBioAvailable);
   }, []);
+
+  const canUseBio = bioAvailable && biometricEnabled;
 
   const doBiometric = useCallback(async () => {
     const ok = await authenticateBiometric(
@@ -42,10 +46,10 @@ const LockScreen = ({ onUnlock }: Props) => {
   }, [onUnlock, t]);
 
   useEffect(() => {
-    if (bioAvailable) {
+    if (canUseBio) {
       void doBiometric();
     }
-  }, [bioAvailable, doBiometric]);
+  }, [canUseBio, doBiometric]);
 
   const press = useCallback(
     (key: string) => {
@@ -126,7 +130,7 @@ const LockScreen = ({ onUnlock }: Props) => {
                 )}
               </Pressable>
             ))}
-            {bioAvailable && (
+            {canUseBio && (
               <Pressable
                 onPress={() => {
                   void doBiometric();

@@ -11,7 +11,6 @@ import type { DisplayMode } from '../services/preferencesService';
 import { getTotals } from '../services/odometerService';
 import { loadTracks, type RecordedTrack } from '../services/trackService';
 import type { AssistantAction, AssistantContextData } from './types';
-import { modeSwitchSkill } from './modeSwitchSkill';
 
 export type SkillOutput =
   | string
@@ -552,6 +551,30 @@ const MODE_ALIASES: { mode: DisplayMode; terms: string[] }[] = [
     mode: 'cadence',
     terms: ['metronomo', 'cadencia', 'ritmo de passo', 'passos por minuto'],
   },
+  {
+    mode: 'map',
+    terms: ['mapa', 'map'],
+  },
+  {
+    mode: 'height',
+    terms: ['altura', 'height', 'medir altura'],
+  },
+  {
+    mode: 'car',
+    terms: ['meu carro', 'carro', 'car'],
+  },
+  {
+    mode: 'tri',
+    terms: ['triangulacao', 'triangulo', 'tri'],
+  },
+  {
+    mode: 'selftest',
+    terms: ['autoteste', 'teste de campo', 'selftest'],
+  },
+  {
+    mode: 'diag',
+    terms: ['diagnostico', 'diag'],
+  },
 ];
 
 const MODE_ARTICLES = new Set([
@@ -867,7 +890,6 @@ const skills: Skill[] = [
   odometerSkill,
   speedSkill,
   switchModeSkill,
-  modeSwitchSkill,
   modeSkill,
   timeSkill,
   dateSkill,

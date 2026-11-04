@@ -43,6 +43,8 @@ import { hasLocationFix } from '../utils/geo';
 import { formatAltitude, formatAccuracy } from '../utils/units';
 import { getBatteryLevel } from '../services/battery';
 import { getNetworkInfo } from '../services/network';
+import { loadEmergencyContact } from '../services/preferencesService';
+import { buildMessage, sendBeaconSms } from '../services/emergencyBeacon';
 import type { LocationFix } from '../services/locationService';
 
 type Props = {
@@ -51,9 +53,18 @@ type Props = {
   location: LocationFix;
   heading: number;
   place: { name: string; cep: string | null } | null;
+  /** Chamado quando o beacon é disparado, para o ciclo recomeçar. */
+  onBeaconSent?: () => void;
 };
 
-const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) => {
+const EmergencyModal = ({
+  visible,
+  onClose,
+  location,
+  heading,
+  place,
+  onBeaconSent,
+}: Props) => {
   const { colors } = useTheme();
   const { t } = useLanguage();
 
@@ -74,6 +85,24 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
     operator: null,
     type: null,
   });
+  /**
+   * Contato do beacon (ideia #6). Carregado quando o modal abre: o número
+   * guardado em Configurações > SOS é o destino do SMS.
+   */
+  const [beaconContact, setBeaconContact] = useState('');
+
+  useEffect(() => {
+    if (!visible) return;
+    let mounted = true;
+    loadEmergencyContact()
+      .then(contact => {
+        if (mounted) setBeaconContact(contact);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [visible]);
   useEffect(() => {
     let mounted = true;
     const refresh = async () => {
@@ -350,6 +379,33 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
     }
   };
 
+  /**
+   * Beacon de emergência (ideia #6): a posição, a bateria e a rede vão por
+   * SMS ao contacto guardado. Sem contacto guardado não há para onde ir, e
+   * o aviso diz isso em vez de falhar em silêncio.
+   */
+  const sendBeacon = async () => {
+    if (!beaconContact) {
+      Alert.alert(t('sos_beacon_send'), t('sos_beacon_no_contact'));
+      return;
+    }
+    const message = buildMessage({
+      latitude: hasFix ? location.latitude : null,
+      longitude: hasFix ? location.longitude : null,
+      accuracy: location.accuracy ?? null,
+      altitude: location.altitude ?? null,
+      battery,
+      network: network.operator ?? network.type ?? null,
+    });
+    const opened = await sendBeaconSms(beaconContact, message);
+    if (!opened) {
+      Alert.alert(t('sos_beacon_send'), t('sos_beacon_fail'));
+      return;
+    }
+    onBeaconSent?.();
+    Alert.alert(t('sos_beacon_send'), t('sos_beacon_ready'));
+  };
+
   return (
     <Modal
       visible={visible}
@@ -485,6 +541,13 @@ const EmergencyModal = ({ visible, onClose, location, heading, place }: Props) =
                 </Pressable>
               </View>
 
+              <Pressable onPress={sendBeacon} style={[styles.shareButton, styles.beaconButton]}>
+                <Text style={styles.shareEmoji}>🆘</Text>
+                <Text style={[styles.shareText, { color: colors.text }]}>
+                  {t('sos_beacon_send')}
+                </Text>
+              </Pressable>
+
               <Text style={[styles.shareHint, { color: colors.textMuted }]}>
                 {t('em_share_hint')}
               </Text>
@@ -553,6 +616,12 @@ const styles = StyleSheet.create({
   },
   stopButton: {
     backgroundColor: '#334155',
+  },
+  beaconButton: {
+    marginTop: spacing.md,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#EF4444',
   },
   liveActive: {
     fontSize: 12,

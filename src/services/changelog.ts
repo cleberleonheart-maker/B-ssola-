@@ -11,6 +11,12 @@ export type ChangelogBuild = { code: number; entries: ChangelogEntry[] };
  * histórico do git e na tabela `app_version` da nuvem.
  */
 const CHANGELOG: Record<number, (t: Translator) => ChangelogEntry[]> = {
+  199: t => [
+    { icon: '🔐', title: t('wn_lock_title'), desc: t('wn_lock_desc') },
+    { icon: '📟', title: t('wn_diag_title'), desc: t('wn_diag_desc') },
+    { icon: '🆘', title: t('wn_sos_title'), desc: t('wn_sos_desc') },
+    { icon: '📐', title: t('wn_triwp_title'), desc: t('wn_triwp_desc') },
+  ],
   196: t => [
     { icon: '🔲', title: t('wn_qr_title'), desc: t('wn_qr_desc') },
   ],

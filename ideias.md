@@ -95,11 +95,26 @@
 - [x] **4. Waypoint por voz** — ✅ feito na v7.17: "marca este ponto como X" salva a
       posição atual sem tirar as mãos do caminho.
 - [x] **5. Odômetro histórico** — ✅ feito na v7.17 (hoje/semana/últimos 7 dias).
-- [ ] **6. Beacon de emergência** — a cada X min envia posição por SMS para contato
-      configurado (funciona sem dados móveis, só SMS).
-- [ ] **7. Detecção de queda** — acelerômetro detecta impacto + imobilidade e oferece
-      envio automático do SOS.
-- [ ] **8. Contexto no SOS** — incluir rede/carrier e % de bateria no alerta.
+- [x] **6. Beacon de emergência** — feito (v7.68, code 199). A cada X minutos
+      (intervalo de 15 a 120, por omissão 30) a app pede a posição e envia-a por
+      **SMS** ao contacto guardado — sem dados móveis, que era o ponto da ideia.
+      O aviso chega ao mundo real por notificação (canal próprio, `aviso-beacon`),
+      porque o telemóvel está muitas vezes no bolso com o ecrã apagado quando o
+      beacon vence; ao tocar, a app abre no SOS com a mensagem já escrita.
+      O número do contacto vive em Configurações → SOS (`@bussola/emergContact`).
+      O envio sai pela app de SMS do sistema (`buildMessage` + `sendBeaconSms`),
+      que é o que deixa a pessoa confirmar antes de mandar.
+- [x] **7. Detecção de queda** — feito (v7.68, code 199). O acelerómetro mede o
+      impacto e a imobilidade a seguir (`utils/fallDetector.ts`: pico forte +
+      pouco movimento durante a janela), e o `fallDetectionService` pergunta
+      **uma vez** por sessão — se a pessoa responder, o alerta fecha e não
+      volta a aparecer. O que se oferece é o SOS, não o envio automático: quem
+      caiu e pode tocar é quem decide.
+- [x] **8. Contexto no SOS** — feito (v7.68, code 199). O alerta passou a levar
+      **percentagem de bateria** e **operadora/tipo de rede** (`buildMessage`),
+      lidos do `BatteryManager` e do `NetworkInfoModule` — quem vai ajudar sabe
+      se o aparelho ainda tem autonomia e se há rede. A bateria também aparece
+      no resumo do modal e no link de partilha ao vivo (#103).
 - [x] **9. Kefera troca modos** — ✅ feito em v7.5: "Kefera, abre o detector de metais" / "modo sol".
 - [x] **10. Kefera conta o histórico** — ✅ feito na v7.17 (hoje, ontem, semana, trilha
       mais longa).
@@ -216,8 +231,14 @@
         (modo persistido em `@bussola/cadenceMode`).
       Pausar não perde a contagem; sair do modo reinicia. "Kefera, abre o
       metrônomo" reconhece o modo.
-- [ ] **27. Triangulação offline por rumos** — estimar a posição mirando 2 marcos
-      conhecidos, sem GPS.
+- [x] **27. Triangulação offline por rumos** — feito (v7.68, code 199). O modo
+      Triângulo ganhou **duas abas**: "Por rumos" (o observador muda de sítio e
+      mira o alvo duas vezes; cruzam-se os dois raios) e "Por marcadores" (a
+      ressecção: os marcos são conhecidos, e quem mira é que se estima a posição).
+      O cálculo deixou de ser a fórmula trigonométrica antiga — que errava por
+      centenas de metros — e passou a ser a interseção de círculos máximos em
+      vetores (`utils/triangulate.ts`), com o teste a recuperar a posição de
+      quem mirou a menos de um metro.
 
 ## ✅ Feitos (v7.11)
 1. **Bússola adaptativa** — a suavização do rumo agora muda de intensidade: rápida
@@ -524,12 +545,36 @@ foram encontrados de verdade, não ideias soltas.
       (`distanceToTrackPath` em `trackProjection.ts`).
 
 ## Ideias novas (23/09/2026, 4ª leva)
-- [ ] **31. 🔐 PIN/biometria no app** — trancar o app (privacidade, útil ao compartilhar
+- [x] **31. 🔐 PIN/biometria no app** — trancar o app (privacidade, útil ao compartilhar
       o telefone). Configurável em Configurações.
       **PIN feito na v7.17** (`LOCK_PIN_KEY` em `preferencesService`): criar, trocar,
       remover. **Falta a biometria** — não há `BiometricPrompt` nem dependência nenhuma
       em `src`, portanto quem já destravou o telemóvel com o dedo tem de escrever o PIN
       à mesma. A linha fica aberta pelo que falta, como a #41.
+      **Fechado na v7.68 (code 199)**: o que a nota dizia estar em falta já estava
+      escrito — `BiometricModule.kt` (com `androidx.biometric`, registado no
+      `MainApplication`), `services/biometric.ts` e o botão 👆 no `LockScreen` — mas
+      a linha nunca foi marcada, porque ninguém pegou no código para ver. **O que
+      faltava de facto era o resto do bloqueio**:
+      - **Voltar a trancar ao sair do fundo.** O bloqueio só existia na abertura
+        (`App.tsx` lia o PIN uma vez), que é a única altura em que ninguém empresta
+        o telemóvel com o app aberto — o caso que o bloqueio existe para cobrir.
+        Agora há um `AppState` que marca quando o app foi para segundo plano e
+        volta a pedir o PIN ao regressar, depois de uma janela de tolerância de
+        30 s (uma calculadora, uma chamada não trancam o telemóvel). A decisão
+        está em `src/utils/appLock.ts`, pura e testada (`__tests__/appLock.test.ts`).
+      - **Biometria ligável e desligável.** Antes era automática: se o aparelho
+        tivesse digital registada, o dedo destrancava o app — sem o utilizador
+        poder escolher. Agora há um interruptor em Configurações → Segurança, que
+        só aparece quando há PIN definido; quando o aparelho não tem biometria, a
+        linha diz isso em vez de prometer uma opção que não funciona. A
+        preferência é `@bussola/lockBiometric` (ligada por omissão).
+      - O atalho interno da biometria (a string vazia que o `LockScreen` passa
+        ao destrancar) só passa quando a biometria está ligada — senão o PIN
+        deixava de ser a única porta.
+      O resto já estava feito e não foi mexido: PIN de 4 dígitos com confirmar,
+        alterar e remover (`SecuritySection` + `PinDialog`), e o ecrã de bloqueio
+        (`LockScreen`) por cima de tudo, com o PIN pedido ao abrir.
 - [x] **32. 🧭 Leitura em mil (militar)** — alternar azimute entre graus e **milésimos**
       (mrad/"mils", 6400/6000). Bom pra quem usa bússola tática.
       **Fechado na v7.23 (code 153)**: `MILS_PER_DEG` em `utils/compass.ts` e a
@@ -539,6 +584,12 @@ foram encontrados de verdade, não ideias soltas.
 - [x] **33. 📸 Waypoint pela câmera** — marcar um ponto distante sem chegar perto: 2+
       avistagens de lugares diferentes cruzam os rumos e **estimam a coordenada**
       (complemento da triangulação #27, usando teodolito + AR).
+      **A v7.68 (code 199) deu-lhe o ecrã que faltava**: o painel existia
+      (`WaypointTriangulation`, do commit `6109c35`) mas não era desenhado em
+      lado nenhum — ficou atrás de um wrapper órfão. Agora vive na aba "Por
+      marcadores" do modo Triângulo, com a conta certa: quem mira o marco A
+      com a agulha em α está no raio que sai de A com o rumo α+180°, e o
+      cruzamento dos dois raios invertidos é a posição de quem mirou.
 - [x] **34. 🗺️ Atalho de volta (linha reta)** — na trilha, além do retorno pelo trajeto,
       mostrar o rumo direto ao início ("em linha reta") para encurtar quando dá.
 - [x] **35. 🔲 QR de localização** — feito (v7.65). Gerar QR com as coordenadas
@@ -666,10 +717,14 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       ausência de "lat"/"lon" no payload, envio/anexo/offline).
 
 ### Produto
-- [ ] **64. 📟 Painel de diagnóstico dos sensores** — mostra valores brutos X/Y/Z do
-      acelerômetro e magnetômetro, o eixo dominante, magnitude, se está calibrado
-      (hard/soft iron efetivo) e um botão "Confirmar eixo". Fecha a ressalva deixada
-      no commit `8dc0c59`: em vez de assumir a convenção de eixos, o **aparelho** diz.
+- [x] **64. 📟 Painel de diagnóstico dos sensores** — feito (v7.68, code 199).
+      Modo novo (📟 Diagnóstico) com os valores crus X/Y/Z do acelerómetro e do
+      magnetómetro, o eixo dominante, a magnitude e o estado da calibração
+      (hard/soft iron efetivo), mais o botão "Confirmar eixo": põe-se o
+      aparelho de pé e toca-se no eixo que aponta para cima, e a resposta fica
+      gravada (`@bussola/axisConfirmed`). Fecha a ressalva deixada no commit
+      `8dc0c59`: em vez de a app assumir a convenção de eixos, o **aparelho**
+      diz. Lógica pura em `utils/sensorDiagnostics.ts`, com testes.
 - [x] **65. 🧭 Auto-detecção da convenção do teodolito** — feito (v7.62/v7.66). Ao
       apontar o topo para o céu, se `verticalAngle` for claramente negativo
       (`≤ -45°`), sugere correção com aviso ("Corrigir inclinação (aponte o topo ao

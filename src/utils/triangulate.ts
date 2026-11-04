@@ -4,35 +4,113 @@ export type Ray = { point: Point; bearing: number };
 const toRad = (d: number) => (d * Math.PI) / 180;
 const toDeg = (r: number) => (r * 180) / Math.PI;
 
-const normalize = (b: number) => ((b % 360) + 360) % 360;
+type Vec3 = { x: number; y: number; z: number };
 
+/** Ponto da esfera (raio 1) a partir da latitude e longitude. */
+const toVec = (p: Point): Vec3 => {
+  const lat = toRad(p.lat);
+  const lon = toRad(p.lon);
+  const cosLat = Math.cos(lat);
+  return {
+    x: cosLat * Math.cos(lon),
+    y: cosLat * Math.sin(lon),
+    z: Math.sin(lat),
+  };
+};
+
+/** Norte local (para onde a latitude cresce). */
+const northHat = (p: Point): Vec3 => {
+  const lat = toRad(p.lat);
+  const lon = toRad(p.lon);
+  return {
+    x: -Math.sin(lat) * Math.cos(lon),
+    y: -Math.sin(lat) * Math.sin(lon),
+    z: Math.cos(lat),
+  };
+};
+
+/** Este local (para onde a longitude cresce). */
+const eastHat = (p: Point): Vec3 => {
+  const lon = toRad(p.lon);
+  return { x: -Math.sin(lon), y: Math.cos(lon), z: 0 };
+};
+
+const cross = (a: Vec3, b: Vec3): Vec3 => ({
+  x: a.y * b.z - a.z * b.y,
+  y: a.z * b.x - a.x * b.z,
+  z: a.x * b.y - a.y * b.x,
+});
+
+const dot = (a: Vec3, b: Vec3): number => a.x * b.x + a.y * b.y + a.z * b.z;
+
+const norm = (v: Vec3): Vec3 => {
+  const len = Math.sqrt(dot(v, v));
+  if (!len) return v;
+  return { x: v.x / len, y: v.y / len, z: v.z / len };
+};
+
+/**
+ * Interseção de dois raios (para frente): cada um parte de um ponto conhecido
+ * e segue um rumo. O ponto onde se cruzam é a posição estimada.
+ *
+ * A conta é feita em vetores: o raio é o círculo máximo que passa pelo ponto
+ * com a direção do rumo, e a interseção de dois círculos máximos é a reta
+ * perpendicular às duas normais — de onde saem dois pontos antipodais, e vale
+ * o que está "à frente" nos dois raios.
+ *
+ * É o que faz a "triangulação por rumos" (o observador muda de sítio e mira o
+ * alvo) e também a "por marcadores": aí os raios partem dos marcos, com o
+ * rumo invertido, e o cruzamento é a posição de quem mirou.
+ */
 export const intersectRays = (r1: Ray, r2: Ray): Point | null => {
-  const lat1 = toRad(r1.point.lat);
-  const lon1 = toRad(r1.point.lon);
-  const lat2 = toRad(r2.point.lat);
-  const lon2 = toRad(r2.point.lon);
-  const brng13 = toRad(r1.bearing);
-  const brng23 = toRad(r2.bearing);
+  const p1 = toVec(r1.point);
+  const p2 = toVec(r2.point);
 
-  const dLat = lat2 - lat1;
-  const dLon = lon2 - lon1;
-  const dist12 = 2 * Math.asin(Math.sqrt(Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2));
+  // Direção do raio: o rumo conta a partir do norte e gira para leste.
+  const bearing1 = toRad(r1.bearing);
+  const d1 = norm({
+    x: Math.cos(bearing1) * northHat(r1.point).x + Math.sin(bearing1) * eastHat(r1.point).x,
+    y: Math.cos(bearing1) * northHat(r1.point).y + Math.sin(bearing1) * eastHat(r1.point).y,
+    z: Math.cos(bearing1) * northHat(r1.point).z + Math.sin(bearing1) * eastHat(r1.point).z,
+  });
 
-  if (dist12 === 0) return null;
+  const bearing2 = toRad(r2.bearing);
+  const d2 = norm({
+    x: Math.cos(bearing2) * northHat(r2.point).x + Math.sin(bearing2) * eastHat(r2.point).x,
+    y: Math.cos(bearing2) * northHat(r2.point).y + Math.sin(bearing2) * eastHat(r2.point).y,
+    z: Math.cos(bearing2) * northHat(r2.point).z + Math.sin(bearing2) * eastHat(r2.point).z,
+  });
 
-  const a = Math.acos((Math.sin(lat2) - Math.sin(lat1) * Math.cos(dist12)) / (Math.sin(dist12) * Math.cos(lat1)));
-  const b = Math.acos((Math.sin(lat1) - Math.sin(lat2) * Math.cos(dist12)) / (Math.sin(dist12) * Math.cos(lat2)));
-  const brngA = Math.sin(lon2 - lon1) > 0 ? a : 2 * Math.PI - a;
-  const brngB = Math.sin(lon1 - lon2) > 0 ? b : 2 * Math.PI - b;
+  // Normal de cada círculo máximo: a perpendicular ao raio no ponto de partida.
+  const n1 = cross(p1, d1);
+  const n2 = cross(p2, d2);
 
-  const alpha1 = (brng13 - brngA + Math.PI) % (2 * Math.PI);
-  const alpha2 = (brngB - brng23 + Math.PI) % (2 * Math.PI);
-  const alpha3 = Math.PI - alpha1 + alpha2;
+  // A interseção dos dois planos é a reta na direção n1 × n2.
+  const c = cross(n1, n2);
+  if (Math.abs(Math.sqrt(dot(c, c))) < 1e-12) return null;
 
-  if (alpha3 <= 0 || alpha3 >= Math.PI) return null;
+  const candidate = norm(c);
+  // Escolhe o ponto que está à frente nos dois raios (e no hemisfério do
+  // ponto de partida, senão o antipodal serve).
+  const forward =
+    dot(candidate, d1) > 0 && dot(candidate, d2) > 0 && dot(candidate, p1) > 0
+      ? candidate
+      : { x: -candidate.x, y: -candidate.y, z: -candidate.z };
 
-  const dist13 = Math.sin(alpha2) * dist12 / Math.sin(alpha3);
-  const lat3 = Math.asin(Math.sin(lat1) * Math.cos(dist13) + Math.cos(lat1) * Math.sin(dist13) * Math.cos(brng13));
-  const lon3 = lon1 + Math.atan2(Math.sin(brng13) * Math.sin(dist13) * Math.cos(lat1), Math.cos(dist13) - Math.sin(lat1) * Math.sin(lat3));
-  return { lat: (lat3 * 180) / Math.PI, lon: ((lon3 * 180) / Math.PI + 540) % 360 - 180 };
+  if (dot(forward, d1) <= 0 || dot(forward, d2) <= 0) return null;
+
+  const lat = Math.asin(forward.z);
+  const lon = Math.atan2(forward.y, forward.x);
+  return { lat: toDeg(lat), lon: toDeg(lon) };
+};
+
+/**
+ * Diferença mínima entre dois rumos, em graus (0–180).
+ *
+ * Serve para dizer "está a apontar 12° ao lado do marco" — o desvio entre o
+ * que a agulha marca e o que o marco exige.
+ */
+export const angleDiff = (a: number, b: number): number => {
+  const diff = Math.abs((((a - b) % 360) + 540) % 360 - 180);
+  return diff;
 };

@@ -8,6 +8,7 @@ import type { Translator } from '../i18n/strings';
 const CHANNEL_ALERTAS = 'alertas-civis';
 const CHANNEL_PRESSAO = 'aviso-pressao';
 const CHANNEL_RETORNO = 'aviso-retorno';
+const CHANNEL_BEACON = 'beacon-emergencia';
 
 /**
  * O nome do canal e o corpo de fallback sao textos de interface, entao seguem o
@@ -98,6 +99,43 @@ export const showPressureDropNotification = async (
       data: { type: 'pressure-drop' },
       android: {
         channelId: CHANNEL_PRESSAO,
+        smallIcon: 'ic_launcher',
+        pressAction: { id: 'default', launchActivity: 'default' },
+      },
+    });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Avisa que chegou a hora do beacon de emergência (ideia #6).
+ *
+ * O telemóvel está muitas vezes no bolso, com o ecrã apagado, quando o beacon
+ * vence. A notificação é o que traz o aviso ao mundo real: ao tocar, a app
+ * abre no SOS, onde o SMS sai com a posição e a bateria já escritas.
+ */
+export const showBeaconNotification = async (
+  t: Translator,
+): Promise<boolean> => {
+  try {
+    await notifee.createChannel({
+      id: CHANNEL_BEACON,
+      name: t('beacon_notif_channel'),
+      importance: AndroidImportance.HIGH,
+      vibration: true,
+    });
+    const settings = await notifee.requestPermission();
+    if (settings.authorizationStatus === AuthorizationStatus.DENIED) {
+      return false;
+    }
+    await notifee.displayNotification({
+      title: t('beacon_notif_title'),
+      body: t('beacon_notif_body'),
+      data: { type: 'beacon' },
+      android: {
+        channelId: CHANNEL_BEACON,
         smallIcon: 'ic_launcher',
         pressAction: { id: 'default', launchActivity: 'default' },
       },

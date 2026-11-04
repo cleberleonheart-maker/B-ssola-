@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DEFAULT_DECLINATION, type Declination } from '../utils/declination';
 import type { UnitSystem } from '../utils/units';
+import type { AxisConfirmation } from '../utils/sensorDiagnostics';
 
 export type AppMode = 'full' | 'minimal' | 'adventure';
 export type DisplayMode =
@@ -21,6 +22,7 @@ export type DisplayMode =
   | 'tri'
   | 'odometer'
   | 'selftest'
+  | 'diag'
   | 'cadence';
 
 export type WindCal = { zero: number; strong: number };
@@ -104,6 +106,7 @@ export const loadDisplayMode = async (): Promise<DisplayMode> => {
       'tri',
       'odometer',
       'selftest',
+      'diag',
       'cadence',
     ];
     return modes.includes(raw as DisplayMode) ? (raw as DisplayMode) : 'compass';
@@ -286,6 +289,27 @@ export const saveLockPin = async (pin: string) => {
 export const clearLockPin = async () => {
   await AsyncStorage.removeItem(LOCK_PIN_KEY);
 };
+
+const LOCK_BIOMETRIC_KEY = '@bussola/lockBiometric';
+
+/**
+ * A biometria entra ligada: quem define um PIN e tem o telemóvel com digital
+ * registada espera é que a impressão destranque o app. Quem não quiser, desliga
+ * em Configurações e fica só com o PIN.
+ */
+export const loadLockBiometric = async (): Promise<boolean> => {
+  try {
+    const raw = await AsyncStorage.getItem(LOCK_BIOMETRIC_KEY);
+    return raw == null ? true : raw === 'true';
+  } catch {
+    return true;
+  }
+};
+
+export const saveLockBiometric = async (enabled: boolean) => {
+  await AsyncStorage.setItem(LOCK_BIOMETRIC_KEY, enabled ? 'true' : 'false');
+};
+
 const EMERG_CONTACT_KEY = '@bussola/emergContact';
 const EMERG_BEACON_ENABLED_KEY = '@bussola/emergBeaconEnabled';
 const EMERG_BEACON_INTERVAL_KEY = '@bussola/emergBeaconInterval';
@@ -325,4 +349,69 @@ export const loadBeaconInterval = async (): Promise<number> => {
 
 export const saveBeaconInterval = async (m: number) => {
   await AsyncStorage.setItem(EMERG_BEACON_INTERVAL_KEY, String(Math.max(5, Math.round(m))));
+};
+
+const FALL_DETECT_KEY = '@bussola/fallDetect';
+const BEACON_LAST_SENT_KEY = '@bussola/beaconLastSent';
+const AXIS_CONFIRMED_KEY = '@bussola/axisConfirmed';
+
+/** Detecção de queda ligada? */
+export const loadFallDetectionEnabled = async (): Promise<boolean> => {
+  try {
+    return (await AsyncStorage.getItem(FALL_DETECT_KEY)) === '1';
+  } catch {
+    return false;
+  }
+};
+
+export const saveFallDetectionEnabled = async (enabled: boolean) => {
+  await AsyncStorage.setItem(FALL_DETECT_KEY, enabled ? '1' : '0');
+};
+
+/**
+ * Instante do último beacon enviado.
+ *
+ * Sem isto, o ciclo repetiria o aviso a cada minuto desde que a app abriu;
+ * com isto, o intervalo conta a partir do último envio.
+ */
+export const loadBeaconLastSent = async (): Promise<number | null> => {
+  try {
+    const raw = await AsyncStorage.getItem(BEACON_LAST_SENT_KEY);
+    if (raw == null) return null;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : null;
+  } catch {
+    return null;
+  }
+};
+
+export const saveBeaconLastSent = async (at: number = Date.now()) => {
+  await AsyncStorage.setItem(BEACON_LAST_SENT_KEY, String(Math.round(at)));
+};
+
+export const clearBeaconLastSent = async () => {
+  await AsyncStorage.removeItem(BEACON_LAST_SENT_KEY);
+};
+
+/**
+ * Eixo vertical que o utilizador confirmou no aparelho (ideia #64).
+ *
+ * Fica gravado para que o valor não se perca entre arranques: é a resposta do
+ * aparelho à pergunta que a app não pode fazer sozinha.
+ */
+export const loadAxisConfirmed = async (): Promise<AxisConfirmation> => {
+  try {
+    const raw = await AsyncStorage.getItem(AXIS_CONFIRMED_KEY);
+    return raw === 'x' || raw === 'y' || raw === 'z' ? raw : null;
+  } catch {
+    return null;
+  }
+};
+
+export const saveAxisConfirmed = async (axis: AxisConfirmation) => {
+  if (axis == null) {
+    await AsyncStorage.removeItem(AXIS_CONFIRMED_KEY);
+    return;
+  }
+  await AsyncStorage.setItem(AXIS_CONFIRMED_KEY, axis);
 };

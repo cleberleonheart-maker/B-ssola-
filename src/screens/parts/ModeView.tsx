@@ -13,6 +13,7 @@ import HeightView from '../../components/HeightView';
 import MetalDetectorView from '../../components/MetalDetectorView';
 import OdometerView from '../../components/OdometerView';
 import SensorSelfTestView from '../../components/SensorSelfTestView';
+import SensorDiagnosticsView from '../../components/SensorDiagnosticsView';
 import SunWatchView from '../../components/SunWatchView';
 import TargetNavBar from '../../components/TargetNavBar';
 import TheodoliteView from '../../components/TheodoliteView';
@@ -56,6 +57,7 @@ const MODE_LABEL_KEY: Record<DisplayMode, string> = {
   odometer: 'ui_card_odometer',
   cadence: 'ui_mode_cadence',
   selftest: 'ui_card_selftest',
+  diag: 'ui_mode_diag',
 };
 
 export type DialMarker = {
@@ -96,6 +98,12 @@ type Props = {
     latitude: number;
     longitude: number;
   }) => void;
+  waypoints: Array<{
+    id: string;
+    name: string;
+    latitude: number;
+    longitude: number;
+  }>;
   statusPanels: React.ReactNode;
 };
 
@@ -131,6 +139,7 @@ const ModeView = (props: Props) => {
     onOpenCalibration,
     onAddWaypoint,
     onAddRemoteWaypoint,
+    waypoints,
     statusPanels,
   } = props;
 
@@ -240,6 +249,7 @@ const ModeView = (props: Props) => {
             declinationEnabled={declination.enabled}
             declinationDegrees={declination.degrees}
             mils={useMils}
+            waypoints={waypoints}
             onAdd={onAddRemoteWaypoint}
           />
         </View>
@@ -282,6 +292,12 @@ const ModeView = (props: Props) => {
           active
           heading={heading}
           calibrationApplied={calibrationApplied}
+        />
+      ) : displayMode === 'diag' ? (
+        <SensorDiagnosticsView
+          active
+          calibration={calibration}
+          onOpenCalibration={onOpenCalibration}
         />
       ) : (
         <View style={styles.arArea}>

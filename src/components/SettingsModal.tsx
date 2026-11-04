@@ -17,7 +17,8 @@ import type { LocationMode } from '../services/locationService';
 import type { AppMode } from '../services/preferencesService';
 import type { Declination } from '../utils/declination';
 import type { UnitSystem } from '../utils/units';
-import { loadLockPin } from '../services/preferencesService';
+import { loadLockBiometric, loadLockPin, saveLockBiometric } from '../services/preferencesService';
+import { isBiometricAvailable } from '../services/biometric';
 import { BACKUP_FILE_VERSION, type BackupMode } from '../services/backupService';
 import { APP_VERSION, APP_VERSION_CODE } from '../version.generated';
 import { checkForUpdate, type AvailableUpdate } from '../services/versionService';
@@ -35,11 +36,13 @@ import CloudSection from './settings/CloudSection';
 import ShareHistorySection from './settings/ShareHistorySection';
 import AccountSection from './settings/AccountSection';
 import SecuritySection, { type PinFlowKind } from './settings/SecuritySection';
+import SosSection from './settings/SosSection';
 import AppSection from './settings/AppSection';
+import ContactDialog from './settings/ContactDialog';
 import ImportDialog from './settings/ImportDialog';
 import PinDialog from './settings/PinDialog';
 import ReportProblemDialog from './settings/ReportProblemDialog';
-import { Caption } from './settings/primitives';
+import { Caption, SectionLabel } from './settings/primitives';
 import { styles } from './settings/styles';
 
 type Props = {
@@ -67,6 +70,14 @@ type Props = {
   onToggleKeepAwake: () => void;
   onVerifyPin: (pin: string) => Promise<boolean>;
   onSetPin: (pin: string | null) => Promise<void>;
+  beaconEnabled: boolean;
+  onToggleBeacon: (enabled: boolean) => void;
+  emergencyContact: string;
+  onChangeEmergencyContact: (contact: string) => void;
+  beaconIntervalMinutes: number;
+  onChangeBeaconInterval: (minutes: number) => void;
+  fallDetection: boolean;
+  onToggleFallDetection: (enabled: boolean) => void;
   onExportBackup: () => Promise<void>;
   onApplyBackup: (json: string, mode: BackupMode) => Promise<string | null>;
 };
@@ -101,6 +112,14 @@ const SettingsModal = ({
   onToggleKeepAwake,
   onVerifyPin,
   onSetPin,
+  beaconEnabled,
+  onToggleBeacon,
+  emergencyContact,
+  onChangeEmergencyContact,
+  beaconIntervalMinutes,
+  onChangeBeaconInterval,
+  fallDetection,
+  onToggleFallDetection,
   onExportBackup,
   onApplyBackup,
 }: Props) => {
@@ -115,10 +134,13 @@ const SettingsModal = ({
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
   const [importVisible, setImportVisible] = useState(false);
+  const [contactVisible, setContactVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
   const [importText, setImportText] = useState('');
   const [exporting, setExporting] = useState(false);
   const [hasPin, setHasPin] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
 
   // Onde está cada secção no conteúdo, para o índice saltar para ela.
   const scrollRef = useRef<ScrollViewInstance>(null);
@@ -170,7 +192,18 @@ const SettingsModal = ({
     loadLockPin()
       .then(pin => setHasPin(pin != null))
       .catch(() => {});
+    loadLockBiometric()
+      .then(setBiometricEnabled)
+      .catch(() => {});
+    isBiometricAvailable()
+      .then(setBiometricAvailable)
+      .catch(() => {});
   }, [visible]);
+
+  const toggleBiometric = useCallback((enabled: boolean) => {
+    setBiometricEnabled(enabled);
+    saveLockBiometric(enabled).catch(() => {});
+  }, []);
 
   const closePinFlow = React.useCallback(() => {
     setPinFlow(null);
@@ -440,7 +473,27 @@ const SettingsModal = ({
             </View>
 
             <View onLayout={mark('seguranca')}>
-              <SecuritySection hasPin={hasPin} onStartFlow={startPinFlow} />
+              <SecuritySection
+                hasPin={hasPin}
+                onStartFlow={startPinFlow}
+                biometricAvailable={biometricAvailable}
+                biometricEnabled={biometricEnabled}
+                onToggleBiometric={toggleBiometric}
+              />
+            </View>
+
+            <View onLayout={mark('sos')}>
+              <SectionLabel label={t('set_section_sos')} />
+              <SosSection
+                beaconEnabled={beaconEnabled}
+                onToggleBeacon={onToggleBeacon}
+                contact={emergencyContact}
+                onEditContact={() => setContactVisible(true)}
+                intervalMinutes={beaconIntervalMinutes}
+                onChangeInterval={onChangeBeaconInterval}
+                fallEnabled={fallDetection}
+                onToggleFall={onToggleFallDetection}
+              />
             </View>
 
             <View onLayout={mark('app')}>
@@ -475,6 +528,14 @@ const SettingsModal = ({
           onChange={setImportText}
           onClose={() => setImportVisible(false)}
           onRestore={handleRestore}
+        />
+      )}
+
+      {contactVisible && (
+        <ContactDialog
+          value={emergencyContact}
+          onSave={onChangeEmergencyContact}
+          onClose={() => setContactVisible(false)}
         />
       )}
 

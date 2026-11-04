@@ -1,61 +1,90 @@
-import { Accelerometer } from 'react-native-sensors';
 import { Vibration } from 'react-native';
-import { map } from 'rxjs/operators';
+import { accelerometer } from 'react-native-sensors';
+import { createFallDetector, type FallDetector } from '../utils/fallDetector';
+import { detectAccelScale, toG } from './sensorSelfTest';
 
 export type FallCallback = () => void;
 
-let subscription: any = null;
-let lastImpact = 0;
-let lastStill = 0;
-let impactCount = 0;
+type Subscription = { unsubscribe: () => void };
 
-const IMPACT_THRESHOLD = 2.8;
-const STILL_THRESHOLD = 0.4;
-const IMPACT_WINDOW = 1500;
-const STILL_WINDOW = 4000;
+let subscription: Subscription | null = null;
+let detector: FallDetector | null = null;
+/**
+ * A escala do acelerómetro (g ou m/s²) só se sabe depois de algumas
+ * leituras: em repouso a magnitude é ~1 (g) ou ~9,8 (m/s²), e o limiar da
+ * queda é 2,8 g. Sem esta medida, uma leitura de 4 m/s² num aparelho em
+ * g seria lida como 4 g — e um puxão brusco pareceria uma queda.
+ */
+let scaleSamples: number[] = [];
+let scale: 'g' | 'ms2' | null = null;
 
-export const startFallDetection = (onFall: FallCallback) => {
-  if (subscription) return;
+const SCALE_SAMPLES = 10;
+
+const clearState = () => {
+  subscription = null;
+  detector = null;
+  scaleSamples = [];
+  scale = null;
+};
+
+/**
+ * Liga a detecção de queda.
+ *
+ * Devolve `true` quando o aparelho leva um embate e fica parado: a partir daí
+ * a app decide o que fazer (normalmente, abrir o SOS).
+ */
+export const startFallDetection = (onFall: FallCallback): boolean => {
+  if (subscription) return false;
+  clearState();
+  detector = createFallDetector();
+
   try {
-    subscription = new Accelerometer({
-      updateInterval: 100,
-    })
-      .pipe(map(({ x, y, z }: any) => Math.sqrt((x * x + y * y + z * z) / 9.81)))
-      .subscribe((g: number) => {
-        const now = Date.now();
-        if (g > IMPACT_THRESHOLD) {
-          if (now - lastImpact > IMPACT_WINDOW) {
-            impactCount = 1;
-            lastImpact = now;
-          } else {
-            impactCount += 1;
-          }
+    const sub = accelerometer.subscribe({
+      next: ({ x, y, z }: { x: number; y: number; z: number }) => {
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+          return;
         }
-        if (g < 1 + STILL_THRESHOLD && g > 1 - STILL_THRESHOLD) {
-          if (impactCount > 0 && now - lastImpact < IMPACT_WINDOW + STILL_WINDOW) {
-            if (now - lastStill > 2000) {
-              lastStill = now;
-              try {
-                Vibration.vibrate([200, 100, 200]);
-              } catch {}
-              onFall();
-            }
-          }
+        const raw = Math.sqrt(x * x + y * y + z * z);
+        if (!Number.isFinite(raw) || raw <= 0) return;
+
+        if (scale == null) {
+          scaleSamples.push(raw);
+          if (scaleSamples.length < SCALE_SAMPLES) return;
+          scale = detectAccelScale(scaleSamples);
         }
-      });
+
+        const g = toG(raw, scale);
+        if (!detector) return;
+        if (detector.push(g, Date.now())) {
+          try {
+            Vibration.vibrate([200, 100, 200]);
+          } catch {}
+          onFall();
+        }
+      },
+      error: () => {},
+    });
+    subscription = {
+      unsubscribe: () => {
+        try {
+          sub.unsubscribe();
+        } catch {}
+      },
+    };
+    return true;
   } catch {
-    // sensores não disponíveis
+    clearState();
+    return false;
   }
 };
 
+/** Desliga a detecção de queda e limpa o estado a meio. */
 export const stopFallDetection = () => {
   if (subscription) {
-    try {
-      subscription.unsubscribe();
-    } catch {}
-    subscription = null;
+    subscription.unsubscribe();
   }
-  impactCount = 0;
-  lastImpact = 0;
-  lastStill = 0;
+  clearState();
 };
+
+/** A detecção está ligada? */
+export const isFallDetectionRunning = (): boolean => subscription != null;

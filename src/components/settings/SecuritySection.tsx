@@ -9,6 +9,7 @@ import {
   RowBody,
   SectionLabel,
   Switch,
+  SwitchRow,
 } from './primitives';
 import { styles } from './styles';
 
@@ -21,9 +22,18 @@ export type PinFlowKind =
 type Props = {
   hasPin: boolean;
   onStartFlow: (flow: PinFlowKind) => void;
+  biometricAvailable: boolean;
+  biometricEnabled: boolean;
+  onToggleBiometric: (enabled: boolean) => void;
 };
 
-const SecuritySection = ({ hasPin, onStartFlow }: Props) => {
+const SecuritySection = ({
+  hasPin,
+  onStartFlow,
+  biometricAvailable,
+  biometricEnabled,
+  onToggleBiometric,
+}: Props) => {
   const { t } = useLanguage();
 
   return (
@@ -54,6 +64,24 @@ const SecuritySection = ({ hasPin, onStartFlow }: Props) => {
             label={t('lock_change_pin')}
             sub={t('lock_pin_confirm')}
             onPress={() => onStartFlow({ kind: 'change', step: 'current' })}
+          />
+        )}
+
+        {hasPin && (
+          <SwitchRow
+            divider
+            icon="👆"
+            label={t('lock_bio_title')}
+            sub={
+              biometricAvailable
+                ? biometricEnabled
+                  ? t('lock_bio_on')
+                  : t('lock_bio_off')
+                : t('lock_bio_unavailable')
+            }
+            on={biometricAvailable && biometricEnabled}
+            disabled={!biometricAvailable}
+            onPress={() => onToggleBiometric(!biometricEnabled)}
           />
         )}
       </GroupCard>

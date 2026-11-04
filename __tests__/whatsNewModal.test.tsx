@@ -5,7 +5,7 @@ import { ThemeProvider } from '../src/theme/ThemeContext';
 import { LanguageProvider } from '../src/i18n/LanguageContext';
 import WhatsNewModal from '../src/components/WhatsNewModal';
 import { createTranslator } from '../src/i18n/strings';
-import { changelogBetween } from '../src/services/changelog';
+import { changelogBetween, changelogFor } from '../src/services/changelog';
 import { APP_VERSION, APP_VERSION_CODE } from '../src/version.generated';
 
 /** O build instalado. Todo o resto é relativo a ele: escrever o número à mão
@@ -13,6 +13,14 @@ import { APP_VERSION, APP_VERSION_CODE } from '../src/version.generated';
 const CURRENT = APP_VERSION_CODE;
 
 const t = createTranslator('pt');
+
+/**
+ * A entrada do build instalado, lida do dicionário do changelog. Escrever a
+ * chave à mão (como se fez com a do QR) parte o teste a cada release: o build
+ * novo traz outra entrada e o teste falha sem que nada esteja errado.
+ */
+const currentEntries = changelogFor(CURRENT, t);
+const currentDesc = currentEntries[currentEntries.length - 1]?.desc ?? '';
 
 /**
  * `await act` porque `ThemeProvider` e `LanguageProvider` leem o storage no
@@ -81,12 +89,13 @@ describe('WhatsNewModal', () => {
     const r = await render(null);
     expect(r.root.findAllByType(Modal)).toHaveLength(1);
     // As novidades do build atual aparecem todas.
-    expect(texts(r)).toContain(t('wn_qr_desc'));
+    expect(currentDesc).not.toBe('');
+    expect(texts(r)).toContain(currentDesc);
   });
 
   it('sem última versão vista, mostra só a atual e sem cabeçalho de build', async () => {
     const shown = texts(await render(null));
-    expect(shown).toContain(t('wn_qr_desc'));
+    expect(shown).toContain(currentDesc);
     expect(shown).toContain(t('wn_title', { version: APP_VERSION }));
     expect(shown).not.toContain(t('wn_build_label', { code: CURRENT }));
   });
@@ -127,7 +136,7 @@ describe('WhatsNewModal', () => {
 
   it('a mesma versão vista não abre o modal com nada de novo', async () => {
     const shown = texts(await render(CURRENT));
-    expect(shown).toContain(t('wn_qr_desc'));
+    expect(shown).toContain(currentDesc);
     expect(shown).not.toContain(t('wn_title_since', { code: CURRENT }));
   });
 

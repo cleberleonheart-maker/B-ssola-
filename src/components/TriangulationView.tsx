@@ -5,6 +5,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import { formatDistance } from '../utils/geo';
 import { normalizeHeading, formatTime, formatAzimuth } from '../utils/compass';
+import WaypointTriangulation from './WaypointTriangulation';
 
 type Sight = {
   lat: number;
@@ -12,6 +13,13 @@ type Sight = {
   bearing: number;
   heading: number;
   t: number;
+};
+
+type Marker = {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
 };
 
 type Props = {
@@ -22,6 +30,7 @@ type Props = {
   declinationEnabled: boolean;
   declinationDegrees: number;
   mils?: boolean;
+  waypoints?: Marker[];
   onAdd: (wp: { name: string; latitude: number; longitude: number }) => void;
 };
 
@@ -68,6 +77,7 @@ export const TriangulationView = ({
   declinationEnabled,
   declinationDegrees,
   mils = false,
+  waypoints = [],
   onAdd,
 }: Props) => {
   const colors = useThemeColors();
@@ -126,6 +136,29 @@ export const TriangulationView = ({
     setAdded(true);
   }, [result, name, onAdd, t]);
 
+  const tabButton = (key: 'rays' | 'wp', label: string) => {
+    const picked = tab === key;
+    return (
+      <Pressable
+        onPress={() => setTab(key)}
+        style={[
+          styles.tab,
+          {
+            borderColor: picked ? colors.primary : colors.border,
+            backgroundColor: picked ? colors.surfaceAlt : 'transparent',
+          },
+        ]}>
+        <Text
+          style={[
+            styles.tabText,
+            { color: picked ? colors.text : colors.textMuted },
+          ]}>
+          {label}
+        </Text>
+      </Pressable>
+    );
+  };
+
   if (!hasFix) {
     return (
       <View style={styles.container}>
@@ -141,94 +174,116 @@ export const TriangulationView = ({
   return (
     <View style={styles.container}>
       <Text style={[styles.title, { color: colors.text }]}>{t('tri_title')}</Text>
-      <Text style={[styles.hint, { color: colors.textMuted }]}>
-        {t('tri_hint')}
-      </Text>
+      <View style={styles.tabs}>
+        {tabButton('rays', t('tri_tab_rays'))}
+        {tabButton('wp', t('tri_tab_wp'))}
+      </View>
 
-      <Pressable
-        disabled={sights.length >= 2}
-        onPress={recordSight}
-        style={[
-          styles.sightButton,
-          {
-            backgroundColor:
-              sights.length >= 2 ? colors.surfaceAlt : colors.primary,
-          },
-        ]}>
-        <Text
-          style={[
-            styles.sightButtonText,
-            { color: sights.length >= 2 ? colors.textMuted : colors.background },
-          ]}>
-          {sights.length === 0 ? t('tri_sight1') : t('tri_sight2')} ·{' '}
-          {formatAzimuth(heading, mils)}
-        </Text>
-      </Pressable>
-
-      {sights.map((s, idx) => (
-        <View
-          key={idx}
-          style={[styles.sightRow, { borderColor: colors.border }]}>
-          <Text style={[styles.sightText, { color: colors.text }]}>
-            {t('tri_recorded', {
-              n: idx + 1,
-              deg: Math.round(s.heading),
-              time: formatTime(s.t),
-            })}
+      {tab === 'rays' ? (
+        <>
+          <Text style={[styles.hint, { color: colors.textMuted }]}>
+            {t('tri_hint')}
           </Text>
-        </View>
-      ))}
 
-      {error && (
-        <Text style={[styles.error, { color: colors.warning }]}>{error}</Text>
-      )}
-
-      {result && (
-        <View style={[styles.resultBox, { borderColor: colors.success + '55' }]}>
-          <Text style={[styles.resultText, { color: colors.text }]}>
-            {t('tri_result', {
-              lat: result.lat.toFixed(6),
-              lon: result.lon.toFixed(6),
-              d1: formatDistance(result.d1),
-              d2: formatDistance(result.d2),
-            })}
-          </Text>
-          {!added ? (
-            <>
-              <TextInput
-                value={name}
-                onChangeText={setName}
-                placeholder={t('tri_default_name')}
-                placeholderTextColor={colors.textMuted}
-                style={[
-                  styles.nameInput,
-                  { borderColor: colors.border, color: colors.text },
-                ]}
-              />
-              <Pressable
-                onPress={add}
-                style={[styles.addButton, { backgroundColor: colors.success }]}>
-                <Text style={[styles.addButtonText, { color: colors.background }]}>
-                  {t('tri_add')}
-                </Text>
-              </Pressable>
-            </>
-          ) : (
-            <Text style={[styles.added, { color: colors.success }]}>
-              {t('tri_added')}
+          <Pressable
+            disabled={sights.length >= 2}
+            onPress={recordSight}
+            style={[
+              styles.sightButton,
+              {
+                backgroundColor:
+                  sights.length >= 2 ? colors.surfaceAlt : colors.primary,
+              },
+            ]}>
+            <Text
+              style={[
+                styles.sightButtonText,
+                {
+                  color:
+                    sights.length >= 2 ? colors.textMuted : colors.background,
+                },
+              ]}>
+              {sights.length === 0 ? t('tri_sight1') : t('tri_sight2')} ·{' '}
+              {formatAzimuth(heading, mils)}
             </Text>
-          )}
-        </View>
-      )}
+          </Pressable>
 
-      <Pressable
-        onPress={reset}
-        style={[styles.resetButton, { borderColor: colors.border }]}>
-        <Text style={[styles.resetText, { color: colors.textMuted }]}>
-          {t('tri_reset')}
-        </Text>
-      </Pressable>
-      </>
+          {sights.map((s, idx) => (
+            <View
+              key={idx}
+              style={[styles.sightRow, { borderColor: colors.border }]}>
+              <Text style={[styles.sightText, { color: colors.text }]}>
+                {t('tri_recorded', {
+                  n: idx + 1,
+                  deg: Math.round(s.heading),
+                  time: formatTime(s.t),
+                })}
+              </Text>
+            </View>
+          ))}
+
+          {error && (
+            <Text style={[styles.error, { color: colors.warning }]}>{error}</Text>
+          )}
+
+          {result && (
+            <View style={[styles.resultBox, { borderColor: colors.success + '55' }]}>
+              <Text style={[styles.resultText, { color: colors.text }]}>
+                {t('tri_result', {
+                  lat: result.lat.toFixed(6),
+                  lon: result.lon.toFixed(6),
+                  d1: formatDistance(result.d1),
+                  d2: formatDistance(result.d2),
+                })}
+              </Text>
+              {!added ? (
+                <>
+                  <TextInput
+                    value={name}
+                    onChangeText={setName}
+                    placeholder={t('tri_default_name')}
+                    placeholderTextColor={colors.textMuted}
+                    style={[
+                      styles.nameInput,
+                      { borderColor: colors.border, color: colors.text },
+                    ]}
+                  />
+                  <Pressable
+                    onPress={add}
+                    style={[styles.addButton, { backgroundColor: colors.success }]}>
+                    <Text style={[styles.addButtonText, { color: colors.background }]}>
+                      {t('tri_add')}
+                    </Text>
+                  </Pressable>
+                </>
+              ) : (
+                <Text style={[styles.added, { color: colors.success }]}>
+                  {t('tri_added')}
+                </Text>
+              )}
+            </View>
+          )}
+
+          <Pressable
+            onPress={reset}
+            style={[styles.resetButton, { borderColor: colors.border }]}>
+            <Text style={[styles.resetText, { color: colors.textMuted }]}>
+              {t('tri_reset')}
+            </Text>
+          </Pressable>
+        </>
+      ) : (
+        <WaypointTriangulation
+          heading={heading}
+          latitude={latitude}
+          longitude={longitude}
+          hasFix={hasFix}
+          declinationEnabled={declinationEnabled}
+          declinationDegrees={declinationDegrees}
+          mils={mils}
+          waypoints={waypoints}
+          onAddWaypoint={onAdd}
+        />
       )}
     </View>
   );
@@ -252,6 +307,23 @@ const createStyles = (_colors: ReturnType<typeof useThemeColors>) =>
       lineHeight: 17,
       textAlign: 'center',
       marginBottom: spacing.md,
+    },
+    tabs: {
+      flexDirection: 'row',
+      alignSelf: 'stretch',
+      marginBottom: spacing.md,
+    },
+    tab: {
+      flex: 1,
+      borderWidth: 1,
+      borderRadius: radius.md,
+      paddingVertical: spacing.sm,
+      marginHorizontal: spacing.xs,
+      alignItems: 'center',
+    },
+    tabText: {
+      fontSize: 13,
+      fontWeight: '800',
     },
     emoji: {
       fontSize: 44,

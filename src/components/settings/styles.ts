@@ -297,6 +297,16 @@ pinDots: {
   flexDirection: 'row',
   marginTop: spacing.md,
 },
+contactInput: {
+  width: '100%',
+  height: 52,
+  borderWidth: 1,
+  borderRadius: radius.md,
+  fontSize: 18,
+  letterSpacing: 1,
+  fontWeight: '700',
+  textAlign: 'center',
+},
 pinDot: {
   width: 10,
   height: 10,

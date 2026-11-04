@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { StatusBar, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import CompassScreen from './src/screens/CompassScreen';
 import { ThemeProvider, useThemeColors, useTheme } from './src/theme/ThemeContext';
@@ -11,7 +11,8 @@ import { CrashBoundary } from './src/components/CrashBoundary';
 import UpdateAvailableModal from './src/components/UpdateAvailableModal';
 import LocationGate from './src/components/LocationGate';
 import LockScreen from './src/components/LockScreen';
-import { loadLockPin } from './src/services/preferencesService';
+import { loadLockBiometric, loadLockPin } from './src/services/preferencesService';
+import { shouldRelock } from './src/utils/appLock';
 import {
   loadChangelogSeen,
   markChangelogSeen,
@@ -31,26 +32,62 @@ function Root() {
   const [availableUpdate, setAvailableUpdate] = useState<AvailableUpdate | null>(
     null,
   );
-  const [lock, setLock] = useState<{ pin: string | null; unlocked: boolean }>({
+  const [lock, setLock] = useState<{
+    pin: string | null;
+    unlocked: boolean;
+    biometric: boolean;
+  }>({
     pin: null,
     unlocked: true,
+    biometric: true,
   });
+  const backgroundedAt = useRef<number | null>(null);
 
   useEffect(() => {
-    loadLockPin().then(pin =>
-      setLock({ pin, unlocked: pin == null }),
+    Promise.all([loadLockPin(), loadLockBiometric()]).then(([pin, biometric]) =>
+      setLock({ pin, unlocked: pin == null, biometric }),
     );
+  }, []);
+
+  // Voltar a trancar ao voltar do fundo: o bloqueio que só existe na
+  // abertura não protege nada quando o telemóvel é emprestado com o app
+  // aberto. A janela de tolerância está em `shouldRelock`.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', next => {
+      if (next === 'background') {
+        backgroundedAt.current = Date.now();
+        return;
+      }
+      if (next !== 'active' || backgroundedAt.current == null) return;
+      const at = backgroundedAt.current;
+      backgroundedAt.current = null;
+      setLock(prev => {
+        if (!shouldRelock({ hasPin: prev.pin != null, backgroundedAt: at, now: Date.now() })) {
+          return prev;
+        }
+        return { ...prev, unlocked: false };
+      });
+      // A biometria pode ter sido desligada nas Configurações enquanto o app
+      // estava em segundo plano: relê-la evita destrancar com o dedo quando o
+      // utilizador já não quer isso.
+      void loadLockBiometric().then(biometric =>
+        setLock(prev => (prev.biometric === biometric ? prev : { ...prev, biometric })),
+      );
+    });
+    return () => sub.remove();
   }, []);
 
   const handleUnlock = useCallback(
     (entered: string): boolean => {
-      if (lock.pin !== null && (entered === lock.pin || entered === '')) {
+      // A string vazia é o atalho da biometria: só passa se ela estiver ligada.
+      const viaBiometric = entered === '' && lock.biometric;
+      if (lock.pin !== null && (entered === lock.pin || viaBiometric)) {
         setLock(prev => ({ ...prev, unlocked: true }));
         return true;
       }
       return false;
     },
-    [lock.pin],
+    [lock.biometric, lock.pin],
   );
 
   useEffect(() => {
@@ -109,7 +146,7 @@ function Root() {
           onClose={closeUpdate}
         />
         {lock.pin !== null && !lock.unlocked && (
-          <LockScreen onUnlock={handleUnlock} />
+          <LockScreen onUnlock={handleUnlock} biometricEnabled={lock.biometric} />
         )}
       </View>
     </LocationGate>

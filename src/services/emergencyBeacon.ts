@@ -1,10 +1,18 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Linking } from 'react-native';
-import { loadEmergencyContact, saveEmergencyContact as saveEmergencyContactPref, loadBeaconEnabled, saveBeaconEnabled, loadBeaconInterval, saveBeaconInterval } from './preferencesService';
-
-const CONTACT_KEY = '@bussola/emergencyContact';
-const ENABLED_KEY = '@bussola/emergencyBeaconEnabled';
-const INTERVAL_KEY = '@bussola/emergencyBeaconInterval';
+import { Linking, Platform } from 'react-native';
+import {
+  loadBeaconEnabled as loadBeaconEnabledPref,
+  loadBeaconInterval as loadBeaconIntervalPref,
+  loadEmergencyContact as loadEmergencyContactPref,
+  saveBeaconEnabled as saveBeaconEnabledPref,
+  saveBeaconInterval as saveBeaconIntervalPref,
+  saveEmergencyContact as saveEmergencyContactPref,
+} from './preferencesService';
+import {
+  buildBeaconMessage,
+  clampBeaconInterval,
+  DEFAULT_BEACON_INTERVAL_MINUTES,
+  type BeaconMessageParams,
+} from '../utils/beacon';
 
 export type BeaconConfig = {
   enabled: boolean;
@@ -12,74 +20,63 @@ export type BeaconConfig = {
   intervalMinutes: number;
 };
 
+/** Config do beacon: o que está gravado, já com o intervalo normalizado. */
 export const loadBeaconConfig = async (): Promise<BeaconConfig> => {
   try {
-    const [enabled, contact, interval] = await Promise.all([loadBeaconEnabled(), loadEmergencyContact(), loadBeaconInterval()]);
-    return { enabled, contact: contact || '', intervalMinutes: interval || 30 };
+    const [enabled, contact, interval] = await Promise.all([
+      loadBeaconEnabledPref(),
+      loadEmergencyContactPref(),
+      loadBeaconIntervalPref(),
+    ]);
+    return {
+      enabled,
+      contact: contact || '',
+      intervalMinutes: clampBeaconInterval(interval || DEFAULT_BEACON_INTERVAL_MINUTES),
+    };
   } catch {
-    return { enabled: false, contact: '', intervalMinutes: 30 };
+    return {
+      enabled: false,
+      contact: '',
+      intervalMinutes: DEFAULT_BEACON_INTERVAL_MINUTES,
+    };
   }
 };
 
 export const saveBeaconConfig = async (cfg: Partial<BeaconConfig>) => {
-  if (cfg.enabled != null) await saveBeaconEnabled(cfg.enabled);
+  if (cfg.enabled != null) await saveBeaconEnabledPref(cfg.enabled);
   if (cfg.contact != null) await saveEmergencyContactPref(cfg.contact);
-  if (cfg.intervalMinutes != null) await saveBeaconInterval(cfg.intervalMinutes);
+  if (cfg.intervalMinutes != null) {
+    await saveBeaconIntervalPref(clampBeaconInterval(cfg.intervalMinutes));
+  }
 };
 
-export const loadEmergencyContact = async (): Promise<string> => {
-  return loadEmergencyContact();
-};
+/** Texto do SMS do beacon. */
+export const buildMessage = (params: BeaconMessageParams): string =>
+  buildBeaconMessage(params);
 
-export const saveEmergencyContact = async (contact: string) => {
-  await saveEmergencyContactPref(contact);
-};
-
-export const loadBeaconEnabled = async (): Promise<boolean> => {
-  return loadBeaconEnabled();
-};
-
-export const saveBeaconEnabled = async (enabled: boolean) => {
-  await saveBeaconEnabled(enabled);
-};
-
-export const loadBeaconInterval = async (): Promise<number> => {
-  return loadBeaconInterval();
-};
-
-export const saveBeaconInterval = async (m: number) => {
-  await saveBeaconInterval(m);
-};
-
-export const buildBeaconMessage = (params: {
-  latitude?: number | null;
-  longitude?: number | null;
-  accuracy?: number | null;
-  altitude?: number | null;
-  battery?: number | null;
-  network?: string | null;
-  time?: Date;
-}) => {
-  const t = params.time || new Date();
-  const lat = params.latitude != null ? params.latitude.toFixed(6) : '?';
-  const lon = params.longitude != null ? params.longitude.toFixed(6) : '?';
-  const acc = params.accuracy != null ? Math.round(params.accuracy) : '?';
-  const alt = params.altitude != null ? Math.round(params.altitude) : '?';
-  const bat = params.battery != null ? Math.round(params.battery) : '?';
-  const net = params.network || '?';
-  const maps = params.latitude != null && params.longitude != null ? `https://maps.google.com/?q=${params.latitude},${params.longitude}` : '';
-  return `SOS BEACON Bussola\n${t.toISOString()}\nLat:${lat} Lon:${lon} acc:${acc}m alt:${alt}m\nBateria:${bat}% Rede:${net}\n${maps}`.trim();
-};
-
-export const sendBeaconSms = async (contact: string, message: string) => {
+/**
+ * Abre a app de SMS com a mensagem pronta para o contacto.
+ *
+ * O Android e o iOS não deixam as apps enviarem SMS sem permissão explícita
+ * (e a Play Store restringe essa permissão), por isso o app abre o compositor
+ * com o texto e o número já lá dentro: quem está em emergência toca em
+ * "enviar". Devolve `false` quando não há app de SMS para abrir.
+ */
+export const sendBeaconSms = async (
+  contact: string,
+  message: string,
+): Promise<boolean> => {
   if (!contact) return false;
-  const url = `sms:${encodeURIComponent(contact)}?body=${encodeURIComponent(message)}`;
+  const body = encodeURIComponent(message);
+  const number = encodeURIComponent(contact);
+  const url =
+    Platform.OS === 'ios' ? `sms:${number}&body=${body}` : `sms:${number}?body=${body}`;
   try {
     await Linking.openURL(url);
     return true;
   } catch {
     try {
-      await Linking.openURL(`sms:${contact}`);
+      await Linking.openURL(`sms:${number}`);
       return true;
     } catch {
       return false;

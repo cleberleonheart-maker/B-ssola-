@@ -1,13 +1,25 @@
-import React, { useCallback, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, TextInput } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { View, Text, Pressable, StyleSheet, TextInput, ScrollView } from 'react-native';
 import { useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
-import { normalizeHeading } from '../utils/compass';
-import { intersectRays } from '../utils/triangulate';
-import { formatDistance } from '../utils/geo';
+import { normalizeHeading, formatAzimuth } from '../utils/compass';
+import { angleDiff, intersectRays } from '../utils/triangulate';
+import { formatDistance, haversine, initialBearing } from '../utils/geo';
 
-type Ray = { lat: number; lon: number; bearing: number };
+type Marker = {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+};
+
+/** Uma avistagem: o marco mirado e o rumo que a agulha marcava nesse instante. */
+type Sighting = {
+  marker: Marker;
+  /** Rumo verdadeiro (0–360) do observador para o marco. */
+  bearing: number;
+};
 
 type Props = {
   heading: number;
@@ -16,21 +28,23 @@ type Props = {
   hasFix: boolean;
   declinationEnabled: boolean;
   declinationDegrees: number;
-  waypoints: Array<{ id: string; name: string; latitude: number; longitude: number }>;
+  mils?: boolean;
+  waypoints: Marker[];
   onAddWaypoint: (wp: { name: string; latitude: number; longitude: number }) => void;
 };
 
-const trueBearingOf = (displayHeading: number, declEnabled: boolean, declDegrees: number) =>
-  normalizeHeading(displayHeading + (declEnabled ? 0 : declDegrees));
-
-const dist = (a: { lat: number; lon: number }, b: { lat: number; lon: number }) => {
-  const R = 6371000;
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-  const dLon = ((b.lon - a.lon) * Math.PI) / 180;
-  const sa = Math.sin(dLat / 2) ** 2 + Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.atan2(Math.sqrt(sa), Math.sqrt(1 - sa));
-};
-
+/**
+ * Triangulação por marcadores (ideia #33).
+ *
+ * Aqui os pontos de referência são conhecidos — são os marcos guardados — e o
+ * que se estima é a posição de quem está a mirar. A conta é a interseção de
+ * dois raios, mas com os raios a partir dos marcos e o rumo invertido: quem
+ * mira o marco A com a agulha em α está no raio que sai de A para α+180°, e o
+ * mesmo vale para o marco B. Onde os dois raios se cruzam é a posição.
+ *
+ * Um só marco não chega: os dois raios precisam de sair de pontos diferentes,
+ * senão são paralelos e não se cruzam.
+ */
 export const WaypointTriangulation = ({
   heading,
   latitude,
@@ -38,40 +52,76 @@ export const WaypointTriangulation = ({
   hasFix,
   declinationEnabled,
   declinationDegrees,
+  mils = false,
   waypoints,
   onAddWaypoint,
 }: Props) => {
   const colors = useThemeColors();
   const { t } = useLanguage();
-  const styles = createStyles(colors);
+  const styles = createStyles();
 
-  const [rays, setRays] = useState<Ray[]>([]);
+  const [sightings, setSightings] = useState<Sighting[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [target, setTarget] = useState<{ lat: number; lon: number } | null>(null);
   const [name, setName] = useState('');
   const [added, setAdded] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // Rumo verdadeiro: o que a agulha mostra é magnético, e a geometria é
+  // geográfica.
+  const trueHeading = normalizeHeading(
+    heading + (declinationEnabled ? 0 : declinationDegrees),
+  );
+
+  const markers = useMemo(
+    () =>
+      waypoints.map(wp => ({
+        ...wp,
+        distance: hasFix ? haversine(latitude, longitude, wp.latitude, wp.longitude) : null,
+        bearing: hasFix
+          ? initialBearing(latitude, longitude, wp.latitude, wp.longitude)
+          : null,
+      })),
+    [waypoints, hasFix, latitude, longitude],
+  );
+
+  const selected = markers.find(m => m.id === selectedId) ?? null;
+  const deviation =
+    selected && selected.bearing != null
+      ? angleDiff(trueHeading, selected.bearing)
+      : null;
+
   const record = useCallback(() => {
-    if (!hasFix || waypoints.length === 0) return;
-    if (rays.length >= 2) return;
-    const bearing = trueBearingOf(heading, declinationEnabled, declinationDegrees);
-    setRays(prev => [...prev, { lat: latitude, lon: longitude, bearing }]);
+    if (!selected) return;
+    if (sightings.some(s => s.marker.id === selected.id)) {
+      setErr(t('tri_wp_same_marker'));
+      return;
+    }
+    const next = [...sightings, { marker: selected, bearing: trueHeading }];
+    setSightings(next);
     setErr(null);
     setTarget(null);
     setAdded(false);
-  }, [hasFix, waypoints.length, rays.length, heading, declinationEnabled, declinationDegrees, latitude, longitude]);
-
-  const calc = useCallback(() => {
-    if (rays.length < 2) return;
-    const res = intersectRays({ point: { lat: rays[0].lat, lon: rays[0].lon }, bearing: rays[0].bearing }, { point: { lat: rays[1].lat, lon: rays[1].lon }, bearing: rays[1].bearing });
-    if (!res) {
-      setErr(t('tri_parallel'));
-      setTarget(null);
-      return;
+    if (next.length === 2) {
+      const [a, b] = next;
+      const res = intersectRays(
+        {
+          point: { lat: a.marker.latitude, lon: a.marker.longitude },
+          bearing: (a.bearing + 180) % 360,
+        },
+        {
+          point: { lat: b.marker.latitude, lon: b.marker.longitude },
+          bearing: (b.bearing + 180) % 360,
+        },
+      );
+      if (!res) {
+        setErr(t('tri_wp_parallel'));
+      } else {
+        setTarget(res);
+        setErr(null);
+      }
     }
-    setTarget(res);
-    setErr(null);
-  }, [rays, t]);
+  }, [selected, sightings, trueHeading, t]);
 
   const add = useCallback(() => {
     if (!target) return;
@@ -81,7 +131,7 @@ export const WaypointTriangulation = ({
   }, [target, name, onAddWaypoint, t]);
 
   const reset = useCallback(() => {
-    setRays([]);
+    setSightings([]);
     setTarget(null);
     setErr(null);
     setAdded(false);
@@ -97,27 +147,124 @@ export const WaypointTriangulation = ({
     );
   }
 
+  if (markers.length === 0) {
+    return (
+      <View style={styles.container}>
+        <Text style={[styles.title, { color: colors.text }]}>{t('tri_wp_title')}</Text>
+        <Text style={[styles.hint, { color: colors.textMuted }]}>
+          {t('tri_wp_no_markers')}
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={[styles.title, { color: colors.text }]}>{t('tri_wp_title')}</Text>
       <Text style={[styles.hint, { color: colors.textMuted }]}>{t('tri_wp_hint')}</Text>
-      <Pressable disabled={rays.length >= 2} onPress={record} style={[styles.btn, { backgroundColor: rays.length >= 2 ? colors.surfaceAlt : colors.primary }]}>
-        <Text style={[styles.btnText, { color: rays.length >= 2 ? colors.textMuted : colors.background }]}>{rays.length === 0 ? t('tri_sight1') : t('tri_sight2')}</Text>
+
+      <Text style={[styles.section, { color: colors.textMuted }]}>
+        {t('tri_wp_select')}
+      </Text>
+      <ScrollView style={styles.list} contentContainerStyle={styles.listInner}>
+        {markers.map(marker => {
+          const picked = marker.id === selectedId;
+          const sighted = sightings.some(s => s.marker.id === marker.id);
+          return (
+            <Pressable
+              key={marker.id}
+              onPress={() => setSelectedId(marker.id)}
+              style={[
+                styles.marker,
+                {
+                  borderColor: picked ? colors.primary : colors.border,
+                  backgroundColor: picked ? colors.surfaceAlt : 'transparent',
+                },
+              ]}>
+              <Text style={[styles.markerName, { color: colors.text }]}>
+                {marker.name}
+              </Text>
+              <Text style={[styles.markerInfo, { color: colors.textMuted }]}>
+                {marker.distance != null && marker.bearing != null
+                  ? `${formatDistance(marker.distance)} · ${formatAzimuth(marker.bearing, mils)}`
+                  : '—'}
+                {sighted ? ` · ${t('tri_wp_sighted')}` : ''}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      {selected ? (
+        <Text style={[styles.aiming, { color: colors.text }]}>
+          {t('tri_wp_aiming', { name: selected.name })}
+          {deviation != null ? ` · ${t('tri_wp_deviation', { deg: Math.round(deviation) })}` : ''}
+        </Text>
+      ) : null}
+
+      <Pressable
+        disabled={!selected || sightings.length >= 2}
+        onPress={record}
+        style={[
+          styles.btn,
+          {
+            backgroundColor:
+              !selected || sightings.length >= 2 ? colors.surfaceAlt : colors.primary,
+          },
+        ]}>
+        <Text
+          style={[
+            styles.btnText,
+            {
+              color:
+                !selected || sightings.length >= 2
+                  ? colors.textMuted
+                  : colors.background,
+            },
+          ]}>
+          {sightings.length === 0 ? t('tri_wp_sight1') : t('tri_wp_sight2')}
+        </Text>
       </Pressable>
-      {rays.length === 2 && !target && (
-        <Pressable onPress={calc} style={[styles.btn, { backgroundColor: colors.surfaceAlt, marginTop: spacing.sm }]}>
-          <Text style={[styles.btnText, { color: colors.text }]}>{t('tri_calc')}</Text>
-        </Pressable>
-      )}
+
+      {sightings.map((s, idx) => (
+        <Text
+          key={`${s.marker.id}-${idx}`}
+          style={[styles.recorded, { color: colors.textMuted }]}>
+          {t('tri_wp_recorded', {
+            name: s.marker.name,
+            deg: Math.round(s.bearing),
+          })}
+        </Text>
+      ))}
+
       {err && <Text style={[styles.err, { color: colors.warning }]}>{err}</Text>}
+
       {target && (
         <View style={[styles.box, { borderColor: colors.success + '55' }]}>
-          <Text style={[styles.txt, { color: colors.text }]}>{target.lat.toFixed(6)}, {target.lon.toFixed(6)}</Text>
+          <Text style={[styles.txt, { color: colors.text }]}>
+            {t('tri_wp_result', {
+              lat: target.lat.toFixed(6),
+              lon: target.lon.toFixed(6),
+            })}
+          </Text>
           {!added ? (
             <>
-              <TextInput value={name} onChangeText={setName} placeholder={t('tri_default_name')} placeholderTextColor={colors.textMuted} style={[styles.input, { color: colors.text, borderColor: colors.border }]} />
-              <Pressable onPress={add} style={[styles.btn, { backgroundColor: colors.primary, marginTop: spacing.sm }]}>
-                <Text style={[styles.btnText, { color: colors.background }]}>{t('tri_add')}</Text>
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                placeholder={t('tri_default_name')}
+                placeholderTextColor={colors.textMuted}
+                style={[
+                  styles.input,
+                  { color: colors.text, borderColor: colors.border },
+                ]}
+              />
+              <Pressable
+                onPress={add}
+                style={[styles.btn, { backgroundColor: colors.primary, marginTop: spacing.sm }]}>
+                <Text style={[styles.btnText, { color: colors.background }]}>
+                  {t('tri_wp_add')}
+                </Text>
               </Pressable>
             </>
           ) : (
@@ -125,27 +272,56 @@ export const WaypointTriangulation = ({
           )}
         </View>
       )}
-      {(rays.length > 0 || target) && (
-        <Pressable onPress={reset} style={{ marginTop: spacing.md }}>
-          <Text style={{ color: colors.textMuted, textAlign: 'center' }}>{t('tri_reset')}</Text>
+
+      {(sightings.length > 0 || target) && (
+        <Pressable onPress={reset} style={styles.reset}>
+          <Text style={[styles.resetText, { color: colors.textMuted }]}>
+            {t('tri_reset')}
+          </Text>
         </Pressable>
       )}
     </View>
   );
 };
 
-const createStyles = (colors: any) =>
+const createStyles = () =>
   StyleSheet.create({
     container: { padding: spacing.lg },
     title: { fontSize: 18, fontWeight: '800', textAlign: 'center' },
-    hint: { textAlign: 'center', marginTop: spacing.sm, marginBottom: spacing.lg },
+    hint: { textAlign: 'center', marginTop: spacing.sm, marginBottom: spacing.md },
+    section: { fontSize: 12, fontWeight: '700', marginBottom: spacing.xs },
+    list: { maxHeight: 140 },
+    listInner: { paddingBottom: spacing.xs },
+    marker: {
+      borderWidth: 1,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      marginBottom: spacing.xs,
+    },
+    markerName: { fontSize: 14, fontWeight: '700' },
+    markerInfo: { fontSize: 12, marginTop: 2 },
+    aiming: { fontSize: 13, fontWeight: '700', marginTop: spacing.sm },
     btn: { padding: spacing.md, borderRadius: radius.md, alignItems: 'center' },
     btnText: { fontWeight: '800' },
-    box: { marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.md, borderWidth: 1 },
+    recorded: { fontSize: 12, marginTop: spacing.xs },
+    box: {
+      marginTop: spacing.lg,
+      padding: spacing.md,
+      borderRadius: radius.md,
+      borderWidth: 1,
+    },
     txt: { textAlign: 'center' },
-    input: { marginTop: spacing.sm, borderWidth: 1, borderRadius: radius.sm, padding: spacing.sm },
+    input: {
+      marginTop: spacing.sm,
+      borderWidth: 1,
+      borderRadius: radius.sm,
+      padding: spacing.sm,
+    },
     err: { textAlign: 'center', marginTop: spacing.md },
     ok: { textAlign: 'center', marginTop: spacing.sm, fontWeight: '700' },
+    reset: { marginTop: spacing.md },
+    resetText: { fontSize: 12, fontWeight: '800', textAlign: 'center' },
   });
 
 export default WaypointTriangulation;

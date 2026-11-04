@@ -14,6 +14,7 @@ export type SettingsSectionId =
   | 'nuvem'
   | 'conta'
   | 'seguranca'
+  | 'sos'
   | 'app';
 
 export type SettingsSectionDef = {
@@ -33,6 +34,7 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
   { id: 'nuvem', labelKey: 'set_section_cloud', icon: '☁️' },
   { id: 'conta', labelKey: 'set_section_account', icon: '🆔' },
   { id: 'seguranca', labelKey: 'set_section_security', icon: '🔐' },
+  { id: 'sos', labelKey: 'set_section_sos', icon: '🆘' },
   { id: 'app', labelKey: 'set_section_app', icon: '📦' },
 ];
 
