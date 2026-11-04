@@ -22,8 +22,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PKG="com.bussola.app"
 ACT="$PKG/.MainActivity"
 REPO="cleberleonheart-maker/B-ssola-"
-ASSET="bussola-v201.apk"
-SHA="ffe7ff67982144cae944ca4a6e4ba9d923d45390e31b63ca9b5306c81c76c8be"
+ASSET="bussola-v202.apk"
+SHA="d4b470f7bd6e2663af68fb98586e528a4c2cee35d341e715a912b8226f9cc27e"
 VIGIA_S=45
 
 APK="${1:-}"
@@ -101,20 +101,18 @@ fi
 echo
 echo "== o guião que falta (à mão, no aparelho) =="
 cat <<'GUIA'
-1. "O que foi feito": no build 200 deve aparecer 1 linha — levantamento de EMF
-   no mapa.
-2. Bloqueio: define um PIN (Configurações > Segurança), sai da app, abre outra
+1. "O que foi feito": no build 202 devem aparecer 2 linhas — Estrela Polar
+   e widget com partilha.
+2. Estrela Polar: Definições > Bússola > "⭐ Calibrar pela Estrela Polar" (à
+   noite, céu limpo): aponta a câmara à Polaris — a mira diz a altura a que
+   ela está e quanto falta para virar e levantar; quando ficar no centro,
+   toca "Medir declinação" e o resultado deve aparecer em segundos.
+3. Widget: no ecrã principal, toca no botão do widget — sem rastreio a correr
+   abre a app no ecra de emergência; com rastreio a correr, para-o sem abrir
+   a app (o botão fica vermelho).
+4. Bloqueio: define um PIN (Configurações > Segurança), sai da app, abre outra
    vez (pede o PIN), espera 30 s fora da app e volta (pede o PIN outra vez).
-   Com a biometria ligada, o dedo destranca sem PIN; desligada, só o PIN.
-3. Diagnóstico (modo 📟): mexe o aparelho e vê os X/Y/Z mexer; põe o aparelho
-   de pé e confirma o eixo que aponta para cima.
-4. Triangulação: modo Triângulo > "Por marcadores" — aponta a dois marcos
-   guardados e grava os dois rumos: a posição estimada deve cair perto de ti.
-5. EMF: modo 🧲, com o GPS ligado, toca "🖍️ Marcar leitura"; o ponto tem de
-   aparecer no mapa do painel "Levantamento EMF", com a cor do nível.
-6. SOS: põe um contacto em Configurações > SOS e liga o beacon; quando a
+5. SOS: põe um contacto em Configurações > SOS e liga o beacon; quando a
    notificação aparecer, toca nela: abre o SMS com a posição, a bateria e a
    rede já escritas.
-7. Widget: põe o widget no ecrã principal, roda o telemóvel (o rumo muda) e
-   toca nele (abre a app).
 GUIA

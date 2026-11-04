@@ -8,7 +8,7 @@
 # Uso (no Termux do telemóvel):
 #   bash validar-termux.sh                 # descarrega o APK do release e instala
 #   bash validar-termux.sh caminho.apk     # instala um APK já descarregado
-#   ASSET=bussola-v201.apk bash validar-termux.sh
+#   ASSET=bussola-v202.apk bash validar-termux.sh
 #
 # A instalação é por cima ("-r") e o APK é do mesmo key de produção: os pontos,
 # as notas, o PIN e o levantamento de EMF ficam como estavam.
@@ -17,8 +17,8 @@ set -euo pipefail
 PKG="com.bussola.app"
 ACT="$PKG/.MainActivity"
 REPO="cleberleonheart-maker/B-ssola-"
-ASSET="${ASSET:-bussola-v201.apk}"
-SHA="${SHA:-ffe7ff67982144cae944ca4a6e4ba9d923d45390e31b63ca9b5306c81c76c8be}"
+ASSET="${ASSET:-bussola-v202.apk}"
+SHA="${SHA:-d4b470f7bd6e2663af68fb98586e528a4c2cee35d341e715a912b8226f9cc27e}"
 DIR="${DIR:-$HOME/bussola}"
 
 APK="${1:-$DIR/$ASSET}"
@@ -74,10 +74,15 @@ echo "   logcat -s ReactNativeJS:V AndroidRuntime:E | tail -100"
 echo
 echo "== o guião (à mão, no aparelho) =="
 cat <<'GUIA'
-1. "O que foi feito": no build 200 deve aparecer 1 linha — levantamento de EMF
-   no mapa.
-2. Modo 🧲 EMF: toca "🖍️ Marcar leitura" com o GPS ligado; o ponto deve
-   aparecer no mapa do painel "Levantamento EMF", com a cor do nível.
-3. Re-lock: com PIN definido, sai da app, espera 30 s e volta — tem de pedir
+1. "O que foi feito": no build 202 devem aparecer 2 linhas — Estrela Polar
+   e widget com partilha.
+2. Estrela Polar: Definições > Bússola > "⭐ Calibrar pela Estrela Polar" (à
+   noite, céu limpo): aponta a câmara à Polaris — a mira diz a altura a que
+   ela está e quanto falta para virar e levantar; quando ficar no centro,
+   toca "Medir declinação" e o resultado deve aparecer em segundos.
+3. Widget: no ecrã principal, toca no botão do widget — sem rastreio a correr
+   abre a app no ecra de emergência; com rastreio a correr, para-o sem abrir
+   a app (o botão fica vermelho).
+4. Re-lock: com PIN definido, sai da app, espera 30 s e volta — tem de pedir
    o PIN outra vez.
 GUIA
