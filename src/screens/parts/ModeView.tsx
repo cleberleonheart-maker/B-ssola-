@@ -211,6 +211,7 @@ const ModeView = (props: Props) => {
             onAdd={onAddWaypoint}
             calibration={calibration}
             onCalibrate={onOpenCalibration}
+            location={location}
           />
         </View>
       ) : displayMode === 'theodolite' ? (

@@ -2,6 +2,20 @@ export type Axis = 'x' | 'y' | 'z';
 export type AxisValues = { x: number; y: number; z: number };
 
 /**
+ * Limiares de nível, como fração do desvio face ao ambiente (o `ratio` de 0 a
+ * 1). São os mesmos que a barra, o bipe e a vibração usam: comparar o valor
+ * absoluto com 40/90 µT marcava "alto" o tempo inteiro em regiões de campo
+ * magnético alto e nunca reagia a anomalias reais.
+ */
+export const EMF_LOW_RATIO = 0.45;
+export const EMF_HIGH_RATIO = 0.75;
+
+export type EmfLevel = 'low' | 'medium' | 'high';
+
+export const emfLevel = (ratio: number): EmfLevel =>
+  ratio >= EMF_HIGH_RATIO ? 'high' : ratio >= EMF_LOW_RATIO ? 'medium' : 'low';
+
+/**
  * Eixo dominante da leitura EMF.
  *
  * Com linha de base (`baseline`, capturada pelo botão "Ambiente"), o eixo é o

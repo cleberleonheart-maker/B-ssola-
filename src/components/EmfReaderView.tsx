@@ -1,5 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Platform, Vibration } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  Platform,
+  Vibration,
+  ScrollView,
+  Dimensions,
+} from 'react-native';
 import {
   magnetometer,
   setUpdateIntervalForType,
@@ -10,17 +19,39 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import type { ColorScheme } from '../theme/themes';
 import TrendChart from './TrendChart';
+import EmfSurveyMap from './EmfSurveyMap';
+import { mapSideFor } from './MiniMapView';
 import { useRepetitiveBeep, soundAvailable } from '../services/sound';
-import { dominantAxis, type AxisValues } from '../utils/emf';
+import {
+  dominantAxis,
+  emfLevel,
+  EMF_LOW_RATIO,
+  EMF_HIGH_RATIO,
+  type AxisValues,
+} from '../utils/emf';
+import { formatTime } from '../utils/compass';
 import { applyCalibration, type MagCalibration } from '../services/calibrationService';
+import {
+  addEmfSurveyPoint,
+  clearEmfSurvey,
+  createEmfSurveyId,
+  loadEmfSurvey,
+  removeEmfSurveyPoint,
+  type EmfSurveyPoint,
+} from '../services/emfSurveyService';
+import type { LocationFix } from '../services/locationService';
 
 const SAMPLE_INTERVAL = 200;
 const FILTER_ALPHA = 0.82;
 const SCALE_MAX = 200;
 // limiares de severidade como fração do desvio do ambiente (ratio 0..1)
-const LOW_THRESHOLD = 0.45;
-const HIGH_THRESHOLD = 0.75;
+const LOW_THRESHOLD = EMF_LOW_RATIO;
+const HIGH_THRESHOLD = EMF_HIGH_RATIO;
 const HISTORY_MAX = 90;
+/** Só as últimas leituras marcadas cabem na lista; o mapa mostra todas. */
+const SURVEY_LIST_MAX = 5;
+/** O mapa do levantamento é compacto: cabe ao lado do resto do painel. */
+const SURVEY_MAP_MAX = 240;
 
 const MONO = Platform.select({ ios: 'Menlo', default: 'monospace' });
 
@@ -38,9 +69,18 @@ type Props = {
   calibration: MagCalibration | null;
   /** Abre a tela de calibração, para quem ainda não tem uma. */
   onCalibrate: () => void;
+  /** Posição actual: é onde fica marcada a leitura do levantamento. */
+  location: LocationFix;
 };
 
-const EmfReaderView = ({ active, hasFix, onAdd, calibration, onCalibrate }: Props) => {
+const EmfReaderView = ({
+  active,
+  hasFix,
+  onAdd,
+  calibration,
+  onCalibrate,
+  location,
+}: Props) => {
   const colors = useThemeColors();
   const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -58,6 +98,10 @@ const EmfReaderView = ({ active, hasFix, onAdd, calibration, onCalibrate }: Prop
   // tempo todo. `frozenRef` espelha `frozen` porque o subscribe captura o
   // closure de quando foi feito (o efeito só depende de `active`).
   const [frozen, setFrozen] = useState(false);
+  // Levantamento de EMF com posição (ideia #48): as leituras marcadas ficam
+  // guardadas com o sítio onde foram lidas, para se ver a mancha.
+  const [survey, setSurvey] = useState<EmfSurveyPoint[]>([]);
+  const [surveyOpen, setSurveyOpen] = useState(false);
 
   const filteredRef = useRef(0);
   const hasSampleRef = useRef(false);
@@ -134,6 +178,20 @@ const EmfReaderView = ({ active, hasFix, onAdd, calibration, onCalibrate }: Prop
     };
   }, [active]);
 
+  // O levantamento vive no armazenamento local: carrega-se uma vez, quando o
+  // ecrã abre, e só volta a mudar quando se marca ou apaga alguma coisa.
+  useEffect(() => {
+    let alive = true;
+    loadEmfSurvey()
+      .then(list => {
+        if (alive) setSurvey(list);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const reset = useCallback(() => {
     minRef.current = null;
     maxRef.current = null;
@@ -197,6 +255,49 @@ const EmfReaderView = ({ active, hasFix, onAdd, calibration, onCalibrate }: Prop
         : t('emf_low');
   const axis = axes === null ? null : dominantAxis(axes, ambientAxes);
 
+  /**
+   * Marca a leitura actual no levantamento (ideia #48). A posição vem do GPS
+   * e a magnitude do sensor: o ponto fica com os dois, para o mapa mostrar
+   * onde o campo sobe e não só o que se lia.
+   */
+  const markReading = useCallback(async () => {
+    if (!hasFix) return;
+    const lat = location.latitude;
+    const lon = location.longitude;
+    if (lat === 0 && lon === 0) return;
+    const point: EmfSurveyPoint = {
+      id: createEmfSurveyId(),
+      lat,
+      lon,
+      value,
+      delta: ambient === null ? null : Math.round(delta * 10) / 10,
+      ratio: Math.round(ratio * 1000) / 1000,
+      createdAt: Date.now(),
+    };
+    const next = await addEmfSurveyPoint(point);
+    setSurvey(next);
+    setSurveyOpen(true);
+  }, [ambient, delta, hasFix, location.latitude, location.longitude, ratio, value]);
+
+  const removeSurveyPoint = useCallback(async (id: string) => {
+    const next = await removeEmfSurveyPoint(id);
+    setSurvey(next);
+  }, []);
+
+  const clearSurvey = useCallback(async () => {
+    const next = await clearEmfSurvey();
+    setSurvey(next);
+  }, []);
+
+  const surveyMapSize = useMemo(
+    () => Math.min(mapSideFor(Dimensions.get('window').width), SURVEY_MAP_MAX),
+    [],
+  );
+  const surveyList = useMemo(
+    () => survey.slice(-SURVEY_LIST_MAX).reverse(),
+    [survey],
+  );
+
   const beepActive = active && !frozen && ratio > 0.08;
   const beepFreq = 240 + Math.pow(ratio, 1.4) * 660;
   const beepInterval = 720 - Math.pow(ratio, 1.4) * 620;
@@ -213,7 +314,10 @@ const EmfReaderView = ({ active, hasFix, onAdd, calibration, onCalibrate }: Prop
   }, [active, beepActive]);
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.container}
+      showsVerticalScrollIndicator={false}>
       <Text style={[styles.title, { color: colors.textMuted }]}>
         {t('emf_title')}
       </Text>
@@ -376,12 +480,92 @@ const EmfReaderView = ({ active, hasFix, onAdd, calibration, onCalibrate }: Prop
             </Pressable>
 
             <Pressable
+              onPress={markReading}
+              disabled={!hasFix}
+              style={[
+                styles.resetButton,
+                { borderColor: hasFix ? colors.primary : colors.border },
+              ]}>
+              <Text
+                style={[styles.resetText, { color: hasFix ? colors.primary : colors.textMuted }]}>
+                {t('emf_survey_mark')}
+              </Text>
+            </Pressable>
+
+            <Pressable
               onPress={reset}
               style={[styles.resetButton, { borderColor: colors.border }]}>
               <Text style={[styles.resetText, { color: colors.text }]}>
                 {t('emf_reset')}
               </Text>
             </Pressable>
+          </View>
+
+          <View style={styles.surveyBox}>
+            <Pressable
+              onPress={() => setSurveyOpen(open => !open)}
+              style={styles.surveyHeader}>
+              <Text style={[styles.surveyTitle, { color: colors.text }]}>
+                {t('emf_survey_title')}
+              </Text>
+              <Text style={[styles.surveyCount, { color: colors.textMuted }]}>
+                {survey.length}
+              </Text>
+              <Text style={[styles.surveyChevron, { color: colors.textMuted }]}>
+                {surveyOpen ? '▲' : '▼'}
+              </Text>
+            </Pressable>
+
+            {surveyOpen && (
+              <>
+                <EmfSurveyMap
+                  points={survey}
+                  location={location}
+                  size={surveyMapSize}
+                />
+
+                {surveyList.map(point => (
+                  <View key={point.id} style={styles.surveyRow}>
+                    <View
+                      style={[
+                        styles.surveyDot,
+                        {
+                          backgroundColor:
+                            point.ratio == null
+                              ? colors.textMuted
+                              : emfLevel(point.ratio) === 'high'
+                                ? colors.danger
+                                : emfLevel(point.ratio) === 'medium'
+                                  ? colors.warning
+                                  : colors.success,
+                        },
+                      ]}
+                    />
+                    <Text style={[styles.surveyValue, { color: colors.text }]}>
+                      {point.value.toFixed(1)} µT
+                    </Text>
+                    <Text style={[styles.surveyTime, { color: colors.textMuted }]}>
+                      {formatTime(point.createdAt)}
+                    </Text>
+                    <Pressable onPress={() => removeSurveyPoint(point.id)}>
+                      <Text style={[styles.surveyRemove, { color: colors.textMuted }]}>
+                        🗑
+                      </Text>
+                    </Pressable>
+                  </View>
+                ))}
+
+                {survey.length > 0 && (
+                  <Pressable
+                    onPress={clearSurvey}
+                    style={[styles.resetButton, { borderColor: colors.border }]}>
+                    <Text style={[styles.resetText, { color: colors.text }]}>
+                      {t('emf_survey_clear')}
+                    </Text>
+                  </Pressable>
+                )}
+              </>
+            )}
           </View>
 
           <View style={styles.hintRow}>
@@ -396,17 +580,21 @@ const EmfReaderView = ({ active, hasFix, onAdd, calibration, onCalibrate }: Prop
           </View>
         </>
       )}
-    </View>
+    </ScrollView>
   );
 };
 
 const createStyles = (_colors: ColorScheme) =>
   StyleSheet.create({
-    container: {
+    scroll: {
       flex: 1,
+    },
+    container: {
+      flexGrow: 1,
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
     },
     title: {
       fontSize: 12,
@@ -592,6 +780,55 @@ const createStyles = (_colors: ColorScheme) =>
       marginTop: spacing.lg,
       lineHeight: 18,
       maxWidth: 320,
+    },
+    surveyBox: {
+      alignSelf: 'stretch',
+      maxWidth: 320,
+      marginTop: spacing.lg,
+    },
+    surveyHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: spacing.sm,
+    },
+    surveyTitle: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: '800',
+    },
+    surveyCount: {
+      fontSize: 13,
+      fontWeight: '800',
+      marginRight: spacing.sm,
+    },
+    surveyChevron: {
+      fontSize: 11,
+      fontWeight: '800',
+    },
+    surveyRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 3,
+    },
+    surveyDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      marginRight: spacing.sm,
+    },
+    surveyValue: {
+      flex: 1,
+      fontSize: 12,
+      fontWeight: '800',
+      fontVariant: ['tabular-nums'],
+    },
+    surveyTime: {
+      fontSize: 11,
+      fontWeight: '700',
+      marginRight: spacing.md,
+    },
+    surveyRemove: {
+      fontSize: 13,
     },
   });
 

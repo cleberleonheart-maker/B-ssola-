@@ -656,8 +656,15 @@ foram encontrados de verdade, não ideias soltas.
       aponta para a anomalia enquanto caminha; sem ambiente, é o de maior
       magnitude (o que depende da orientação do aparelho). Legenda explicita:
       "Eixo dominante: X". Lógica pura e testada em `utils/emf.ts`.
-- [ ] **48. 🗺️ EMF: levantamento geolocalizado** — marcar leituras num mini-mapa
-      (heatmap) para mapear fontes numa área.
+- [x] **48. 🗺️ EMF: levantamento geolocalizado** — ✅ feito: o botão "🖍️ Marcar
+      leitura" grava a leitura actual (magnitude em µT, desvio face ao ambiente
+      e nível de 0 a 1) com a posição do GPS. As marcações ficam no
+      `AsyncStorage` (`emfSurveyService.ts`) e o painel de levantamento
+      desenha-as no `EmfSurveyMap`: cada ponto com a cor do nível que a leitura
+      tinha, o número ao lado, o trajecto entre leituras e a posição actual
+      marcada a-ringue. Aponta-se um ponto ou limpa-se tudo. É a parte
+      geolocalizada do heatmap: sem base cartográfica, como o resto do app
+      (ideia #93).
 - [x] **49. ❄️ EMF: travar leitura** — ✅ feito: chip ❄️ Congelar ao lado do valor
       (torna-se ▶️ Retomar). Enquanto congelado o subscription é ignorado —
       ecrã, barra, histórico, min/máx, bipes e vibração ficam no último valor,
