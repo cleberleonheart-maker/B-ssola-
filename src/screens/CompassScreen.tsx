@@ -50,6 +50,7 @@ import {
   type LocationMode,
 } from '../services/locationService';
 import { reverseGeocode } from '../services/geocodingService';
+import { useWhereabouts } from '../services/whereaboutsService';
 import {
   loadCalibration,
   loadVerification,
@@ -860,6 +861,11 @@ const CompassScreen = () => {
       flushOdometer().catch(() => {});
     };
   }, []);
+
+  // "Onde estive" (ideia #36): regista por onde a app passa, para o mapa de
+  // calor do modo Mapa ter o dia (e a semana) desenhados. A amostragem é
+  // preguiçosa e vive no hook; aqui só se liga.
+  useWhereabouts(true, location);
 
   useEffect(() => {
     const lat = location.latitude;

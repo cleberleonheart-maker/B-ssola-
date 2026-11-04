@@ -192,6 +192,22 @@ export const createStyles = (colors: ColorScheme) =>
   trackArea: {
     flex: 1,
   },
+  mapTabs: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
+  mapTab: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+    borderWidth: 1,
+  },
+  mapTabText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
   headingBlock: {
     marginTop: spacing.md,
     alignItems: 'center',

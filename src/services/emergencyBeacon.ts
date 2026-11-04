@@ -13,6 +13,7 @@ import {
   DEFAULT_BEACON_INTERVAL_MINUTES,
   type BeaconMessageParams,
 } from '../utils/beacon';
+import { toInternationalPhone } from './phoneNumberService';
 
 export type BeaconConfig = {
   enabled: boolean;
@@ -50,6 +51,27 @@ export const saveBeaconConfig = async (cfg: Partial<BeaconConfig>) => {
   }
 };
 
+/**
+ * Passa o contacto guardado para o formato internacional.
+ *
+ * Quem guardou o número local ("21999990000") fica com ele assim até aqui.
+ * O WhatsApp diz que esse número não está no WhatsApp — e está; o formato é
+ * que não bate — e o SMS vai para um número que não existe. Passando pelo
+ * país do telemóvel, o número guardado passa a ser o número a sério, e
+ * gravá-lo corrigido evita que o problema volte.
+ */
+export const normalizeBeaconContact = async (
+  contact: string,
+): Promise<{ contact: string; changed: boolean }> => {
+  if (!contact) return { contact, changed: false };
+  const international = await toInternationalPhone(contact);
+  if (!international || international === contact) {
+    return { contact, changed: false };
+  }
+  await saveEmergencyContactPref(international);
+  return { contact: international, changed: true };
+};
+
 /** Texto do SMS do beacon. */
 export const buildMessage = (params: BeaconMessageParams): string =>
   buildBeaconMessage(params);
@@ -68,7 +90,9 @@ export const sendBeaconSms = async (
 ): Promise<boolean> => {
   if (!contact) return false;
   const body = encodeURIComponent(message);
-  const number = encodeURIComponent(contact);
+  // O número não vai codificado: o `+` de E.164 codificado (%2B) é
+  // interpretado por alguns apps de SMS como o fim do número.
+  const number = contact.replace(/[^\d+]/g, '');
   const url =
     Platform.OS === 'ios' ? `sms:${number}&body=${body}` : `sms:${number}?body=${body}`;
   try {

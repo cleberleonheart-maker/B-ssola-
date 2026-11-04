@@ -34,6 +34,7 @@ class MainApplication : Application(), ReactApplication {
           add(BatteryOptPackage())
           add(NetworkInfoPackage())
           add(BiometricPackage())
+          add(PhoneNumberPackage())
         },
     )
   }

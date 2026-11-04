@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, type LayoutChangeEvent } from 'react-native';
+import { View, Text, Pressable, type LayoutChangeEvent } from 'react-native';
 import AROverlay from '../../components/AROverlay';
 import BubbleLevel from '../../components/BubbleLevel';
 import CameraARView from '../../components/CameraARView';
@@ -19,6 +19,7 @@ import TargetNavBar from '../../components/TargetNavBar';
 import TheodoliteView from '../../components/TheodoliteView';
 import TrackView from '../../components/TrackView';
 import MiniMapView from '../../components/MiniMapView';
+import WhereaboutsHeatmap from '../../components/WhereaboutsHeatmap';
 import TriangulationView from '../../components/TriangulationView';
 import WindView from '../../components/WindView';
 import { useLanguage } from '../../i18n/LanguageContext';
@@ -142,6 +143,11 @@ const ModeView = (props: Props) => {
     waypoints,
     statusPanels,
   } = props;
+
+  // No modo mapa há duas vistas: o mapa de agora e o mapa de calor "onde
+  // estive" (ideia #36). É um estado local do ecrã: muda de vista, não muda
+  // de modo.
+  const [mapView, setMapView] = React.useState<'map' | 'whereabouts'>('map');
 
   return (
     <ErrorBoundary modeLabel={t(MODE_LABEL_KEY[displayMode])}>
@@ -268,7 +274,48 @@ const ModeView = (props: Props) => {
         </View>
       ) : displayMode === 'map' ? (
         <View style={styles.trackArea}>
-          <MiniMapView active location={location} heading={heading} />
+          <View style={styles.mapTabs}>
+            <Pressable
+              onPress={() => setMapView('map')}
+              style={[
+                styles.mapTab,
+                {
+                  borderColor: colors.border,
+                  backgroundColor: mapView === 'map' ? colors.surfaceAlt : 'transparent',
+                },
+              ]}>
+              <Text
+                style={[
+                  styles.mapTabText,
+                  { color: mapView === 'map' ? colors.text : colors.textMuted },
+                ]}>
+                🧭 {t('map_tab_map')}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setMapView('whereabouts')}
+              style={[
+                styles.mapTab,
+                {
+                  borderColor: colors.border,
+                  backgroundColor:
+                    mapView === 'whereabouts' ? colors.surfaceAlt : 'transparent',
+                },
+              ]}>
+              <Text
+                style={[
+                  styles.mapTabText,
+                  { color: mapView === 'whereabouts' ? colors.text : colors.textMuted },
+                ]}>
+                🗺️ {t('map_tab_whereabouts')}
+              </Text>
+            </Pressable>
+          </View>
+          {mapView === 'map' ? (
+            <MiniMapView active location={location} heading={heading} />
+          ) : (
+            <WhereaboutsHeatmap location={location} />
+          )}
         </View>
       ) : displayMode === 'notes' ? (
         <View style={styles.trackArea}>

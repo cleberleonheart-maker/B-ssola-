@@ -44,7 +44,12 @@ import { formatAltitude, formatAccuracy } from '../utils/units';
 import { getBatteryLevel } from '../services/battery';
 import { getNetworkInfo } from '../services/network';
 import { loadEmergencyContact } from '../services/preferencesService';
-import { buildMessage, sendBeaconSms } from '../services/emergencyBeacon';
+import {
+  buildMessage,
+  normalizeBeaconContact,
+  sendBeaconSms,
+} from '../services/emergencyBeacon';
+import { hasCountryCode, phoneForWhatsApp } from '../utils/beacon';
 import type { LocationFix } from '../services/locationService';
 
 type Props = {
@@ -95,8 +100,12 @@ const EmergencyModal = ({
     if (!visible) return;
     let mounted = true;
     loadEmergencyContact()
-      .then(contact => {
-        if (mounted) setBeaconContact(contact);
+      .then(async contact => {
+        // O contacto guardado pode estar em formato local; ao abrir o modal
+        // passa-se ao internacional (e grava-se), para o WhatsApp e o SMS
+        // chegarem ao número certo.
+        const { contact: normalizado } = await normalizeBeaconContact(contact || '');
+        if (mounted) setBeaconContact(normalizado);
       })
       .catch(() => {});
     return () => {
@@ -177,14 +186,51 @@ const EmergencyModal = ({
     }
   };
 
+  /**
+   * Abre o WhatsApp a falar com o contacto de emergência.
+   *
+   * O número vai em formato internacional (só dígitos), que é o que o
+   * WhatsApp resolve: com o número local, o WhatsApp responde que o número
+   * não está no WhatsApp — e está; o formato é que não bate.
+   *
+   * Sem contacto guardado, o WhatsApp abre para se escolher a quem escrever.
+   */
   const openWhatsApp = async () => {
     if (!hasFix) return;
     const text = encodeURIComponent(shareText);
+    const contact = beaconContact?.trim();
+    if (!contact) {
+      try {
+        await Linking.openURL(`whatsapp://send?text=${text}`);
+      } catch {
+        try {
+          await Linking.openURL(`https://wa.me/?text=${text}`);
+        } catch {
+          Alert.alert(t('em_title'), t('em_direct_unavailable'));
+        }
+      }
+      return;
+    }
+
+    if (!hasCountryCode(contact)) {
+      Alert.alert(t('em_title'), t('em_whatsapp_no_country', { number: contact }), [
+        { text: t('em_close'), style: 'cancel' },
+        {
+          text: t('em_whatsapp_fix'),
+          onPress: () => {
+            Linking.openSettings().catch(() => {});
+          },
+        },
+      ]);
+      return;
+    }
+
+    const number = phoneForWhatsApp(contact);
     try {
-      await Linking.openURL(`whatsapp://send?text=${text}`);
+      await Linking.openURL(`whatsapp://send?phone=${number}&text=${text}`);
     } catch {
       try {
-        await Linking.openURL(`https://wa.me/?text=${text}`);
+        await Linking.openURL(`https://wa.me/${number}?text=${text}`);
       } catch {
         Alert.alert(t('em_title'), t('em_direct_unavailable'));
       }

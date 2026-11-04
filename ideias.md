@@ -104,6 +104,15 @@
       O número do contacto vive em Configurações → SOS (`@bussola/emergContact`).
       O envio sai pela app de SMS do sistema (`buildMessage` + `sendBeaconSms`),
       que é o que deixa a pessoa confirmar antes de mandar.
+      **Correcção (v7.70, code 201):** o número do contacto passa automaticamente
+      ao formato internacional (`+5521999990000`) — o Android sabe passá-lo
+      usando o país do telemóvel (`PhoneNumberModule`, `PhoneNumberUtils
+      .formatNumberToE164`), e o que estava guardado em formato local é
+      corrigido ao abrir o modal. Sem isso, o WhatsApp respondia "este número
+      não está no WhatsApp" (estava; o formato é que não batia) e o botão
+      💬 do SOS abria o WhatsApp sem destino — agora abre a conversa com o
+      contacto, e avisa em português quando o número guardado não tem código
+      de país.
 - [x] **7. Detecção de queda** — feito (v7.68, code 199). O acelerómetro mede o
       impacto e a imobilidade a seguir (`utils/fallDetector.ts`: pico forte +
       pouco movimento durante a janela), e o `fallDetectionService` pergunta
@@ -600,8 +609,13 @@ foram encontrados de verdade, não ideias soltas.
 - [x] **35. 🔲 QR de localização** — feito (v7.65). Gerar QR com as coordenadas
       (`geo:`) para outro aparelho ler/abrir em mapa. Tipo "compartilhar sem redes
       sociais". Adicionado ao modal de coordenadas com botões copiar/compartilhar.
-- [ ] **36. 🌡️ Heatmap "onde estive"** — registrar posições ao longo do dia e desenhar um
-      mapa de calor do dia/semana (junta GPS + trilhas salvas).
+- [x] **36. 🌡️ Heatmap "onde estive"** — ✅ feito: o modo Mapa tem uma segunda
+      aba, "Onde estive". As posições por onde a app passa ficam registadas
+      (`whereaboutsService.ts`, `AsyncStorage`, uma semana, amostragem preguiçosa:
+      15 m **e** 20 s), e o mapa de calor (`utils/heatmap.ts` + `WhereaboutsHeatmap`)
+      agrupa-as numa grelha de 40 m: azul onde se passou, vermelho onde se
+      esteve, com a escolha "Hoje" ou "7 dias" e a escala de cores por baixo.
+      Sem tiles e sem rede, como o resto do app (#93).
 - [ ] **37. 🔗 GPX por link** — além do arquivo, gerar link curto da trilha salva na
       nuvem para compartilhar (email/WhatsApp).
 - [x] **38. 💾 Backup completo** — exportar tudo (notas, waypoints, trilhas, calibrações,

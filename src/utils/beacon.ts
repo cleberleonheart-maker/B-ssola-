@@ -47,6 +47,27 @@ export const normalizePhone = (raw: string): string => {
   return plus + trimmed.replace(/\D/g, '');
 };
 
+/**
+ * O número tem código de país?
+ *
+ * Sem código de país, o WhatsApp diz que o número não está no WhatsApp (o
+ * erro é do formato, não do número) e o SMS vai para um número que não
+ * existe. O `+` ou o `00` à frente é o sinal.
+ */
+export const hasCountryCode = (raw: string): boolean => {
+  const trimmed = raw.trim();
+  return trimmed.startsWith('+') || trimmed.startsWith('00');
+};
+
+/**
+ * O número como o WhatsApp o quer: só dígitos, sem `+` e sem o `00` do
+ * prefixo internacional.
+ */
+export const phoneForWhatsApp = (raw: string): string => {
+  const digits = raw.replace(/\D/g, '');
+  return digits.startsWith('00') ? digits.slice(2) : digits;
+};
+
 /** Um número é plausível para SMS? (6 a 15 dígitos, como o E.164 permite) */
 export const isValidPhone = (raw: string): boolean => {
   const digits = raw.replace(/\D/g, '');

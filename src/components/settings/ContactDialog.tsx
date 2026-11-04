@@ -3,6 +3,7 @@ import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { useThemeColors } from '../../theme/ThemeContext';
 import { isValidPhone, normalizePhone } from '../../utils/beacon';
+import { toInternationalPhone } from '../../services/phoneNumberService';
 import { styles } from './styles';
 
 type Props = {
@@ -14,17 +15,20 @@ type Props = {
 /**
  * Diálogo do contacto de emergência.
  *
- * O número é normalizado ao guardar (só dígitos, com `+` à frente se o
- * utilizador o escrever), porque o SMS abre com o número tal e qual e um
- * espaço a meio faz o Android recusar o destino.
+ * O número é guardado no formato internacional ("+5521999990000"): o
+ * WhatsApp só encontra um contacto pelo número completo e diz "este número
+ * não está no WhatsApp" quando o formato é local — mesmo estando. O Android
+ * sabe passar o número local ao formato internacional quando lhe dizem de que
+ * país é, por isso o país do telemóvel é usado aqui.
  */
 const ContactDialog = ({ value, onSave, onClose }: Props) => {
   const { t } = useLanguage();
   const colors = useThemeColors();
   const [text, setText] = useState(value);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const save = () => {
+  const save = async () => {
     const normalized = normalizePhone(text);
     if (normalized.length === 0) {
       onSave('');
@@ -35,7 +39,12 @@ const ContactDialog = ({ value, onSave, onClose }: Props) => {
       setError(t('emerg_contact_invalid'));
       return;
     }
-    onSave(normalized);
+    setSaving(true);
+    // O país do telemóvel entra aqui: é o que falta para o número local
+    // fazer sentido para o WhatsApp e para o SMS.
+    const international = await toInternationalPhone(text);
+    setSaving(false);
+    onSave(international || normalized);
     onClose();
   };
 
@@ -74,6 +83,7 @@ const ContactDialog = ({ value, onSave, onClose }: Props) => {
           </Pressable>
           <Pressable
             onPress={save}
+            disabled={saving}
             style={[styles.restoreButton, { backgroundColor: colors.primary }]}>
             <Text style={styles.restoreButtonText}>{t('emerg_contact_save')}</Text>
           </Pressable>
