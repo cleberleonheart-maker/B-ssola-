@@ -35,7 +35,11 @@ class BiometricModule(private val reactContext: ReactApplicationContext) :
   @ReactMethod
   fun authenticate(promptTitle: String, promptSubtitle: String, promptCancel: String, promise: Promise) {
     try {
-      val activity = currentActivity
+      // `currentActivity` vindo da classe base deixou de resolver: no React
+      // Native 0.87 essa base passou a Kotlin, e um `fun getCurrentActivity()`
+      // em Kotlin não vira propriedade. A via que o próprio RN recomenda (e a
+      // que os outros módulos do projeto usam) é pelo contexto.
+      val activity = reactContext.currentActivity
       if (activity !is FragmentActivity) {
         promise.resolve(false)
         return
