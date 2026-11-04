@@ -152,8 +152,13 @@
       permissão para mexer na janela.
 
 ## Ideias novas (23/09/2026)
-- [ ] **17. AR sobre a câmera real** — marcar sol/lua/destino com o fundo da câmera
+- [x] **17. AR sobre a câmera real** — marcar sol/lua/destino com o fundo da câmera
       viva (a camada de marcadores do `CameraARView` já existe; falta unir os dois).
+      **Já estava feito**: o `CameraARView` desenha a `<Camera>` do vision-camera
+      (`styles.cameraLayer`) e, por cima, a camada de marcadores (`styles.markersLayer`,
+      `pointerEvents="none"`), onde entram sol, lua, cardeais, alvo e marco virtual.
+      A nota ficou escrita antes de o código existir e ninguém voltou a abri-la —
+      a linha só não estava marcada.
 - [x] **18. Backup e sincronização de notas/waypoints** — ✅ feito. A escrita
       para a nuvem existia sem leitura (`fetchCloudNotes`/`fetchCloudTracks` não
       tinham chamador) e os waypoints não falhavam com a nuvem de modo nenhum.
