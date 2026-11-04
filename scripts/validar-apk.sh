@@ -7,9 +7,12 @@
 # escrito, porque nenhuma máquina sabe se a impressão digital destravou.
 #
 # Uso:
-#   bash scripts/validar-apk.sh                    # usa o APK do release 199
+#   bash scripts/validar-apk.sh                    # usa o APK do release 200
 #   bash scripts/validar-apk.sh /caminho/app.apk   # usa um APK local
 #   SKIP_INSTALL=1 bash scripts/validar-apk.sh     # não instala, só vigia
+#
+# Sem adb (o telemóvel trabalha pelo Termux) há o `scripts/validar-termux.sh`,
+# que corre no próprio aparelho e não precisa de USB.
 #
 # O APK é do mesmo key de produção, por isso a instalação é por cima: os
 # dados do utilizador (pontos, notas, PIN) ficam como estavam.
@@ -19,7 +22,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PKG="com.bussola.app"
 ACT="$PKG/.MainActivity"
 REPO="cleberleonheart-maker/B-ssola-"
-ASSET="bussola-v199.apk"
+ASSET="bussola-v200.apk"
+SHA="dd748a13a872b7e9a9e3235159597583d90fa9d8bcaa1464a89e0809c0d18f13"
 VIGIA_S=45
 
 APK="${1:-}"
@@ -34,6 +38,7 @@ fi
 
 if ! command -v adb >/dev/null 2>&1; then
   echo "ERRO: adb não está instalado."
+  echo "Sem adb? Corre scripts/validar-termux.sh no Termux do próprio telemóvel."
   exit 1
 fi
 
@@ -45,6 +50,15 @@ fi
 echo "== aparelho =="
 adb shell getprop ro.product.model | tr -d '\r'
 adb shell getprop ro.build.version.release | tr -d '\r'
+
+echo
+echo "== a verificar a assinatura do ficheiro =="
+OBTIDO=$(sha256sum "$APK" | cut -d' ' -f1)
+if [ "$OBTIDO" != "$SHA" ]; then
+  echo "ERRO: o sha256 não bate (esperado $SHA, obtido $OBTIDO)."
+  exit 1
+fi
+echo "OK: $OBTIDO"
 
 if [ "${SKIP_INSTALL:-0}" != "1" ]; then
   echo
@@ -87,8 +101,8 @@ fi
 echo
 echo "== o guião que falta (à mão, no aparelho) =="
 cat <<'GUIA'
-1. "O que foi feito": devem aparecer 4 linhas — bloqueio por PIN, diagnóstico
-   dos sensores, SOS com contexto, triangulação por marcadores.
+1. "O que foi feito": no build 200 deve aparecer 1 linha — levantamento de EMF
+   no mapa.
 2. Bloqueio: define um PIN (Configurações > Segurança), sai da app, abre outra
    vez (pede o PIN), espera 30 s fora da app e volta (pede o PIN outra vez).
    Com a biometria ligada, o dedo destranca sem PIN; desligada, só o PIN.
@@ -96,9 +110,11 @@ cat <<'GUIA'
    de pé e confirma o eixo que aponta para cima.
 4. Triangulação: modo Triângulo > "Por marcadores" — aponta a dois marcos
    guardados e grava os dois rumos: a posição estimada deve cair perto de ti.
-5. SOS: põe um contacto em Configurações > SOS e liga o beacon; quando a
+5. EMF: modo 🧲, com o GPS ligado, toca "🖍️ Marcar leitura"; o ponto tem de
+   aparecer no mapa do painel "Levantamento EMF", com a cor do nível.
+6. SOS: põe um contacto em Configurações > SOS e liga o beacon; quando a
    notificação aparecer, toca nela: abre o SMS com a posição, a bateria e a
    rede já escritas.
-6. Widget: põe o widget no ecrã principal, roda o telemóvel (o rumo muda) e
+7. Widget: põe o widget no ecrã principal, roda o telemóvel (o rumo muda) e
    toca nele (abre a app).
 GUIA
