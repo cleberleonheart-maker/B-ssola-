@@ -21,7 +21,7 @@ import {
   SensorTypes,
 } from 'react-native-sensors';
 import CalibrationModal from '../components/CalibrationModal';
-import PolarisCalibrationModal from '../components/PolarisCalibrationModal';
+import StarCalibrationModal from '../components/StarCalibrationModal';
 import SettingsModal from '../components/SettingsModal';
 import WaypointModal from '../components/WaypointModal';
 import AlertsModal from '../components/AlertsModal';
@@ -229,7 +229,7 @@ const CompassScreen = () => {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [coordVisible, setCoordVisible] = useState(false);
   const [calibrationVisible, setCalibrationVisible] = useState(false);
-  const [polarisVisible, setPolarisVisible] = useState(false);
+  const [starCalVisible, setStarCalVisible] = useState(false);
   const [alertsVisible, setAlertsVisible] = useState(false);
   const [emergencyVisible, setEmergencyVisible] = useState(false);
 
@@ -1698,7 +1698,7 @@ const CompassScreen = () => {
         onSelectMode={selectMode}
         calibrated={calibrated}
         onOpenCalibration={openCalibration}
-        onOpenPolaris={() => setPolarisVisible(true)}
+        onOpenStarCal={() => setStarCalVisible(true)}
         appMode={appMode}
         onSelectAppMode={selectAppMode}
         declination={declination}
@@ -1740,9 +1740,9 @@ const CompassScreen = () => {
         declinationDegrees={declination.degrees}
       />
 
-      <PolarisCalibrationModal
-        visible={polarisVisible}
-        onClose={() => setPolarisVisible(false)}
+      <StarCalibrationModal
+        visible={starCalVisible}
+        onClose={() => setStarCalVisible(false)}
         onSave={degrees => setDeclination({ enabled: true, degrees })}
         latitude={location.latitude}
         longitude={location.longitude}

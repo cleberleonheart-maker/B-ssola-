@@ -74,12 +74,15 @@ echo "   logcat -s ReactNativeJS:V AndroidRuntime:E | tail -100"
 echo
 echo "== o guião (à mão, no aparelho) =="
 cat <<'GUIA'
-1. "O que foi feito": no build 202 devem aparecer 2 linhas — Estrela Polar
-   e widget com partilha.
-2. Estrela Polar: Definições > Bússola > "⭐ Calibrar pela Estrela Polar" (à
-   noite, céu limpo): aponta a câmara à Polaris — a mira diz a altura a que
-   ela está e quanto falta para virar e levantar; quando ficar no centro,
+1. "O que foi feito": no build 203 devem aparecer 3 linhas — calibração por
+   estrela, Estrela Polar e widget com partilha.
+2. Calibração por estrela: Definições > Bússola > "⭐ Calibrar por estrela"
+   (à noite, céu limpo): a app lista as estrelas que estão no horizonte —
+   no Brasil, a Cruz do Sul, Canopus, Sirius, Achernar — e diz a altura e o
+   azimute de cada uma. Escolhe uma, aponta a câmara (em retrato): a mira
+   diz quanto falta para virar e levantar; quando a estrela ficar no centro,
    toca "Medir declinação" e o resultado deve aparecer em segundos.
+   Se a estrela estiver demasiado alta ou baixa, a app avisa e não mede.
 3. Widget: no ecrã principal, toca no botão do widget — sem rastreio a correr
    abre a app no ecra de emergência; com rastreio a correr, para-o sem abrir
    a app (o botão fica vermelho).

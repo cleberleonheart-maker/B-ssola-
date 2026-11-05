@@ -117,10 +117,66 @@ const precess = (ra: number, dec: number, t: number): RaDec => {
  * para todos os efeitos, a latitude de quem está a olhar, e o seu azimute é
  * o norte verdadeiro — é o que permite calibrar a bússola sem tabela de
  * declinação nenhuma (ideia #13).
+ *
+ * Mas só a norte do equador: no hemisfério sul está abaixo do horizonte, e
+ * por isso a calibração do sul usa outras estrelas (a Cruz do Sul e as mais
+ * brilhantes do céu sul).
  */
-const POLARIS_J2000: RaDec = {
+export const POLARIS_J2000: RaDec = {
   rightAscension: 37.954542,
   declination: 89.264111,
+};
+
+/** As quatro estrelas da Cruz do Sul, em J2000 (RA/Dec em graus). */
+export const CRUX_J2000 = {
+  acrux: { rightAscension: 186.6499, declination: -63.0992 },
+  gacrux: { rightAscension: 187.7916, declination: -57.1131 },
+  mimosa: { rightAscension: 191.9303, declination: -59.6888 },
+  delta: { rightAscension: 183.7863, declination: -58.7489 },
+} as const;
+
+type Vector3 = { x: number; y: number; z: number };
+
+const vectorFromRaDec = ({ rightAscension: ra, declination: dec }: RaDec): Vector3 => {
+  const a = toRad(ra);
+  const d = toRad(dec);
+  return {
+    x: Math.cos(d) * Math.cos(a),
+    y: Math.cos(d) * Math.sin(a),
+    z: Math.sin(d),
+  };
+};
+
+const raDecFromVector = (v: Vector3): RaDec => {
+  const norm = Math.hypot(v.x, v.y, v.z) || 1;
+  return {
+    rightAscension: wrap360(toDeg(Math.atan2(v.y, v.x))),
+    declination: toDeg(Math.asin(Math.max(-1, Math.min(1, v.z / norm)))),
+  };
+};
+
+const crossProduct = (a: Vector3, b: Vector3): Vector3 => ({
+  x: a.y * b.z - a.z * b.y,
+  y: a.z * b.x - a.x * b.z,
+  z: a.x * b.y - a.y * b.x,
+});
+
+/**
+ * Onde está uma estrela agora, para quem está em `lat`/`lon`.
+ *
+ * A estrela é dada em J2000 e precessionada para a data; daqui sai o azimute
+ * e a altura sobre o horizonte, que é o que a mira de calibração usa para
+ * saber para onde apontar.
+ */
+export const starPosition = (
+  raDecJ2000: RaDec,
+  date: Date,
+  lat: number,
+  lon: number,
+): CelestialPoint => {
+  const t = toDays(date) / 36525;
+  const rd = precess(raDecJ2000.rightAscension, raDecJ2000.declination, t);
+  return horizonCoords(rd, date, lat, lon);
 };
 
 /**
@@ -130,10 +186,43 @@ const POLARIS_J2000: RaDec = {
  * meio grau, que é a distância de Polaris ao polo em 2026). É isso que a
  * mira de calibração usa para saber para onde apontar.
  */
-export const polarisPosition = (date: Date, lat: number, lon: number) => {
+export const polarisPosition = (date: Date, lat: number, lon: number) =>
+  starPosition(POLARIS_J2000, date, lat, lon);
+
+/**
+ * O centro da Cruz do Sul: o ponto onde o eixo longo (Gacrux–Acrux) cruza o
+ * eixo curto (Mimosa–Delta).
+ *
+ * É o alvo que se aponta no hemisfério sul: a Cruz é a figura mais fácil de
+ * reconhecer do céu sul, e o seu centro fica a ~30° do polo celeste sul —
+ * longe o suficiente para o erro de mira não pesar demasiado.
+ *
+ * O centro é a interseção dos dois grandes círculos, calculada com vetores
+ * unitários: primeiro a precessão de cada estrela para a data, depois o
+ * cruzamento dos vetores.
+ */
+export const crossCentrePosition = (date: Date, lat: number, lon: number) => {
   const t = toDays(date) / 36525;
-  const rd = precess(POLARIS_J2000.rightAscension, POLARIS_J2000.declination, t);
-  return horizonCoords(rd, date, lat, lon);
+  const p = (rd: RaDec) =>
+    vectorFromRaDec(
+      precess(rd.rightAscension, rd.declination, t),
+    );
+  const gacrux = p(CRUX_J2000.gacrux);
+  const acrux = p(CRUX_J2000.acrux);
+  const mimosa = p(CRUX_J2000.mimosa);
+  const delta = p(CRUX_J2000.delta);
+  const longAxis = crossProduct(gacrux, acrux);
+  const shortAxis = crossProduct(mimosa, delta);
+  let centre = raDecFromVector(crossProduct(longAxis, shortAxis));
+  // A interseção dá dois pontos opostos; o que nos interessa é o do hemisfério
+  // sul celeste (a Cruz fica ao sul, perto do polo sul).
+  if (centre.declination > 0) {
+    centre = {
+      rightAscension: wrap360(centre.rightAscension + 180),
+      declination: -centre.declination,
+    };
+  }
+  return horizonCoords(centre, date, lat, lon);
 };
 
 export const solarPosition = (date: Date, lat: number, lon: number) => {

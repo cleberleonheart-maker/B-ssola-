@@ -151,6 +151,19 @@
       com a convenção "leste positivo" da app. A partir de 44° de latitude a
       estrela fica alta demais para o telefone e a app diz que não dá — melhor
       do que um número errado.
+      **Alargado na v7.72 (code 203)**: a Polaris só se vê a norte do
+      equador — no Brasil está uns 23° abaixo do horizonte, ou seja, a
+      calibração que interessava a quem usa o app nunca chegou a funcionar.
+      A mira passou a aceitar **qualquer estrela**: `utils/starCatalog.ts` traz
+      as 42 mais brilhantes (Sirius, Canopus, Achernar…) e o centro da Cruz do
+      Sul (`utils/astro.ts`, interseção dos dois grandes círculos), e a app
+      ordena os alvos por altura e magnitude e escolhe o melhor. A mira ficou
+      em `utils/starCalibration.ts` + `StarCalibrationModal`, com a escolha do
+      alvo e avisos honestos: de dia, sem GPS, sem estrelas no horizonte, e
+      fora da faixa de 4°–44°, onde o telefone lê mal o azimute — aí a app
+      recusa medir em vez de gravar um número errado. A medição lê o sensor em
+      tempo real (as 12 amostras são do momento, não do clique) e aborta se a
+      estrela se perder a meio.
 - [ ] **14. Tiles Android** — quick-settings tile para abrir direto num modo.
 - [x] **15. Tema automático** — ✅ feito: opção "Automático" no grid de tema, com
       três estratégias (Claro/Escuro por horário 6h–18h; Sol forte/Noturno por

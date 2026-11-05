@@ -21,7 +21,7 @@ export type Suggest = { city: string; uf: string; decl: number } | null;
 type Props = {
   calibrated: boolean;
   onOpenCalibration: () => void;
-  onOpenPolaris: () => void;
+  onOpenStarCal: () => void;
   declination: Declination;
   onSetDeclination: (decl: Declination) => void;
   declinationSuggest: Suggest;
@@ -48,7 +48,7 @@ const CompassSection = (props: Props) => {
   const {
     calibrated,
     onOpenCalibration,
-    onOpenPolaris,
+    onOpenStarCal,
     declination,
     onSetDeclination,
     declinationSuggest,
@@ -135,9 +135,9 @@ const CompassSection = (props: Props) => {
             ponto de referência fica com a declinação errada em graus. A
             Estrela Polar mede-a no sitio, à noite, sem tabela nenhuma.
           */}
-          <Pressable onPress={onOpenPolaris} style={styles.suggestButton}>
+          <Pressable onPress={onOpenStarCal} style={styles.suggestButton}>
             <Text style={[styles.suggestText, { color: colors.primary }]}>
-              {t('set_polaris')}
+              {t('set_star')}
             </Text>
           </Pressable>
         </GroupRow>
