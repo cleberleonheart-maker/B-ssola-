@@ -8,7 +8,7 @@
 # Uso (no Termux do telemóvel):
 #   bash validar-termux.sh                 # descarrega o APK do release e instala
 #   bash validar-termux.sh caminho.apk     # instala um APK já descarregado
-#   ASSET=bussola-v208.apk bash validar-termux.sh
+#   ASSET=bussola-v209.apk bash validar-termux.sh
 #
 # A instalação é por cima ("-r") e o APK é do mesmo key de produção: os pontos,
 # as notas, o PIN e o levantamento de EMF ficam como estavam.
@@ -17,8 +17,8 @@ set -euo pipefail
 PKG="com.bussola.app"
 ACT="$PKG/.MainActivity"
 REPO="cleberleonheart-maker/B-ssola-"
-ASSET="${ASSET:-bussola-v208.apk}"
-SHA="${SHA:-fe3305cc250fd67c449ec03b66e1c78966541156413a7746596c0d45d739096f}"
+ASSET="${ASSET:-bussola-v209.apk}"
+SHA="${SHA:-dd521f8b4d0922c6b496d9f3b46fefbb18bf6f4e7dd8c9cb7c35519708261689}"
 DIR="${DIR:-$HOME/bussola}"
 
 APK="${1:-$DIR/$ASSET}"
