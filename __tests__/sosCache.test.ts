@@ -10,10 +10,10 @@ import { NativeModules } from 'react-native';
  */
 
 type SosNative = {
-  cacheContact?: jest.Mock;
-  cacheFix?: jest.Mock;
-  cacheBattery?: jest.Mock;
-  cachedState?: jest.Mock;
+  cacheContact: jest.Mock;
+  cacheFix: jest.Mock;
+  cacheBattery: jest.Mock;
+  cachedState: jest.Mock;
 };
 
 const loadSos = (native: SosNative) => {
