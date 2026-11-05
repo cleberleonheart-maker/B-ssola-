@@ -101,15 +101,19 @@ fi
 echo
 echo "== o guião que falta (à mão, no aparelho) =="
 cat <<'GUIA'
-1. "O que foi feito": no build 208 devem aparecer 3 linhas — modo de assalto,
-   partilha da trilha por link e tile por modo.
+1. "O que foi feito": no build 209 devem aparecer 3 linhas — o SOS sem a app
+   aberta, modo de assalto e partilha da trilha por link.
 2. Modo de assalto: em Definições > SOS, toca em "📨 Envio de SMS em silêncio" e
-   permite a permissão. Depois põe a tile "🚨 Assalto" no painel de Definições
-   Rápidas: ao tocares nela (com o ecrã bloqueado) a app tem de abrir o ecrã de
-   emergência. Toca em "🚨 SOS discreto": conta 5 segundos (toca para
-   cancelar) e depois o aviso tem de sair por SMS, em silêncio, para o
-   contacto guardado — com a posição e o link do rastreio ao vivo. Confirma
-   que o telemóvel não abriu a app de SMS.
+   permite a permissão. Põe a tile "🚨 Assalto" no painel de Definições
+   Rápidas e bloqueia o telemóvel. Toca na tile: a app NÃO pode abrir, o ecrã
+   não se acende e tem de aparecer uma notificação silenciosa a contar 10
+   segundos, com o botão "Cancelar". Ao fim da contagem o aviso tem de sair
+   por SMS para o contacto guardado, com a última posição e a bateria, e o
+   telemóvel continua bloqueado. Testa também o "Cancelar": passados uns
+   segundos, cancela e confirma que o SMS não saiu. (Sem contacto de
+   emergência guardado, a tile tem de abrir a app no ecrã de emergência.)
+   Dentro da app, o botão "🚨 SOS discreto" continua a contar 5 segundos e
+   manda o aviso com o link do rastreio ao vivo.
 3. Partilha por link: grava uma trilha (Trilha > gravar > parar), toca em
    "Link" ao lado do GPX e escolhe a app de partilha. O link que sai é
    https://cleberleonheart-maker.github.io/B-ssola-/gpx.html#tkn=... — abre-o

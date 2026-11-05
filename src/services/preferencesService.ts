@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { cacheEmergencyContact } from './sosSender';
 import { DEFAULT_DECLINATION, type Declination } from '../utils/declination';
 import type { UnitSystem } from '../utils/units';
 import type { AxisConfirmation } from '../utils/sensorDiagnostics';
@@ -328,6 +329,10 @@ export const loadEmergencyContact = async (): Promise<string> => {
 
 export const saveEmergencyContact = async (v: string) => {
   await AsyncStorage.setItem(EMERG_CONTACT_KEY, v || '');
+  // O modo de assalto (ideia #107) manda o aviso com a app fechada: o nativo
+  // precisa de saber para quem avisar. O cache é uma cópia — se esta escrita
+  // falhar, o aviso sai pelo caminho com a app aberta, que é o de sempre.
+  await cacheEmergencyContact(v || '');
 };
 
 export const loadBeaconEnabled = async (): Promise<boolean> => {

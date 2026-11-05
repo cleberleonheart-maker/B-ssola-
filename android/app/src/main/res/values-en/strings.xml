@@ -41,4 +41,12 @@
     <string name="tile_selftest">🧪 Self-test</string>
     <string name="tile_diag">📟 Diagnostics</string>
     <string name="tile_sos">🚨 SOS</string>
+    <string name="sos_channel_name">SOS</string>
+    <string name="sos_channel_desc">Countdown before the emergency alert</string>
+    <string name="sos_countdown_title">🚨 Sending the SOS in %1$d s</string>
+    <string name="sos_countdown_text">Tap cancel to stop the alert.</string>
+    <string name="sos_cancel_action">Cancel</string>
+    <string name="sos_sent_title">🚨 SOS sent</string>
+    <string name="sos_sent_text">The alert went out quietly to the saved contact.</string>
+    <string name="tile_sos_pending">Sending…</string>
 </resources>

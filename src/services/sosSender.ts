@@ -16,6 +16,23 @@ import { NativeModules, PermissionsAndroid, Platform } from 'react-native';
 type SosSenderNative = {
   canSend?: () => Promise<boolean>;
   sendSms?: (contact: string, message: string) => Promise<string>;
+  cacheContact?: (contact: string) => Promise<boolean>;
+  cacheFix?: (
+    lat: number,
+    lon: number,
+    accuracy: number,
+    alt: number,
+    at: number,
+  ) => Promise<boolean>;
+  cacheBattery?: (percent: number) => Promise<boolean>;
+  cachedState?: () => Promise<{
+    contact?: string;
+    battery?: number;
+    pending?: boolean;
+    lat?: number;
+    lon?: number;
+    fixAt?: number;
+  }>;
 };
 
 const SosSender = (NativeModules as { SosSender?: SosSenderNative }).SosSender ?? null;
@@ -84,5 +101,89 @@ export const sendSmsSilently = async (
     return 'failed';
   } catch {
     return 'failed';
+  }
+};
+
+/**
+ * O que o nativo sabe para mandar o aviso sem a app aberta.
+ *
+ * A tile do SOS dispara o aviso com o telemóvel bloqueado e a app morta: o
+ * nativo precisa de saber para quem avisar e onde a pessoa estava. O
+ * JavaScript escreve aqui o que sabe — o contacto, a última posição e a
+ * bateria — e o nativo lê quando o aviso é disparado.
+ *
+ * Tudo isto é cache: falhar não pode estragar o que o app faz a seguir, por
+ * isso cada escrita é engolida se o módulo nativo não estiver lá.
+ */
+
+/** O contacto de emergência, para o aviso sair sem a app aberta. */
+export const cacheEmergencyContact = async (contact: string): Promise<void> => {
+  if (!SosSender?.cacheContact) return;
+  try {
+    await SosSender.cacheContact(contact || '');
+  } catch {
+    // sem cache, o aviso tem de ser mandado com a app aberta
+  }
+};
+
+/** A última posição, para o aviso levar as coordenadas. */
+export const cacheFix = async (fix: {
+  latitude: number;
+  longitude: number;
+  accuracy?: number | null;
+  altitude?: number | null;
+  updatedAt?: number | null;
+}): Promise<void> => {
+  if (!SosSender?.cacheFix) return;
+  if (!Number.isFinite(fix.latitude) || !Number.isFinite(fix.longitude)) return;
+  try {
+    await SosSender.cacheFix(
+      fix.latitude,
+      fix.longitude,
+      typeof fix.accuracy === 'number' && isFinite(fix.accuracy) ? fix.accuracy : NaN,
+      typeof fix.altitude === 'number' && isFinite(fix.altitude) ? fix.altitude : NaN,
+      typeof fix.updatedAt === 'number' && isFinite(fix.updatedAt)
+        ? fix.updatedAt
+        : Date.now(),
+    );
+  } catch {
+    // idem
+  }
+};
+
+/** A última percentagem de bateria conhecida. */
+export const cacheBattery = async (percent: number | null): Promise<void> => {
+  if (!SosSender?.cacheBattery) return;
+  if (typeof percent !== 'number' || !isFinite(percent)) return;
+  try {
+    await SosSender.cacheBattery(percent);
+  } catch {
+    // idem
+  }
+};
+
+/** O estado do cache nativo (para o diagnóstico e os testes). */
+export const getCachedSosState = async (): Promise<{
+  contact: string;
+  battery: number | null;
+  pending: boolean;
+  lat: number | null;
+  lon: number | null;
+  fixAt: number | null;
+} | null> => {
+  if (!SosSender?.cachedState) return null;
+  try {
+    const state = await SosSender.cachedState();
+    if (!state) return null;
+    return {
+      contact: state.contact ?? '',
+      battery: typeof state.battery === 'number' && state.battery >= 0 ? state.battery : null,
+      pending: !!state.pending,
+      lat: typeof state.lat === 'number' ? state.lat : null,
+      lon: typeof state.lon === 'number' ? state.lon : null,
+      fixAt: typeof state.fixAt === 'number' ? state.fixAt : null,
+    };
+  } catch {
+    return null;
   }
 };

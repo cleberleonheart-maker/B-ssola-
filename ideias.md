@@ -1417,3 +1417,16 @@ a nota de cada uma diz o que a distingue da ideia vizinha.
       permissões e é ilegal em muitos países sem aviso), e o SMS continua a
       precisar de rede da operadora — sem rede, nem o link do rastreio
       chega ao contacto.
+      **Feito na v7.78 (code 209)**: a tile deixou de abrir a app. Tocar
+      nela com o telemóvel bloqueado arranca o `SosAlertService` — um serviço
+      de foreground com **10 s** de contagem (notificação silenciosa com o
+      botão "Cancelar" e o subtítulo no tile) e, no fim, o SMS sai sozinho,
+      com a última posição e a bateria, sem o ecrã acender. Para isso o
+      nativo precisa do que só a app sabe: o contacto de emergência e a
+      última posição são copiados para o `SosPrefs` (o `SosSender` ganhou
+      `cacheContact`/`cacheFix`/`cacheBattery`).
+      A contagem é **mais longa do que a do botão dentro da app (5 s)** de
+      propósito: aqui o toque acidental no bolso é provável e ninguém vê a
+      contagem com o ecrã apagado — por isso o cancelamento está sempre à
+      vista, na notificação. Sem contacto guardado, a tile abre a app no
+      ecrã de emergência (é lá que o contacto se guarda).

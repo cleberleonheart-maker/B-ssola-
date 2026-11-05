@@ -23,6 +23,10 @@
     <!-- O modo de assalto (ideia #107) manda o SOS por SMS sem abrir a app de
          SMS. A permissao e pedida nas defincoes, antes de ser preciso. -->
     <uses-permission android:name="android.permission.SEND_SMS" />
+    <!-- O servico que conta e manda o aviso do modo de assalto (ideia #107).
+         Vive em foreground durante a contagem para o Android nao adiar o
+         aviso; e do tipo "dataSync" porque e um envio de dados. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     <!-- Sensores usados pela bússola -->
@@ -282,6 +286,12 @@
           <action android:name="android.service.quicksettings.action.QS_TILE" />
         </intent-filter>
       </service>
+
+      <!-- O aviso do modo de assalto, disparado pela tile sem abrir a app. -->
+      <service
+        android:name=".SosAlertService"
+        android:exported="false"
+        android:foregroundServiceType="dataSync" />
 
       <!-- Mantem o processo em foreground durante o rastreio ao vivo -->
       <service

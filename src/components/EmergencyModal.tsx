@@ -583,8 +583,10 @@ const EmergencyModal = ({
                 ? `🚨 ${t('sos_attack_btn')}`
                 : `🚨 ${t('sos_attack_countdown', { seconds: sosCountdown })}`}
             </Text>
-            {sosCountdown != null && (
+            {sosCountdown != null ? (
               <Text style={styles.sosCancelText}>{t('sos_attack_cancel')}</Text>
+            ) : (
+              <Text style={styles.sosCancelText}>{t('sos_attack_hint')}</Text>
             )}
           </Pressable>
 

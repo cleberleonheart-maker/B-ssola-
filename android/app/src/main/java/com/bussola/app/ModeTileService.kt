@@ -149,10 +149,16 @@ class TileDiag : ModeTileService() {
 /**
  * A tile do modo de assalto (ideia #107).
  *
- * Nao e um modo como os outros: e uma accao. Abre o ecra de emergencia pelo
- * atalho `bussola://sos` — o mesmo que o botao do widget usa — para que
- * quem esta a ser assaltado chegue ao SOS a partir do painel de atalhos,
- * sem desbloquear o telemóvel.
+ * Nao e um modo como os outros: e uma accao. E nao abre a app — quem esta a
+ * ser assaltado tem o telemóvel bloqueado, no bolso, e um ecrã a acender-se
+ * e o pior sitio para estar. Por isso a tile arranca o `SosAlertService`:
+ * uma contagem de 10 s com uma notificacao silenciosa e um botao de cancelar,
+ * e depois o SMS sai sozinho, com a ultima posicao conhecida, para o
+ * contacto guardado.
+ *
+ * Sem contacto guardado nao ha para quem avisar: nesse caso a tile abre a
+ * app no ecra de emergencia (o atalho `bussola://sos`, o mesmo do botao do
+ * widget), que e onde o contacto se guarda e o aviso se manda a mao.
  *
  * Vive nesta classe porque o Android so mostra um tile por servico: o tile
  * do SOS e um servico como os outros, so que nao aponta para um modo.
@@ -175,6 +181,29 @@ class TileSos : TileService() {
   }
 
   override fun onClick() {
+    val contacto = SosPrefs.contact(this)
+    if (contacto.isBlank()) {
+      abrirEcraEmergencia()
+      return
+    }
+    val intent = Intent(this, SosAlertService::class.java).setAction(SosAlertService.ACTION_SEND)
+    try {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        startForegroundService(intent)
+      } else {
+        startService(intent)
+      }
+      SosPrefs.setPending(this, true)
+    } catch (_: Exception) {
+      // O Android pode recusar um servico de foreground neste contexto. Nao
+      // e a hora de falhar calado: abre-se a app, que e o caminho de sempre.
+      abrirEcraEmergencia()
+      return
+    }
+    refresh()
+  }
+
+  private fun abrirEcraEmergencia() {
     val intent = Intent(this, MainActivity::class.java).apply {
       action = Intent.ACTION_VIEW
       data = Uri.parse("bussola://sos")
@@ -192,12 +221,17 @@ class TileSos : TileService() {
       @Suppress("DEPRECATION")
       startActivity(intent)
     }
-    refresh()
   }
 
   private fun refresh() {
     val tile = qsTile ?: return
-    tile.state = Tile.STATE_INACTIVE
+    val pending = SosPrefs.pending(this)
+    tile.state = if (pending) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
+    // O subtítulo só existe a partir do Android 10; antes disso o tile
+    // fica só com o estado.
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+      tile.subtitle = if (pending) getString(R.string.tile_sos_pending) else null
+    }
     tile.updateTile()
   }
 }

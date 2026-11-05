@@ -74,14 +74,19 @@ echo "   logcat -s ReactNativeJS:V AndroidRuntime:E | tail -100"
 echo
 echo "== o guião (à mão, no aparelho) =="
 cat <<'GUIA'
-1. "What was done": in build 208 there should be 3 lines — attack mode, track
-   shared by link and a tile for every mode.
+1. "What was done": in build 209 there should be 3 lines — the SOS without the
+   app open, attack mode and track shared by link.
 2. Attack mode: in Settings > SOS, tap "📨 Quiet SMS sending" and allow the
-   permission. Then put the "🚨 SOS" tile in the Quick Settings panel: tapping
-   it (with the screen locked) must open the emergency screen. Tap "🚨 Quiet
-   SOS": it counts 5 seconds (tap to cancel) and then the alert must go out by
-   SMS, quietly, to the saved contact — with the position and the live
-   tracking link. Check the phone did not open the SMS app.
+   permission. Put the "🚨 SOS" tile in the Quick Settings panel and lock the
+   phone. Tap the tile: the app must NOT open, the screen must not light up,
+   and a quiet notification must count 10 seconds with a "Cancel" button.
+   When the countdown ends the alert must go out by SMS to the saved contact,
+   with the last position and the battery, and the phone stays locked. Test
+   "Cancel" as well: cancel after a few seconds and check no SMS went out.
+   (With no emergency contact saved, the tile must open the app on the
+   emergency screen.)
+   Inside the app, the "🚨 Quiet SOS" button still counts 5 seconds and sends
+   the alert with the live tracking link.
 3. Sharing by link: record a track (Track > record > stop), tap "Link" next to
    GPX and pick a share app. The link is
    https://cleberleonheart-maker.github.io/B-ssola-/gpx.html#tkn=... — open it

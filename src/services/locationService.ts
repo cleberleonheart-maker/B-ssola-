@@ -2,6 +2,7 @@ import Geolocation, {
   type GeolocationOptions,
 } from '@react-native-community/geolocation';
 import { PermissionsAndroid, Platform, Linking } from 'react-native';
+import { cacheFix } from './sosSender';
 
 export type PermissionStatus = 'granted' | 'denied';
 
@@ -97,7 +98,13 @@ export const watchLocation = (
   onError: (error: Error) => void,
 ): (() => void) => {
   const watchId = Geolocation.watchPosition(
-    position => onFix(toFix(position)),
+    position => {
+      const fix = toFix(position);
+      // O modo de assalto (ideia #107) dispara o aviso com a app fechada: o
+      // nativo precisa da última posição conhecida.
+      void cacheFix(fix);
+      onFix(fix);
+    },
     error => onError(new Error(error.message)),
     buildOptions(opts),
   );
@@ -111,7 +118,11 @@ export const getLocationOnce = (
   onError: (error: Error) => void,
 ) => {
   Geolocation.getCurrentPosition(
-    position => onFix(toFix(position)),
+    position => {
+      const fix = toFix(position);
+      void cacheFix(fix);
+      onFix(fix);
+    },
     error => onError(new Error(error.message)),
     buildOptions(opts),
   );

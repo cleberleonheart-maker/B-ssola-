@@ -63,6 +63,62 @@ class SosSenderModule(private val reactContext: ReactApplicationContext) :
     }
   }
 
+  /**
+   * O contacto de emergência, para o aviso sair sem a app aberta.
+   *
+   * Quem guarda o contacto nas definições escreve-o aqui; a tile do SOS lê-o
+   * de volta quando o telemóvel está bloqueado e a app nem está a correr.
+   */
+  @ReactMethod
+  fun cacheContact(contact: String, promise: Promise) {
+    SosPrefs.setContact(reactContext, contact)
+    promise.resolve(true)
+  }
+
+  /** A última posição, para o aviso levar as coordenadas. */
+  @ReactMethod
+  fun cacheFix(
+    lat: Double,
+    lon: Double,
+    accuracy: Double,
+    alt: Double,
+    at: Double,
+    promise: Promise,
+  ) {
+    SosPrefs.setFix(
+      reactContext,
+      lat,
+      lon,
+      if (accuracy.isNaN()) null else accuracy,
+      if (alt.isNaN()) null else alt,
+      at.toLong(),
+    )
+    promise.resolve(true)
+  }
+
+  /** A última percentagem de bateria conhecida. */
+  @ReactMethod
+  fun cacheBattery(percent: Double, promise: Promise) {
+    SosPrefs.setBattery(reactContext, percent.toInt())
+    promise.resolve(true)
+  }
+
+  /** O que o nativo sabe: para os testes e para o diagnóstico. */
+  @ReactMethod
+  fun cachedState(promise: Promise) {
+    val fix = SosPrefs.fix(reactContext)
+    val map = com.facebook.react.bridge.Arguments.createMap()
+    map.putString("contact", SosPrefs.contact(reactContext))
+    map.putInt("battery", SosPrefs.battery(reactContext) ?: -1)
+    map.putBoolean("pending", SosPrefs.pending(reactContext))
+    if (fix != null) {
+      map.putDouble("lat", fix.lat)
+      map.putDouble("lon", fix.lon)
+      map.putDouble("fixAt", fix.at.toDouble())
+    }
+    promise.resolve(map)
+  }
+
   private fun hasPermission(): Boolean =
     ContextCompat.checkSelfPermission(reactContext, Manifest.permission.SEND_SMS) ==
       PackageManager.PERMISSION_GRANTED
