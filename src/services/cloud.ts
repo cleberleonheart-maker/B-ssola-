@@ -516,6 +516,41 @@ export const pushWaypoints = async (
   items: { id: string; data: unknown }[],
 ): Promise<boolean> => pushRecords('waypoints', userId, items);
 
+/**
+ * Cria uma partilha de trilha por link (ideia #37).
+ *
+ * A linha vai para `track_shares` com o token, a trilha e a validade. E o
+ * dono que a insere, e a RLS so aceita `user_id` igual ao `auth.uid()`: nao
+ * ha como partilhar a trilha de outra pessoa.
+ */
+export const createTrackShare = async (
+  userId: string,
+  token: string,
+  trackId: string,
+  expiresAt: number,
+): Promise<boolean> => {
+  if (!client) {
+    return false;
+  }
+  try {
+    const { error } = await withTimeout(
+      client.from('track_shares').insert({
+        token,
+        user_id: userId,
+        track_id: trackId,
+        expires_at: new Date(expiresAt).toISOString(),
+      }),
+    );
+    if (error) {
+      console.warn('[cloud] falha ao criar a partilha', error.message);
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const fetchCloudWaypoints = async (
   userId: string,
 ): Promise<CloudRecord[]> => fetchRecords('waypoints', userId);

@@ -41,6 +41,7 @@ const FICHEIROS = [
   'app_version.sql',
   'app_version_sha.sql',
   'crashes.sql',
+  'track_shares.sql',
   'account_delete.sql',
 ];
 
@@ -58,11 +59,13 @@ const TABELAS = [
   'notes',
   'waypoints',
   'crashes',
+  'track_shares',
 ];
 const FUNCOES = [
   'get_live_position(p_token text)',
   'get_live_status(p_token text)',
   'get_live_track(p_token text, p_after bigint)',
+  'get_track_share(p_token text)',
   'delete_my_account()',
 ];
 

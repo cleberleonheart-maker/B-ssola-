@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex" />
+<title>Trilha partilhada · Bussola</title>
+<style>
+  :root { --bg:#0b1220; --card:#121b31; --line:#1e2b46; --text:#eaf0fb; --muted:#93a3c4; --ok:#2fd66b; --warn:#f5b544; --accent:#4da3ff; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:18px;
+         font-family:-apple-system,"Segoe UI",Roboto,sans-serif; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:18px; max-width:420px; width:100%; padding:24px 20px; text-align:center; }
+  h1 { font-size:20px; margin:10px 0 4px; }
+  .sub { color:var(--muted); font-size:14px; margin-bottom:16px; }
+  .name { font-size:18px; font-weight:800; margin:4px 0 12px; word-break:break-word; }
+  .stats { color:var(--muted); font-size:14px; line-height:1.7; margin:0 0 14px; }
+  .stats b { color:var(--text); font-weight:800; }
+  .map { width:100%; max-width:320px; height:320px; margin:0 auto 6px; background:var(--bg);
+         border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+  .map svg { display:block; width:100%; height:100%; }
+  .mapnote { color:var(--muted); font-size:11px; line-height:1.5; margin:0 0 14px; }
+  .btn { display:block; background:var(--accent); color:#08111f; font-weight:800; font-size:15px; padding:14px 0;
+         border-radius:12px; text-decoration:none; border:0; cursor:pointer; width:100%; font-family:inherit; }
+  .btn.ghost { background:transparent; border:1px solid var(--line); color:var(--muted); margin-top:10px; }
+  .note { color:var(--muted); font-size:14px; line-height:1.6; padding:14px 0 0; }
+  .note.err { color:var(--warn); }
+  details { margin-top:14px; text-align:left; }
+  details summary { color:var(--muted); font-size:13px; cursor:pointer; }
+  pre { color:var(--muted); font-size:11px; line-height:1.45; max-height:180px; overflow:auto;
+        background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:10px; margin-top:8px;
+        white-space:pre-wrap; word-break:break-all; }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Trilha partilhada</h1>
+    <div class="sub">Enviada pela app Bussola</div>
+    <div class="name hidden" id="name"></div>
+    <div class="stats hidden" id="stats"></div>
+    <div class="map hidden" id="map"></div>
+    <div class="mapnote hidden" id="mapNote"></div>
+    <a class="btn hidden" id="download" download="trilha.gpx">⬇ Descarregar o GPX</a>
+    <details class="hidden" id="gpxBox">
+      <summary>Ver o GPX em texto</summary>
+      <pre id="gpxText"></pre>
+    </details>
+    <div class="note" id="note">A carregar…</div>
+  </div>
+  <script>
+  'use strict';
+  var API = 'https://wotzcykrvidbjkonaawx.supabase.co';
+  var KEY = 'sb_publishable_g8EcCQe4YPGaeMz1V-8gIw_OxF3iLNv';
+  var raw = (location.hash.match(/[#?&]tkn=([^&]+)/) || [])[1] || '';
+  var tkn = '';
+  try { tkn = decodeURIComponent(raw); } catch (e) { tkn = raw; }
+
+  // ==========================================================================
+  // Geometria do mini mapa. Isto e uma copia de `src/utils/trackProjection.ts`
+  // do app, em ES5 e sem dependencias, para a pagina ficar num ficheiro so.
+  // Nao ha tiles, nem Leaflet, nem pedidos: e uma funcao pura das coordenadas.
+  //
+  // `__tests__/trackProjectionParity.test.ts` corre as duas versoes no mesmo
+  // fixture e compara os numeros. Se uma mexer e a outra nao, esse teste
+  // acende em vez de as duas divergirem em silencio.
+  // ==========================================================================
+  var METERS_PER_DEGREE_LAT = 111320;
+  var MIN_SPAN_METERS = 400;
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+
+  var MAP_SIZE = 320;
+  var MAP_PADDING = 18;
+
+  function clamp(v, min, max) { return v < min ? min : v > max ? max : v; }
+
+  function projectTrack(points, viewport) {
+    if (!points.length) {
+      return { points: [], scale: 0, center: null, spanMeters: { width: 0, height: 0 }, atMinimumSpan: true };
+    }
+    var padding = clamp(
+      viewport.padding == null ? 12 : viewport.padding,
+      0,
+      Math.min(viewport.width, viewport.height) / 2
+    );
+    var innerWidth = Math.max(viewport.width - padding * 2, 1);
+    var innerHeight = Math.max(viewport.height - padding * 2, 1);
+
+    var minLat = points[0].lat, maxLat = points[0].lat;
+    var minLon = points[0].lon, maxLon = points[0].lon;
+    for (var i = 0; i < points.length; i++) {
+      if (points[i].lat < minLat) minLat = points[i].lat;
+      if (points[i].lat > maxLat) maxLat = points[i].lat;
+      if (points[i].lon < minLon) minLon = points[i].lon;
+      if (points[i].lon > maxLon) maxLon = points[i].lon;
+    }
+
+    var followed = viewport.center || null;
+    var center = followed || { lat: (minLat + maxLat) / 2, lon: (minLon + maxLon) / 2 };
+    var metersPerDegreeLon = METERS_PER_DEGREE_LAT * Math.cos(center.lat * Math.PI / 180);
+
+    var rawWidth = (maxLon - minLon) * metersPerDegreeLon;
+    var rawHeight = (maxLat - minLat) * METERS_PER_DEGREE_LAT;
+    var atMinimumSpan = !followed && (rawWidth < MIN_SPAN_METERS || rawHeight < MIN_SPAN_METERS);
+
+    var spanWidth = followed
+      ? Math.max(viewport.spanMeters == null ? MIN_SPAN_METERS : viewport.spanMeters, 1)
+      : Math.max(rawWidth, MIN_SPAN_METERS);
+    var spanHeight = followed ? spanWidth : Math.max(rawHeight, MIN_SPAN_METERS);
+
+    var scale = Math.min(innerWidth / spanWidth, innerHeight / spanHeight);
+    var originX = viewport.width / 2;
+    var originY = viewport.height / 2;
+
+    return {
+      points: points.map(function (p) {
+        return {
+          x: originX + (p.lon - center.lon) * metersPerDegreeLon * scale,
+          y: originY - (p.lat - center.lat) * METERS_PER_DEGREE_LAT * scale,
+        };
+      }),
+      scale: scale,
+      center: center,
+      spanMeters: { width: spanWidth, height: spanHeight },
+      atMinimumSpan: atMinimumSpan,
+    };
+  }
+
+  function niceScaleBar(projection, width, maxFraction) {
+    if (!projection.center || projection.scale <= 0) return null;
+    var budget = Math.max(width, 0) * (maxFraction == null ? 0.3 : maxFraction);
+    var raw2 = budget / projection.scale;
+    if (raw2 < 1) return { meters: 1, pixels: projection.scale };
+    var magnitude = Math.pow(10, Math.floor(Math.log(raw2) / Math.LN10));
+    var normalized = raw2 / magnitude;
+    var step = normalized >= 5 ? 5 : normalized >= 2 ? 2 : 1;
+    var meters = step * magnitude;
+    return { meters: meters, pixels: meters * projection.scale };
+  }
+
+  function polylinePath(points) {
+    if (!points.length) return '';
+    var round = function (v) { return Math.round(v * 100) / 100; };
+    return points.map(function (p, i) {
+      return (i === 0 ? 'M' : 'L') + ' ' + round(p.x) + ' ' + round(p.y);
+    }).join(' ');
+  }
+
+  // ==========================================================================
+  // O GPX. E a mesma coisa que o `serializeTrackToGpx` do app
+  // (`src/utils/gpx.ts`), com o mesmo formato byte a byte: quem recebe o
+  // link e descarrega o ficheiro tem de ter o mesmo GPX que quem exportou a
+  // trilha do telefone. `__tests__/gpxParity.test.ts` compara as duas.
+  // ==========================================================================
+  function escapeXml(value) {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  function toIso(ms) { return new Date(ms).toISOString(); }
+
+  function buildGpx(name, startedAt, points) {
+    var safeName = escapeXml(name);
+    var pts = points.map(function (p) {
+      var ele = (p.alt != null && isFinite(p.alt))
+        ? '        <ele>' + p.alt.toFixed(1) + '</ele>\n'
+        : '';
+      var time = '        <time>' + toIso(p.ts) + '</time>';
+      return '      <trkpt lat="' + p.lat.toFixed(7) + '" lon="' + p.lon.toFixed(7) + '">\n' + ele + time + '\n      </trkpt>';
+    }).join('\n');
+
+    return [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<gpx version="1.1" creator="B\u00fassola" xmlns="http://www.topografix.com/GPX/1/1">',
+      '  <metadata>',
+      '    <name>' + safeName + '</name>',
+      '    <time>' + toIso(startedAt) + '</time>',
+      '  </metadata>',
+      '  <trk>',
+      '    <name>' + safeName + '</name>',
+      '    <trkseg>',
+      pts,
+      '    </trkseg>',
+      '  </trk>',
+      '</gpx>',
+      '',
+    ].join('\n');
+  }
+
+  function $(id) { return document.getElementById(id); }
+
+  function show(el, on) { if (el) el.classList.toggle('hidden', !on); }
+
+  function fmtDistance(m) {
+    if (m == null || !isFinite(m)) return '—';
+    return m >= 1000 ? (m / 1000).toFixed(2) + ' km' : Math.round(m) + ' m';
+  }
+
+  function fmtDuration(ms) {
+    if (ms == null || !isFinite(ms) || ms <= 0) return '—';
+    var total = Math.round(ms / 1000);
+    var h = Math.floor(total / 3600);
+    var m = Math.floor((total % 3600) / 60);
+    return h > 0 ? h + ' h ' + m + ' min' : m + ' min';
+  }
+
+  function svgNode(tag, attrs) {
+    var node = document.createElementNS(SVG_NS, tag);
+    for (var i = 0; i < attrs.length; i++) node.setAttribute(attrs[i][0], attrs[i][1]);
+    return node;
+  }
+
+  function drawMap(points) {
+    var viewport = { width: MAP_SIZE, height: MAP_SIZE, padding: MAP_PADDING };
+    var projection = projectTrack(points, viewport);
+    var svg = svgNode('svg', [['viewBox', '0 0 ' + MAP_SIZE + ' ' + MAP_SIZE]]);
+
+    var path = svgNode('path', [
+      ['d', polylinePath(projection.points)],
+      ['fill', 'none'],
+      ['stroke', '#4da3ff'],
+      ['stroke-width', '3'],
+      ['stroke-linejoin', 'round'],
+      ['stroke-linecap', 'round'],
+    ]);
+    svg.appendChild(path);
+
+    var first = projection.points[0];
+    var last = projection.points[projection.points.length - 1];
+    if (first) {
+      svg.appendChild(svgNode('circle', [
+        ['cx', first.x], ['cy', first.y], ['r', '5'],
+        ['fill', '#2fd66b'], ['stroke', '#0b1220'], ['stroke-width', '2'],
+      ]));
+    }
+    if (last && projection.points.length > 1) {
+      svg.appendChild(svgNode('circle', [
+        ['cx', last.x], ['cy', last.y], ['r', '5'],
+        ['fill', '#ff4d6d'], ['stroke', '#0b1220'], ['stroke-width', '2'],
+      ]));
+    }
+
+    var bar = niceScaleBar(projection, MAP_SIZE, 0.3);
+    if (bar) {
+      var x = MAP_PADDING;
+      var y = MAP_SIZE - MAP_PADDING;
+      svg.appendChild(svgNode('line', [
+        ['x1', x], ['y1', y], ['x2', x + bar.pixels], ['y2', y],
+        ['stroke', '#eaf0fb'], ['stroke-width', '2'],
+      ]));
+      var label = svgNode('text', [
+        ['x', x], ['y', y - 6], ['fill', '#93a3c4'], ['font-size', '10'],
+      ]);
+      label.textContent = bar.meters >= 1000
+        ? (bar.meters / 1000) + ' km'
+        : bar.meters + ' m';
+      svg.appendChild(label);
+    }
+
+    $('map').appendChild(svg);
+    $('mapNote').textContent = projection.atMinimumSpan
+      ? 'Percurso curto: a caixa mostra a zona toda, com a escala minima.'
+      : 'Escala aproximada, sem mapa de fundo. O GPX tem as coordenadas exactas.';
+  }
+
+  function post(rpc, body) {
+    var ctl = ('AbortController' in window) ? new AbortController() : null;
+    var guard = setTimeout(function () { if (ctl) ctl.abort(); }, 10000);
+    return fetch(API + '/rest/v1/rpc/' + rpc, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: KEY, Authorization: 'Bearer ' + KEY },
+      body: JSON.stringify(body),
+      signal: ctl ? ctl.signal : undefined,
+    })
+      .then(function (r) {
+        clearTimeout(guard);
+        if (!r.ok) throw new Error('http ' + r.status);
+        return r.status === 204 ? null : r.json();
+      })
+      .catch(function (e) { clearTimeout(guard); throw e; });
+  }
+
+  function fail(message) {
+    var note = $('note');
+    note.textContent = message;
+    note.classList.add('err');
+  }
+
+  function render(data) {
+    var points = Array.isArray(data.points) ? data.points : [];
+    show($('name'), true);
+    show($('stats'), true);
+    $('name').textContent = data.name || 'Trilha';
+
+    var parts = [];
+    parts.push('<b>' + fmtDistance(data.distance) + '</b> de percurso');
+    var dur = (data.endedAt && data.startedAt) ? data.endedAt - data.startedAt : null;
+    if (dur) parts.push('<b>' + fmtDuration(dur) + '</b>');
+    if (data.eleGain != null || data.eleLoss != null) {
+      parts.push('desnível <b>+' + Math.round(data.eleGain || 0) + ' m</b> / <b>-' + Math.round(data.eleLoss || 0) + ' m</b>');
+    }
+    parts.push(points.length + ' pontos');
+    $('stats').innerHTML = parts.join(' · ');
+
+    if (points.length > 0) {
+      show($('map'), true);
+      show($('mapNote'), true);
+      drawMap(points);
+    }
+
+    var gpx = buildGpx(data.name || 'Trilha', data.startedAt || Date.now(), points);
+    $('gpxText').textContent = gpx;
+    show($('gpxBox'), true);
+    var blob = new Blob([gpx], { type: 'application/gpx+xml' });
+    var url = URL.createObjectURL(blob);
+    var link = $('download');
+    link.href = url;
+    link.download = (data.name || 'trilha').replace(/\s+/g, '_').replace(/[^A-Za-z0-9._-]/g, '') + '.gpx';
+    show(link, true);
+
+    $('note').textContent = data.expires_at
+      ? 'Este link deixa de funcionar quando expira. Para partilhar outra vez, cria um novo link na app.'
+      : 'Partilha pela app Bussola.';
+  }
+
+  if (!tkn) {
+    fail('Falta o token do link. Abre o link como te foi enviado, com o #tkn=... no fim.');
+  } else {
+    post('get_track_share', { p_token: tkn })
+      .then(function (data) {
+        if (!data) {
+          fail('Este link expirou ou nunca existiu. Pede um novo link a quem partilhou a trilha.');
+          return;
+        }
+        render(data);
+      })
+      .catch(function () {
+        fail('Não foi possível ler a trilha. Confirma a ligação e recarrega a página.');
+      });
+  }
+  </script>
+</body>
+</html>

@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'web/live.html'
+      - 'web/gpx.html'
       - '.github/workflows/pages.yml'
 
 permissions:

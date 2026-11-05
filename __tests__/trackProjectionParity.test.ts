@@ -26,8 +26,10 @@ import {
  * aqui o que se compara é a matemática, que é o que faz o desenho bater certo.
  */
 
-const html = fs.readFileSync(path.join(__dirname, '..', 'web', 'live.html'), 'utf8');
-const script = html.slice(html.lastIndexOf('<script>') + 8, html.lastIndexOf('</script>'));
+const readScript = (file: string): string => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'web', file), 'utf8');
+  return html.slice(html.lastIndexOf('<script>') + 8, html.lastIndexOf('</script>'));
+};
 
 /** A cópia ES5 começa no comentário da geometria e acaba em `function $(id)`. */
 const BLOCK_START = '// Geometria do mini mapa';
@@ -39,7 +41,8 @@ type Geometry = {
   polylinePath: typeof polylinePath;
 };
 
-const readWebGeometry = (): Geometry => {
+const readWebGeometry = (file: string): Geometry => {
+  const script = readScript(file);
   const from = script.indexOf(BLOCK_START);
   const to = script.indexOf(BLOCK_END);
   expect(from).toBeGreaterThan(-1);
@@ -61,7 +64,18 @@ const readWebGeometry = (): Geometry => {
   return geometry;
 };
 
-const web = readWebGeometry();
+const livePage = readWebGeometry('live.html');
+const gpxPage = readWebGeometry('gpx.html');
+
+/**
+ * As duas paginas com o mesmo mapa: a do rastreio ao vivo (`live.html`) e a
+ * da trilha partilhada (`gpx.html`, ideia #37). As duas tem a geometria
+ * escrita a mao, e as duas tem de dar os mesmos numeros que o app.
+ */
+const PAGES: [string, Geometry][] = [
+  ['live.html', livePage],
+  ['gpx.html', gpxPage],
+];
 
 const LISBOA: GeoPoint = { lat: 38.7223, lon: -9.1393 };
 const TROPEIRO: GeoPoint = { lat: 78.2232, lon: 15.6469 };
@@ -127,10 +141,10 @@ const FIXTURES: { nome: string; points: GeoPoint[]; viewport: Viewport }[] = [
   },
 ];
 
-describe('projectTrack — a cópia do live.html dá os mesmos números', () => {
+describe.each(PAGES)('%s — a cópia da página dá os mesmos números', (_file, webPage) => {
   it.each(FIXTURES)('$nome', ({ points, viewport }) => {
     const app = projectTrack(points, viewport);
-    const page = web.projectTrack(points, viewport);
+    const page = webPage.projectTrack(points, viewport);
 
     expect(page.points.length).toBe(app.points.length);
     app.points.forEach((q, i) => {
@@ -151,7 +165,7 @@ describe('projectTrack — a cópia do live.html dá os mesmos números', () => 
   });
 
   it('sem pontos as duas dão o mesmo vazio', () => {
-    const page = web.projectTrack([], { width: 300, height: 300 });
+    const page = webPage.projectTrack([], { width: 300, height: 300 });
 
     expect(page.points).toEqual([]);
     expect(page.center).toBeNull();
@@ -159,7 +173,7 @@ describe('projectTrack — a cópia do live.html dá os mesmos números', () => 
   });
 });
 
-describe('niceScaleBar — a barra de escala é a mesma nos dois lados', () => {
+describe.each(PAGES)('%s — a barra de escala é a mesma nos dois lados', (_file, webPage) => {
   const CASES: { nome: string; viewport: Viewport; width: number; fraction?: number }[] = [
     {
       nome: 'a janela de 300 m da página',
@@ -188,7 +202,7 @@ describe('niceScaleBar — a barra de escala é a mesma nos dois lados', () => {
 
   it.each(CASES)('$nome', ({ viewport, width, fraction }) => {
     const app = niceScaleBar(projectTrack(WALK, viewport), width, fraction ?? 0.3);
-    const page = web.niceScaleBar(web.projectTrack(WALK, viewport), width, fraction ?? 0.3);
+    const page = webPage.niceScaleBar(webPage.projectTrack(WALK, viewport), width, fraction ?? 0.3);
 
     expect(page).not.toBeNull();
     expect(app).not.toBeNull();
@@ -199,20 +213,20 @@ describe('niceScaleBar — a barra de escala é a mesma nos dois lados', () => {
   it('sem projeção não há barra, nos dois lados', () => {
     const viewport: Viewport = { width: 300, height: 300 };
     expect(niceScaleBar(projectTrack([], viewport), 300)).toBeNull();
-    expect(web.niceScaleBar(web.projectTrack([], viewport), 300)).toBeNull();
+    expect(webPage.niceScaleBar(webPage.projectTrack([], viewport), 300)).toBeNull();
   });
 });
 
-describe('polylinePath — o caminho SVG é a mesma string', () => {
+describe.each(PAGES)('%s — o caminho SVG é a mesma string', (_file, webPage) => {
   it.each(FIXTURES)('$nome', ({ points, viewport }) => {
     const app = polylinePath(projectTrack(points, viewport).points);
-    const page = web.polylinePath(web.projectTrack(points, viewport).points);
+    const page = webPage.polylinePath(webPage.projectTrack(points, viewport).points);
 
     expect(page).toBe(app);
   });
 
   it('sem pontos dá string vazia, e não "M undefined"', () => {
     expect(polylinePath([])).toBe('');
-    expect(web.polylinePath([])).toBe('');
+    expect(webPage.polylinePath([])).toBe('');
   });
 });

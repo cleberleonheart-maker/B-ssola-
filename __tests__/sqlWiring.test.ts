@@ -76,6 +76,7 @@ describe('o verificador da nuvem', () => {
       'notes',
       'waypoints',
       'crashes',
+      'track_shares',
     ];
     expect(tabelasDaNuvem().sort()).toEqual([...esperadas].sort());
   });

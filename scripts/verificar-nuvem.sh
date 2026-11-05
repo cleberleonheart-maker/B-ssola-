@@ -101,7 +101,7 @@ echo "Nuvem: $SUPABASE_URL"
 echo "Tabelas (o app le/escreve com a anon key, via RLS por utilizador):"
 # limit=1 e nao count: o que interessa e a tabela existir e o anon poder
 # selectar, nao o conteudo.
-for t in app_version live_shares live_points virgin_memory tracks notes waypoints crashes; do
+for t in app_version live_shares live_points track_shares virgin_memory tracks notes waypoints crashes; do
   probe "$t" GET "$t?select=*&limit=1" || true
 done
 
@@ -131,6 +131,11 @@ echo "Funcoes (a pagina web do rastreio ao vivo chama-as sem login):"
 probe "get_live_position(p_token)" POST "rpc/get_live_position" '{"p_token":"verificar-nuvem"}' || true
 probe "get_live_status(p_token)"   POST "rpc/get_live_status"   '{"p_token":"verificar-nuvem"}' || true
 probe "get_live_track(p_token,p_after)" POST "rpc/get_live_track" '{"p_token":"verificar-nuvem","p_after":0}' || true
+# A partilha de trilha por link (ideia #37): a pagina web do GPX chama esta
+# funcao sem login, so com o token. Sem a funcao na nuvem, o link que a
+# pessoa manda nao abre nada -- e o erro aparece no telefone de outra
+# pessoa, que e o pior sitio para descobrir que falta uma funcao.
+probe "get_track_share(p_token)" POST "rpc/get_track_share" '{"p_token":"verificar-nuvem"}' || true
 # Sem header de sessao o auth.uid() e null e a funcao devolve false sem tocar em
 # nada -- o probe confirma que existe sem criar um utilizador de teste.
 probe "delete_my_account()" POST "rpc/delete_my_account" '{}' || true

@@ -195,3 +195,26 @@ export const formatDuration = (ms: number): string => {
   if (m > 0) return `${m}min ${String(s).padStart(2, '0')}s`;
   return `${s}s`;
 };
+
+/**
+ * O que vai para a nuvem: a trilha sem o `id`, que e a chave da linha.
+ *
+ * Vive aqui e nao no ecra porque dois sitios precisam do mesmo payload: o
+ * botao "subir" e a partilha por link (ideia #37), que tem de garantir que a
+ * trilha esta na nuvem antes de dar o link a alguem. Se os dois escribissem
+ * a sua versao, um dia um mudava e o outro nao -- e o link partilhado
+ * abria uma trilha sem metade dos dados.
+ */
+export const trackCloudPayload = (track: RecordedTrack) => ({
+  name: track.name,
+  startedAt: track.startedAt,
+  endedAt: track.endedAt,
+  points: track.points,
+  pois: track.pois,
+  distance: track.distance,
+  eleGain: track.eleGain,
+  eleLoss: track.eleLoss,
+  maxAlt: track.maxAlt,
+  minAlt: track.minAlt,
+  maxSpeedKmh: track.maxSpeedKmh,
+});

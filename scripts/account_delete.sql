@@ -46,6 +46,7 @@ begin
   delete from public.crashes where user_id = meu_id;
   delete from public.live_points where user_id = meu_id;
   delete from public.live_shares where user_id = meu_id;
+  delete from public.track_shares where user_id = meu_id;
 
   delete from auth.users where id = meu_id::uuid;
 

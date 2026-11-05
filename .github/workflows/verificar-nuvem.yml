@@ -104,6 +104,7 @@ jobs:
             scripts/app_version.sql \
             scripts/app_version_sha.sql \
             scripts/crashes.sql \
+            scripts/track_shares.sql \
             scripts/account_delete.sql
 
       - name: Liga o manual linking no projecto (#102)

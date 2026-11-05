@@ -657,8 +657,20 @@ foram encontrados de verdade, não ideias soltas.
       agrupa-as numa grelha de 40 m: azul onde se passou, vermelho onde se
       esteve, com a escolha "Hoje" ou "7 dias" e a escala de cores por baixo.
       Sem tiles e sem rede, como o resto do app (#93).
-- [ ] **37. 🔗 GPX por link** — além do arquivo, gerar link curto da trilha salva na
+- [x] **37. 🔗 GPX por link** — além do arquivo, gerar link curto da trilha salva na
       nuvem para compartilhar (email/WhatsApp).
+      **Feito na v7.76 (code 207)**: o botão "Link" ao lado do GPX cria uma
+      partilha na nuvem (`track_shares`, com token e validade de 30 dias) e
+      manda o link pelo menu de partilha do sistema. O link não leva os dados:
+      leva um token no hash, e a página `web/gpx.html` lê a trilha pela
+      `get_track_share`, mostra o percurso e deixa descargar o GPX. A
+      `get_track_share` é `SECURITY DEFINER` e valida tudo — token certo,
+      não expirado, e a trilha a ser do dono da partilha; nunca devolve
+      `user_id`. O GPX da página é byte a byte o mesmo que o do app (há um
+      teste de paridade, como o da geometria do mapa). O que fica de fora: a
+      app não pode revogar o link sem o owner apagar a linha, e o link não
+      tem “ver no Google Maps” com o percurso todo — só o GPX e o mapa
+      desenhado.
 - [x] **38. 💾 Backup completo** — exportar tudo (notas, waypoints, trilhas, calibrações,
       declinação, FOV) como um JSON/PDF para restaurar/transferir.
       **Feito na v7.17** (JSON, com validação de `fileVersion` reforçada no commit

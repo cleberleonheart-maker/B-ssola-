@@ -21,6 +21,7 @@ import {
 import { cardinalOf, formatAzimuth } from '../utils/compass';
 import { serializeTrackToGpx } from '../utils/gpx';
 import { shareTrackGpx } from '../services/trackShare';
+import { shareTrackLink } from '../services/trackLinkShare';
 import TargetNavBar from './TargetNavBar';
 import TrackPoiModal from './TrackPoiModal';
 import type { LocationFix } from '../services/locationService';
@@ -33,6 +34,7 @@ import {
   computeTrackStats,
   simplifyPath,
   formatDuration,
+  trackCloudPayload,
   type TrackPoint,
   type TrackPoi,
   type RecordedTrack,
@@ -344,24 +346,27 @@ const TrackView = ({ location, heading = 0, mils = false }: Props) => {
       const ok = await pushTracks(userId, [
         {
           id: track.id,
-          data: {
-            name: track.name,
-            startedAt: track.startedAt,
-            endedAt: track.endedAt,
-            points: track.points,
-            pois: track.pois,
-            distance: track.distance,
-            eleGain: track.eleGain,
-            eleLoss: track.eleLoss,
-            maxAlt: track.maxAlt,
-            minAlt: track.minAlt,
-            maxSpeedKmh: track.maxSpeedKmh,
-          },
+          data: trackCloudPayload(track),
         },
       ]);
       setCloudMsg(ok ? t('track_cloud_ok') : t('track_cloud_fail'));
     } catch {
       setCloudMsg(t('track_cloud_fail'));
+    }
+  }, [t]);
+
+  const shareLink = useCallback(async (track: RecordedTrack) => {
+    try {
+      const result = await shareTrackLink(track);
+      if (result.ok) {
+        setCloudMsg(t('track_link_ok'));
+      } else if (result.reason === 'cloud') {
+        setCloudMsg(t('track_cloud_disabled'));
+      } else {
+        setCloudMsg(t('track_link_fail'));
+      }
+    } catch {
+      setCloudMsg(t('track_link_fail'));
     }
   }, [t]);
 
@@ -786,6 +791,13 @@ const TrackView = ({ location, heading = 0, mils = false }: Props) => {
                 style={[styles.smallButton, { borderColor: colors.accent }]}>
                 <Text style={[styles.smallButtonText, { color: colors.accent }]}>
                   {t('track_gpx')}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => shareLink(track)}
+                style={[styles.smallButton, { borderColor: colors.success }]}>
+                <Text style={[styles.smallButtonText, { color: colors.success }]}>
+                  {t('track_link')}
                 </Text>
               </Pressable>
               <Pressable

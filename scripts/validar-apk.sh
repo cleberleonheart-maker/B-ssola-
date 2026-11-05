@@ -101,27 +101,33 @@ fi
 echo
 echo "== o guião que falta (à mão, no aparelho) =="
 cat <<'GUIA'
-1. "O que foi feito": no build 206 devem aparecer 3 linhas — tile por modo, tiles nas definições
-   e calibração por estrela.
-2. Tiles: desce o painel de Definições Rápidas e abre a edição (o lápis ou os
+1. "O que foi feito": no build 207 devem aparecer 3 linhas — partilha da trilha
+   por link, tile por modo e tiles nas definições.
+2. Partilha por link: grava uma trilha (Trilha > gravar > parar), toca em
+   "Link" ao lado do GPX e escolhe a app de partilha. O link que sai é
+   https://cleberleonheart-maker.github.io/B-ssola-/gpx.html#tkn=... — abre-o
+   noutro telefone (ou no navegador do computador): tem de mostrar o percurso
+   desenhado, a distância e o botão "Descarregar o GPX". O GPX descarregado
+   tem de abrir numa app de mapas. O link deixa de funcionar ao fim de 30 dias.
+3. Tiles: desce o painel de Definições Rápidas e abre a edição (o lápis ou os
    dois dedos); arrasta os tiles da Bússola para o painel — Bússola, AR, Nível,
    Detector, EMF, Sol, Trilha e Triângulo. Toca num deles: a app tem de abrir
    já no modo desse tile (sem passar pelo menu de modos). E em Definições >
    Bússola > "Tiles das Definições Rápidas": o diálogo deve listar os 19
    tiles (um por modo) e dizer quais já estão no painel.
-3. Calibração por estrela: Definições > Bússola > "⭐ Calibrar por estrela"
+4. Calibração por estrela: Definições > Bússola > "⭐ Calibrar por estrela"
    (à noite, céu limpo): a app lista as estrelas que estão no horizonte —
    no Brasil, a Cruz do Sul, Canopus, Sirius, Achernar — e diz a altura e o
    azimute de cada uma. Escolhe uma, aponta a câmara (em retrato): a mira
    diz quanto falta para virar e levantar; quando a estrela ficar no centro,
    toca "Medir declinação" e o resultado deve aparecer em segundos.
    Se a estrela estiver demasiado alta ou baixa, a app avisa e não mede.
-4. Widget: no ecrã principal, toca no botão do widget — sem rastreio a correr
+5. Widget: no ecrã principal, toca no botão do widget — sem rastreio a correr
    abre a app no ecra de emergência; com rastreio a correr, para-o sem abrir
    a app (o botão fica vermelho).
-5. Bloqueio: define um PIN (Configurações > Segurança), sai da app, abre outra
+6. Bloqueio: define um PIN (Configurações > Segurança), sai da app, abre outra
    vez (pede o PIN), espera 30 s fora da app e volta (pede o PIN outra vez).
-6. SOS: põe um contacto em Configurações > SOS e liga o beacon; quando a
+7. SOS: põe um contacto em Configurações > SOS e liga o beacon; quando a
    notificação aparecer, toca nela: abre o SMS com a posição, a bateria e a
    rede já escritas.
 GUIA
