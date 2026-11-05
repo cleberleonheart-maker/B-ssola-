@@ -4,19 +4,31 @@ import type { DisplayMode } from './preferencesService';
 /**
  * Tiles das Definições Rápidas (ideia #14).
  *
- * Cada tile abre a app já no seu modo. A lista abaixo tem de bater com as
- * classes de `ModeTileService.kt` (uma por tile): um tile que não exista
- * aqui simplesmente não aparece nas definições.
+ * Cada tile abre a app já no seu modo. Há um tile por modo — a lista abaixo
+ * tem de bater com as classes de `ModeTileService.kt` (uma por tile): um modo
+ * que não tenha classe do lado do Android não tem tile, e um tile sem modo
+ * aqui não serve para nada.
  */
 export const TILE_MODES: DisplayMode[] = [
   'compass',
-  'ar',
   'level',
+  'ar',
+  'camera',
   'metal',
+  'theodolite',
   'emf',
   'sun',
+  'wind',
   'track',
+  'map',
+  'notes',
+  'odometer',
+  'cadence',
+  'height',
+  'car',
   'tri',
+  'selftest',
+  'diag',
 ];
 
 const { TileStatus } = NativeModules;

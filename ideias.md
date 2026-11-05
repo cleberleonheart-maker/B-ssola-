@@ -178,6 +178,12 @@
       e mostra quais já lá estão. Para saber isso, o `TileService` marca a
       entrada e a saída de cada tile (`onTileAdded`/`onTileRemoved`) em
       `TilePrefs`, e o módulo `TileStatus` leva a lista ao JavaScript.
+      **Na v7.75 (code 206)**: deixou de haver oito tiles escolhidos pela app
+      e passou a haver **um por cada um dos 19 modos** — a lista do diálogo
+      mostra-os todos, e os que já estão no painel aparecem primeiro. A app
+      não pode retirar um tile do seletor do Android (isso é do sistema), por
+      isso a configuração é no painel de atalhos; o que a app garante é que
+      qualquer modo pode ter o seu.
 - [x] **15. Tema automático** — ✅ feito: opção "Automático" no grid de tema, com
       três estratégias (Claro/Escuro por horário 6h–18h; Sol forte/Noturno por
       horário; e "pelo sol real" via `sunEvents`, com recuo ao horário sem GPS).

@@ -8,6 +8,10 @@ describe('os tiles das Definições Rápidas', () => {
     }
   });
 
+  it('há um tile para cada modo do app', () => {
+    expect([...TILE_MODES].sort()).toEqual([...DISPLAY_MODES].sort());
+  });
+
   it('sem o módulo nativo a lista de tiles é vazia', async () => {
     // No Jest não há módulo nativo: a app tem de saber isso sem breaking.
     await expect(getAddedTiles()).resolves.toEqual([]);

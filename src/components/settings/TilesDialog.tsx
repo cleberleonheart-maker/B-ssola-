@@ -42,6 +42,12 @@ const TilesDialog = ({ onClose }: Props) => {
   }, []);
 
   const cards = buildModeCards(t).filter(card => TILE_MODES.includes(card.key));
+  // Os que já estão no painel vêm primeiro: é o que o utilizador quer ver.
+  const ordered = [...cards].sort((a, b) => {
+    const aOn = added.includes(a.key) ? 0 : 1;
+    const bOn = added.includes(b.key) ? 0 : 1;
+    return aOn - bOn;
+  });
 
   return (
     <View style={styles.overlay}>
@@ -51,7 +57,7 @@ const TilesDialog = ({ onClose }: Props) => {
         <Text style={[styles.sub, { color: colors.textMuted }]}>{t('tiles_sub')}</Text>
 
         <ScrollView style={styles.list}>
-          {cards.map(card => {
+          {ordered.map(card => {
             const on = added.includes(card.key);
             return (
               <View key={card.key} style={styles.row}>

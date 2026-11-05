@@ -159,6 +159,116 @@
           <action android:name="android.service.quicksettings.action.QS_TILE" />
         </intent-filter>
       </service>
+      <service
+        android:name=".TileCamera"
+        android:label="@string/tile_camera"
+        android:icon="@drawable/ic_tile_bussola"
+        android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.service.quicksettings.action.QS_TILE" />
+        </intent-filter>
+      </service>
+      <service
+        android:name=".TileTheodolite"
+        android:label="@string/tile_theodolite"
+        android:icon="@drawable/ic_tile_bussola"
+        android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.service.quicksettings.action.QS_TILE" />
+        </intent-filter>
+      </service>
+      <service
+        android:name=".TileWind"
+        android:label="@string/tile_wind"
+        android:icon="@drawable/ic_tile_bussola"
+        android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.service.quicksettings.action.QS_TILE" />
+        </intent-filter>
+      </service>
+      <service
+        android:name=".TileMap"
+        android:label="@string/tile_map"
+        android:icon="@drawable/ic_tile_bussola"
+        android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.service.quicksettings.action.QS_TILE" />
+        </intent-filter>
+      </service>
+      <service
+        android:name=".TileNotes"
+        android:label="@string/tile_notes"
+        android:icon="@drawable/ic_tile_bussola"
+        android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.service.quicksettings.action.QS_TILE" />
+        </intent-filter>
+      </service>
+      <service
+        android:name=".TileOdometer"
+        android:label="@string/tile_odometer"
+        android:icon="@drawable/ic_tile_bussola"
+        android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.service.quicksettings.action.QS_TILE" />
+        </intent-filter>
+      </service>
+      <service
+        android:name=".TileCadence"
+        android:label="@string/tile_cadence"
+        android:icon="@drawable/ic_tile_bussola"
+        android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.service.quicksettings.action.QS_TILE" />
+        </intent-filter>
+      </service>
+      <service
+        android:name=".TileHeight"
+        android:label="@string/tile_height"
+        android:icon="@drawable/ic_tile_bussola"
+        android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.service.quicksettings.action.QS_TILE" />
+        </intent-filter>
+      </service>
+      <service
+        android:name=".TileCar"
+        android:label="@string/tile_car"
+        android:icon="@drawable/ic_tile_bussola"
+        android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.service.quicksettings.action.QS_TILE" />
+        </intent-filter>
+      </service>
+      <service
+        android:name=".TileSelftest"
+        android:label="@string/tile_selftest"
+        android:icon="@drawable/ic_tile_bussola"
+        android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.service.quicksettings.action.QS_TILE" />
+        </intent-filter>
+      </service>
+      <service
+        android:name=".TileDiag"
+        android:label="@string/tile_diag"
+        android:icon="@drawable/ic_tile_bussola"
+        android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.service.quicksettings.action.QS_TILE" />
+        </intent-filter>
+      </service>
 
       <!-- Mantem o processo em foreground durante o rastreio ao vivo -->
       <service

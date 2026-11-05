@@ -14,6 +14,10 @@ import android.service.quicksettings.TileService
  * o mesmo caminho que o JavaScript lê para escolher o modo. O Android só
  * mostra um tile por serviço, por isso cada modo tem a sua classe; o que
  * muda entre elas é só o modo.
+ *
+ * Há uma classe por modo do app (os 19 de `DISPLAY_MODES`), para que o
+ * utilizador possa pôr no painel de atalhos o modo que quiser — e não só os
+ * que a app achou mais prováveis.
  */
 abstract class ModeTileService : TileService() {
 
@@ -70,16 +74,24 @@ class TileCompass : ModeTileService() {
   override val mode = "compass"
 }
 
-class TileAr : ModeTileService() {
-  override val mode = "ar"
-}
-
 class TileLevel : ModeTileService() {
   override val mode = "level"
 }
 
+class TileAr : ModeTileService() {
+  override val mode = "ar"
+}
+
+class TileCamera : ModeTileService() {
+  override val mode = "camera"
+}
+
 class TileMetal : ModeTileService() {
   override val mode = "metal"
+}
+
+class TileTheodolite : ModeTileService() {
+  override val mode = "theodolite"
 }
 
 class TileEmf : ModeTileService() {
@@ -90,10 +102,46 @@ class TileSun : ModeTileService() {
   override val mode = "sun"
 }
 
+class TileWind : ModeTileService() {
+  override val mode = "wind"
+}
+
 class TileTrack : ModeTileService() {
   override val mode = "track"
 }
 
+class TileMap : ModeTileService() {
+  override val mode = "map"
+}
+
+class TileNotes : ModeTileService() {
+  override val mode = "notes"
+}
+
+class TileOdometer : ModeTileService() {
+  override val mode = "odometer"
+}
+
+class TileCadence : ModeTileService() {
+  override val mode = "cadence"
+}
+
+class TileHeight : ModeTileService() {
+  override val mode = "height"
+}
+
+class TileCar : ModeTileService() {
+  override val mode = "car"
+}
+
 class TileTri : ModeTileService() {
   override val mode = "tri"
+}
+
+class TileSelftest : ModeTileService() {
+  override val mode = "selftest"
+}
+
+class TileDiag : ModeTileService() {
+  override val mode = "diag"
 }

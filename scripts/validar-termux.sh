@@ -74,14 +74,14 @@ echo "   logcat -s ReactNativeJS:V AndroidRuntime:E | tail -100"
 echo
 echo "== o guião (à mão, no aparelho) =="
 cat <<'GUIA'
-1. "O que foi feito": no build 205 devem aparecer 3 linhas — tiles nas definições,
-   calibração por estrela e Estrela Polar.
+1. "O que foi feito": no build 206 devem aparecer 3 linhas — tile por modo, tiles nas definições
+   e calibração por estrela.
 2. Tiles: desce o painel de Definições Rápidas e abre a edição (o lápis ou os
    dois dedos); arrasta os tiles da Bússola para o painel — Bússola, AR, Nível,
    Detector, EMF, Sol, Trilha e Triângulo. Toca num deles: a app tem de abrir
    já no modo desse tile (sem passar pelo menu de modos). E em Definições >
-   Bússola > "Tiles das Definições Rápidas": o diálogo deve listar os 8 tiles
-   e dizer quais já estão no painel.
+   Bússola > "Tiles das Definições Rápidas": o diálogo deve listar os 19
+   tiles (um por modo) e dizer quais já estão no painel.
 3. Calibração por estrela: Definições > Bússola > "⭐ Calibrar por estrela"
    (à noite, céu limpo): a app lista as estrelas que estão no horizonte —
    no Brasil, a Cruz do Sul, Canopus, Sirius, Achernar — e diz a altura e o

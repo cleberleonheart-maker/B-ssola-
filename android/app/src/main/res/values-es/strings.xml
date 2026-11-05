@@ -29,4 +29,15 @@
     <string name="tile_sun">☀️ Sol</string>
     <string name="tile_track">🗺️ Ruta</string>
     <string name="tile_tri">📐 Triángulo</string>
+    <string name="tile_camera">📷 Visión</string>
+    <string name="tile_theodolite">📐 Teodolito</string>
+    <string name="tile_wind">🍃 Viento</string>
+    <string name="tile_map">📍 Mapa</string>
+    <string name="tile_notes">📓 Libreta</string>
+    <string name="tile_odometer">📏 Odómetro</string>
+    <string name="tile_cadence">👣 Cadencia</string>
+    <string name="tile_height">⌖ Altura</string>
+    <string name="tile_car">🚗 Coche</string>
+    <string name="tile_selftest">🧪 Autotest</string>
+    <string name="tile_diag">📟 Diagnóstico</string>
 </resources>
