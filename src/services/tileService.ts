@@ -31,6 +31,15 @@ export const TILE_MODES: DisplayMode[] = [
   'diag',
 ];
 
+/**
+ * O tile do modo de assalto (ideia #107).
+ *
+ * Não é um modo: é uma acção — abre o ecrã de emergência pelo atalho
+ * `bussola://sos`. Vive fora de `TILE_MODES` porque a lista dos modos é a
+ * lista dos ecrãs, e este não é um ecrã: é o botão do SOS.
+ */
+export const SOS_TILE_KEY = 'sos';
+
 const { TileStatus } = NativeModules;
 
 /**
@@ -49,5 +58,22 @@ export const getAddedTiles = async (): Promise<DisplayMode[]> => {
     );
   } catch {
     return [];
+  }
+};
+
+/**
+ * O tile do SOS já está no painel de atalhos?
+ *
+ * Vai à parte porque `getAddedTiles` só devolve modos — o "sos" não é um
+ * modo, e metê-lo na mesma lista faria o diálogo dos tiles dizer que há um
+ * modo chamado "sos".
+ */
+export const isSosTileAdded = async (): Promise<boolean> => {
+  try {
+    const tiles = await TileStatus?.getAddedTiles?.();
+    if (!Array.isArray(tiles)) return false;
+    return tiles.includes(SOS_TILE_KEY);
+  } catch {
+    return false;
   }
 };

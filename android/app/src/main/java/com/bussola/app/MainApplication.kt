@@ -36,6 +36,7 @@ class MainApplication : Application(), ReactApplication {
           add(BiometricPackage())
           add(PhoneNumberPackage())
           add(TileStatusPackage())
+          add(SosSenderPackage())
         },
     )
   }

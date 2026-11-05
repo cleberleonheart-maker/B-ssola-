@@ -9,6 +9,7 @@ import {
   Linking,
   Platform,
   Alert,
+  Vibration,
 } from 'react-native';
 import {
   startLiveShare,
@@ -51,6 +52,8 @@ import {
   sendBeaconSms,
 } from '../services/emergencyBeacon';
 import { hasCountryCode, phoneForWhatsApp } from '../utils/beacon';
+import { buildSosMessage, sosCountdownTick, SOS_COUNTDOWN_SECONDS } from '../utils/sos';
+import { sendSmsSilently } from '../services/sosSender';
 import type { LocationFix } from '../services/locationService';
 
 type Props = {
@@ -357,50 +360,69 @@ const EmergencyModal = ({
     void saveLiveDuration(minutes);
   };
 
+  /**
+   * Arranca o rastreio ao vivo e devolve a sessão.
+   *
+   * Separado do `startLive` porque o modo de assalto (ideia #107) não pode
+   * abrir o menu de partilha do sistema: quem está a ser assaltado não pode
+   * ter um ecrã com a lista de apps à vista. O link vai no SMS, em silêncio.
+   */
+  const startLiveSession = useCallback(
+    async (quiet = false): Promise<LiveSession | null> => {
+      if (!hasFix || liveBusy) return sessionRef.current;
+      setLiveBusy(true);
+      try {
+        const s = await startLiveShare(liveMinutes);
+        if (!s) {
+          if (!quiet) Alert.alert(t('live_title'), t('live_need_cloud'));
+          return null;
+        }
+        // O primeiro fix continua sendo do JS: e o que aborta a sessao se o
+        // upsert falhar, em vez de mandar um link que ninguem vai ver.
+        const sent = await pushLiveFix(s, locationRef.current, headingRef.current);
+        if (!sent) {
+          // Ler a causa ANTES do `stopLiveShare`: a limpeza volta a chamar
+          // `ensureCloudUser` e, se voltar a falhar, sobrescreve a razao original
+          // com a dela.
+          const cause = livePushError();
+          await stopLiveShare(s.token);
+          // A causa entra no diálogo: "não foi possível" sem dizer o quê obriga a
+          // eliminar por tentativa, e quem está a tentar arrancar o rastreio pode
+          // estar numa emergência.
+          if (!quiet) {
+            Alert.alert(
+              t('live_title'),
+              t('live_error') + (cause ? `\n\n${cause}` : ''),
+            );
+          }
+          return null;
+        }
+        const owner = await ensureService(s, true);
+        startTicker(s, owner);
+        // O widget passa a dizer "Parar" (ideia #105): quem o tiver no ecrã
+        // principal pode cortar o rastreio sem abrir a app.
+        setWidgetShareState(true, Date.now());
+        return s;
+      } catch {
+        if (!quiet) Alert.alert(t('live_title'), t('live_error'));
+        return null;
+      } finally {
+        setLiveBusy(false);
+      }
+    },
+    [hasFix, liveBusy, liveMinutes, t, ensureService, startTicker],
+  );
+
   const startLive = async () => {
     if (!hasFix || liveBusy || sessionRef.current) return;
-    setLiveBusy(true);
+    const s = await startLiveSession();
+    if (!s) return;
     try {
-      const s = await startLiveShare(liveMinutes);
-      if (!s) {
-        Alert.alert(t('live_title'), t('live_need_cloud'));
-        return;
-      }
-      const url = liveLink(s);
-      // O primeiro fix continua sendo do JS: e o que aborta a sessao se o
-      // upsert falhar, em vez de mandar um link que ninguem vai ver.
-      const sent = await pushLiveFix(s, locationRef.current, headingRef.current);
-      if (!sent) {
-        // Ler a causa ANTES do `stopLiveShare`: a limpeza volta a chamar
-        // `ensureCloudUser` e, se voltar a falhar, sobrescreve a razao original
-        // com a dela.
-        const cause = livePushError();
-        await stopLiveShare(s.token);
-        // A causa entra no diálogo: "não foi possível" sem dizer o quê obriga a
-        // eliminar por tentativa, e quem está a tentar arrancar o rastreio pode
-        // estar numa emergência.
-        Alert.alert(
-          t('live_title'),
-          t('live_error') + (cause ? `\n\n${cause}` : ''),
-        );
-        return;
-      }
-      const owner = await ensureService(s, true);
-      startTicker(s, owner);
-      // O widget passa a dizer "Parar" (ideia #105): quem o tiver no ecrã
-      // principal pode cortar o rastreio sem abrir a app.
-      setWidgetShareState(true, Date.now());
-      try {
-        await Share.share({
-          message:
-            t('live_shared', { time: liveDurationLabel(liveMinutes) }) + ' ' + url,
-        });
-      } catch {}
-    } catch {
-      Alert.alert(t('live_title'), t('live_error'));
-    } finally {
-      setLiveBusy(false);
-    }
+      await Share.share({
+        message:
+          t('live_shared', { time: liveDurationLabel(liveMinutes) }) + ' ' + liveLink(s),
+      });
+    } catch {}
   };
 
   const stopLive = async () => {
@@ -457,6 +479,89 @@ const EmergencyModal = ({
     Alert.alert(t('sos_beacon_send'), t('sos_beacon_ready'));
   };
 
+  /**
+   * Modo de assalto (ideia #107).
+   *
+   * Um botão só: manda o aviso ao contacto guardado em silêncio e liga o
+   * rastreio ao vivo, para que quem recebe o SMS veja por onde a pessoa vai
+   * e não só onde ela estava.
+   *
+   * A contagem de 5 segundos é o que separa "discreto" de "acidente": um
+   * toque no bolso não pode disparar o SOS. Cancelar está sempre à vista.
+   */
+  const [sosCountdown, setSosCountdown] = useState<number | null>(null);
+  const [sosBusy, setSosBusy] = useState(false);
+
+  const cancelarSos = useCallback(() => {
+    setSosCountdown(null);
+  }, []);
+
+  const dispararSos = useCallback(async () => {
+    setSosCountdown(null);
+    setSosBusy(true);
+    try {
+      if (!beaconContact) {
+        Alert.alert(t('sos_attack_title'), t('sos_attack_no_contact'));
+        return;
+      }
+      const fix = locationRef.current;
+      const temFix = hasLocationFix(fix);
+      // A sessão do rastreio pode já estar a correr (a pessoa carregou no
+      // "Iniciar" antes); se não, arranca-se agora — o link é o que dá o
+      // movimento, e é o que vai no SMS.
+      // Em silêncio: um diálogo de erro no meio de uma agressão é pior do que
+      // o rastreio não arrancar — o aviso sai na mesma, com a posição.
+      const s = sessionRef.current ?? (await startLiveSession(true));
+      const message = buildSosMessage({
+        latitude: temFix ? fix.latitude : null,
+        longitude: temFix ? fix.longitude : null,
+        accuracy: fix.accuracy ?? null,
+        altitude: fix.altitude ?? null,
+        battery,
+        network: network.operator ?? network.type ?? null,
+        liveLink: s ? liveLink(s) : null,
+      });
+      const result = await sendSmsSilently(beaconContact, message);
+      if (result === 'sent') {
+        onBeaconSent?.();
+        Alert.alert(t('sos_attack_title'), t('sos_attack_sent'));
+        return;
+      }
+      // Sem a permissão de SMS (ou sem módulo nativo): o caminho antigo, o
+      // compositor com o aviso escrito. Menos discreto, mas melhor do que
+      // não avisar.
+      const opened = await sendBeaconSms(beaconContact, message);
+      Alert.alert(
+        t('sos_attack_title'),
+        opened ? t('sos_attack_composer') : t('sos_attack_failed'),
+      );
+    } catch {
+      Alert.alert(t('sos_attack_title'), t('sos_attack_failed'));
+    } finally {
+      setSosBusy(false);
+    }
+  }, [beaconContact, battery, network, t, startLiveSession, onBeaconSent]);
+
+  useEffect(() => {
+    if (sosCountdown == null) return;
+    if (sosCountdown <= 0) {
+      void dispararSos();
+      return;
+    }
+    const id = setTimeout(() => {
+      setSosCountdown(n => sosCountdownTick(n));
+    }, 1000);
+    return () => clearTimeout(id);
+  }, [sosCountdown, dispararSos]);
+
+  const iniciarSos = useCallback(() => {
+    if (sosBusy) return;
+    // Uma vibração curta: confirma o toque sem barulho — quem está a ser
+    // assaltado não pode ter o telemóvel a tocar.
+    Vibration.vibrate(60);
+    setSosCountdown(SOS_COUNTDOWN_SECONDS);
+  }, [sosBusy]);
+
   return (
     <Modal
       visible={visible}
@@ -468,6 +573,20 @@ const EmergencyModal = ({
           style={[styles.card, { backgroundColor: colors.surface }]}
           onPress={() => {}}>
           <Text style={[styles.title, { color: colors.text }]}>🆘 {t('em_title')}</Text>
+
+          <Pressable
+            onPress={sosCountdown == null ? iniciarSos : cancelarSos}
+            disabled={sosBusy}
+            style={[styles.sosButton, sosCountdown != null && styles.sosButtonCancel]}>
+            <Text style={styles.sosButtonText}>
+              {sosCountdown == null
+                ? `🚨 ${t('sos_attack_btn')}`
+                : `🚨 ${t('sos_attack_countdown', { seconds: sosCountdown })}`}
+            </Text>
+            {sosCountdown != null && (
+              <Text style={styles.sosCancelText}>{t('sos_attack_cancel')}</Text>
+            )}
+          </Pressable>
 
           {hasFix ? (
             <>
@@ -632,6 +751,27 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: spacing.lg,
     alignSelf: 'flex-start',
+  },
+  sosButton: {
+    width: '100%',
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    backgroundColor: '#c0392b',
+  },
+  sosButtonCancel: {
+    backgroundColor: '#7f1d1d',
+  },
+  sosButtonText: {
+    color: '#ffffff',
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  sosCancelText: {
+    color: '#ffd9d4',
+    fontSize: 12,
+    marginTop: 4,
   },
   fixBox: {
     width: '100%',

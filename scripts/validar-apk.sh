@@ -101,33 +101,40 @@ fi
 echo
 echo "== o guião que falta (à mão, no aparelho) =="
 cat <<'GUIA'
-1. "O que foi feito": no build 207 devem aparecer 3 linhas — partilha da trilha
-   por link, tile por modo e tiles nas definições.
-2. Partilha por link: grava uma trilha (Trilha > gravar > parar), toca em
+1. "O que foi feito": no build 208 devem aparecer 3 linhas — modo de assalto,
+   partilha da trilha por link e tile por modo.
+2. Modo de assalto: em Definições > SOS, toca em "📨 Envio de SMS em silêncio" e
+   permite a permissão. Depois põe a tile "🚨 Assalto" no painel de Definições
+   Rápidas: ao tocares nela (com o ecrã bloqueado) a app tem de abrir o ecrã de
+   emergência. Toca em "🚨 SOS discreto": conta 5 segundos (toca para
+   cancelar) e depois o aviso tem de sair por SMS, em silêncio, para o
+   contacto guardado — com a posição e o link do rastreio ao vivo. Confirma
+   que o telemóvel não abriu a app de SMS.
+3. Partilha por link: grava uma trilha (Trilha > gravar > parar), toca em
    "Link" ao lado do GPX e escolhe a app de partilha. O link que sai é
    https://cleberleonheart-maker.github.io/B-ssola-/gpx.html#tkn=... — abre-o
    noutro telefone (ou no navegador do computador): tem de mostrar o percurso
    desenhado, a distância e o botão "Descarregar o GPX". O GPX descarregado
    tem de abrir numa app de mapas. O link deixa de funcionar ao fim de 30 dias.
-3. Tiles: desce o painel de Definições Rápidas e abre a edição (o lápis ou os
+4. Tiles: desce o painel de Definições Rápidas e abre a edição (o lápis ou os
    dois dedos); arrasta os tiles da Bússola para o painel — Bússola, AR, Nível,
    Detector, EMF, Sol, Trilha e Triângulo. Toca num deles: a app tem de abrir
    já no modo desse tile (sem passar pelo menu de modos). E em Definições >
    Bússola > "Tiles das Definições Rápidas": o diálogo deve listar os 19
    tiles (um por modo) e dizer quais já estão no painel.
-4. Calibração por estrela: Definições > Bússola > "⭐ Calibrar por estrela"
+5. Calibração por estrela: Definições > Bússola > "⭐ Calibrar por estrela"
    (à noite, céu limpo): a app lista as estrelas que estão no horizonte —
    no Brasil, a Cruz do Sul, Canopus, Sirius, Achernar — e diz a altura e o
    azimute de cada uma. Escolhe uma, aponta a câmara (em retrato): a mira
    diz quanto falta para virar e levantar; quando a estrela ficar no centro,
    toca "Medir declinação" e o resultado deve aparecer em segundos.
    Se a estrela estiver demasiado alta ou baixa, a app avisa e não mede.
-5. Widget: no ecrã principal, toca no botão do widget — sem rastreio a correr
+6. Widget: no ecrã principal, toca no botão do widget — sem rastreio a correr
    abre a app no ecra de emergência; com rastreio a correr, para-o sem abrir
    a app (o botão fica vermelho).
-6. Bloqueio: define um PIN (Configurações > Segurança), sai da app, abre outra
+7. Bloqueio: define um PIN (Configurações > Segurança), sai da app, abre outra
    vez (pede o PIN), espera 30 s fora da app e volta (pede o PIN outra vez).
-7. SOS: põe um contacto em Configurações > SOS e liga o beacon; quando a
+8. SOS: põe um contacto em Configurações > SOS e liga o beacon; quando a
    notificação aparecer, toca nela: abre o SMS com a posição, a bateria e a
    rede já escritas.
 GUIA

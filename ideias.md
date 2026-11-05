@@ -1394,3 +1394,26 @@ a nota de cada uma diz o que a distingue da ideia vizinha.
       `bussola://sos` (intent-filter no manifesto + `Linking` no JS), que é
       onde a sessão e o link de partilha são criados: as credenciais vivem no
       JavaScript e um link novo não se inventa num botão do widget.
+
+- [x] **107. 🚨 Modo de assalto (SOS discreto)** — ✅ feito na v7.77 (code 208).
+      O que faltava ao SOS era a discrição: o beacon abria a app de SMS com o
+      aviso escrito, e quem estivesse a ser assaltado tinha de tocar em
+      "enviar" com o ecrã à vista de toda a gente.
+      Agora o ecrã de emergência tem **um botão só**: conta 5 segundos (toca
+      para cancelar) e depois manda o aviso ao contacto guardado **por SMS em
+      silêncio** — módulo novo `SosSender` (Kotlin, `SmsManager`), com a
+      permissão `SEND_SMS` pedida antes, em Definições > SOS. Sem a
+      permissão, o app cai no caminho antigo (o compositor de SMS), em vez de
+      não avisar.
+      O aviso leva o **link do rastreio ao vivo**: quem recebe o SMS passa a
+      ver por onde a pessoa vai, e não só onde ela estava. O rastreio
+      arranca em silêncio (sem o menu de partilha do sistema) e, se não
+      arrancar, o aviso sai na mesma com a posição.
+      E há a **tile "🚨 Assalto"** nas Definições Rápidas: abre o ecrã de
+      emergência pelo atalho `bussola://sos` — o mesmo do botão do widget —
+      para se chegar lá a partir do painel de atalhos, **sem desbloquear o
+      telemóvel**.
+      O que fica de fora: não há gravação de áudio nem de vídeo (exige
+      permissões e é ilegal em muitos países sem aviso), e o SMS continua a
+      precisar de rede da operadora — sem rede, nem o link do rastreio
+      chega ao contacto.

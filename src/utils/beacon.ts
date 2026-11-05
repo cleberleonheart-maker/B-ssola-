@@ -82,6 +82,16 @@ export type BeaconMessageParams = {
   battery?: number | null;
   network?: string | null;
   time?: Date;
+  /**
+   * Link do rastreio ao vivo (ideia #107).
+   *
+   * A posição sozinha é o onde a pessoa estava. Com o link, quem recebe o
+   * aviso passa a ver por onde ela vai — que é a diferença entre "chamar a
+   * polícia para este ponto" e "acompanhar a pessoa".
+   */
+  liveLink?: string | null;
+  /** Cabeçalho da mensagem. O beacon usa o seu; o modo de assalto, o outro. */
+  title?: string;
 };
 
 /**
@@ -92,6 +102,7 @@ export type BeaconMessageParams = {
  */
 export const buildBeaconMessage = (params: BeaconMessageParams): string => {
   const time = params.time ?? new Date();
+  const titulo = params.title || 'SOS BEACON Bussola';
   const lat = params.latitude != null ? params.latitude.toFixed(6) : '?';
   const lon = params.longitude != null ? params.longitude.toFixed(6) : '?';
   const acc = params.accuracy != null ? Math.round(params.accuracy) : '?';
@@ -102,9 +113,10 @@ export const buildBeaconMessage = (params: BeaconMessageParams): string => {
   const maps = hasCoord
     ? `https://maps.google.com/?q=${params.latitude},${params.longitude}`
     : '';
+  const link = params.liveLink ? `\nRastreio ao vivo: ${params.liveLink}` : '';
   return (
-    `SOS BEACON Bussola\n${time.toISOString()}\n` +
+    `${titulo}\n${time.toISOString()}\n` +
     `Lat:${lat} Lon:${lon} acc:${acc}m alt:${alt}m\n` +
-    `Bateria:${bat}% Rede:${net}\n${maps}`
+    `Bateria:${bat}% Rede:${net}\n${maps}${link}`
   ).trim();
 };

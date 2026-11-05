@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { useThemeColors } from '../../theme/ThemeContext';
-import { getAddedTiles, TILE_MODES } from '../../services/tileService';
+import { getAddedTiles, isSosTileAdded, TILE_MODES } from '../../services/tileService';
 import type { DisplayMode } from '../../services/preferencesService';
 import { buildModeCards } from '../../screens/parts/modeCards';
 import { spacing, radius } from '../../theme/colors';
@@ -30,11 +30,15 @@ const TilesDialog = ({ onClose }: Props) => {
   const { t } = useLanguage();
   const colors = useThemeColors();
   const [added, setAdded] = useState<DisplayMode[]>([]);
+  const [sosAdded, setSosAdded] = useState(false);
 
   useEffect(() => {
     let alive = true;
     getAddedTiles().then(modes => {
       if (alive) setAdded(modes);
+    });
+    isSosTileAdded().then(on => {
+      if (alive) setSosAdded(on);
     });
     return () => {
       alive = false;
@@ -57,6 +61,19 @@ const TilesDialog = ({ onClose }: Props) => {
         <Text style={[styles.sub, { color: colors.textMuted }]}>{t('tiles_sub')}</Text>
 
         <ScrollView style={styles.list}>
+          <View style={styles.row}>
+            <Text style={styles.icon}>🚨</Text>
+            <Text style={[styles.name, { color: colors.text }]}>
+              {t('tiles_sos_name')}
+            </Text>
+            <Text
+              style={[
+                styles.state,
+                { color: sosAdded ? colors.success : colors.textMuted },
+              ]}>
+              {sosAdded ? t('tiles_added') : t('tiles_not_added')}
+            </Text>
+          </View>
           {ordered.map(card => {
             const on = added.includes(card.key);
             return (

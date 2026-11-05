@@ -40,4 +40,5 @@
     <string name="tile_car">🚗 Car</string>
     <string name="tile_selftest">🧪 Self-test</string>
     <string name="tile_diag">📟 Diagnostics</string>
+    <string name="tile_sos">🚨 SOS</string>
 </resources>

@@ -74,28 +74,34 @@ echo "   logcat -s ReactNativeJS:V AndroidRuntime:E | tail -100"
 echo
 echo "== o guião (à mão, no aparelho) =="
 cat <<'GUIA'
-1. "What was done": in build 207 there should be 3 lines — track shared by
-   link, a tile for every mode and the tiles in the settings.
-2. Sharing by link: record a track (Track > record > stop), tap "Link" next to
+1. "What was done": in build 208 there should be 3 lines — attack mode, track
+   shared by link and a tile for every mode.
+2. Attack mode: in Settings > SOS, tap "📨 Quiet SMS sending" and allow the
+   permission. Then put the "🚨 SOS" tile in the Quick Settings panel: tapping
+   it (with the screen locked) must open the emergency screen. Tap "🚨 Quiet
+   SOS": it counts 5 seconds (tap to cancel) and then the alert must go out by
+   SMS, quietly, to the saved contact — with the position and the live
+   tracking link. Check the phone did not open the SMS app.
+3. Sharing by link: record a track (Track > record > stop), tap "Link" next to
    GPX and pick a share app. The link is
    https://cleberleonheart-maker.github.io/B-ssola-/gpx.html#tkn=... — open it
    on another phone (or in a computer browser): it must show the route drawn,
    the distance and the "Download the GPX" button. The downloaded GPX must
    open in a maps app. The link stops working after 30 days.
-3. Tiles: desce o painel de Definições Rápidas e abre a edição (o lápis ou os
+4. Tiles: desce o painel de Definições Rápidas e abre a edição (o lápis ou os
    dois dedos); arrasta os tiles da Bússola para o painel — Bússola, AR, Nível,
    Detector, EMF, Sol, Trilha e Triângulo. Toca num deles: a app tem de abrir
    já no modo desse tile (sem passar pelo menu de modos). E em Definições >
    Bússola > "Tiles das Definições Rápidas": o diálogo deve listar os 19
    tiles (um por modo) e dizer quais já estão no painel.
-4. Calibração por estrela: Definições > Bússola > "⭐ Calibrar por estrela"
+5. Calibração por estrela: Definições > Bússola > "⭐ Calibrar por estrela"
    (à noite, céu limpo): a app lista as estrelas que estão no horizonte —
    no Brasil, a Cruz do Sul, Canopus, Sirius, Achernar — e diz a altura e o
    azimute de cada uma. Escolhe uma, aponta a câmara (em retrato): a mira
    diz quanto falta para virar e levantar; quando a estrela ficar no centro,
    toca "Medir declinação" e o resultado deve aparecer em segundos.
    Se a estrela estiver demasiado alta ou baixa, a app avisa e não mede.
-5. Widget: no ecrã principal, toca no botão do widget — sem rastreio a correr
+6. Widget: no ecrã principal, toca no botão do widget — sem rastreio a correr
    abre a app no ecra de emergência; com rastreio a correr, para-o sem abrir
    a app (o botão fica vermelho).
 5. Re-lock: com PIN definido, sai da app, espera 30 s e volta — tem de pedir

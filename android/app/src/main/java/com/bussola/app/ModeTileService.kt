@@ -145,3 +145,59 @@ class TileSelftest : ModeTileService() {
 class TileDiag : ModeTileService() {
   override val mode = "diag"
 }
+
+/**
+ * A tile do modo de assalto (ideia #107).
+ *
+ * Nao e um modo como os outros: e uma accao. Abre o ecra de emergencia pelo
+ * atalho `bussola://sos` — o mesmo que o botao do widget usa — para que
+ * quem esta a ser assaltado chegue ao SOS a partir do painel de atalhos,
+ * sem desbloquear o telemóvel.
+ *
+ * Vive nesta classe porque o Android so mostra um tile por servico: o tile
+ * do SOS e um servico como os outros, so que nao aponta para um modo.
+ */
+class TileSos : TileService() {
+  override fun onStartListening() {
+    super.onStartListening()
+    TilePrefs.mark(this, "sos", true)
+    refresh()
+  }
+
+  override fun onTileAdded() {
+    super.onTileAdded()
+    TilePrefs.mark(this, "sos", true)
+  }
+
+  override fun onTileRemoved() {
+    super.onTileRemoved()
+    TilePrefs.mark(this, "sos", false)
+  }
+
+  override fun onClick() {
+    val intent = Intent(this, MainActivity::class.java).apply {
+      action = Intent.ACTION_VIEW
+      data = Uri.parse("bussola://sos")
+      flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+    }
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+      val pending = PendingIntent.getActivity(
+        this,
+        "sos".hashCode(),
+        intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+      )
+      startActivityAndCollapse(pending)
+    } else {
+      @Suppress("DEPRECATION")
+      startActivity(intent)
+    }
+    refresh()
+  }
+
+  private fun refresh() {
+    val tile = qsTile ?: return
+    tile.state = Tile.STATE_INACTIVE
+    tile.updateTile()
+  }
+}

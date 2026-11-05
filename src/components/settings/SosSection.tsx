@@ -1,7 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { BEACON_INTERVAL_OPTIONS } from '../../utils/beacon';
+import {
+  canSendSmsSilently,
+  requestSmsPermission,
+  sosSenderSupported,
+} from '../../services/sosSender';
 import { ChevronRow, GroupCard, SwitchRow } from './primitives';
 
 type Props = {
@@ -34,6 +39,36 @@ const SosSection = ({
   onToggleFall,
 }: Props) => {
   const { t } = useLanguage();
+
+  /**
+   * Permissão de enviar SMS (ideia #107).
+   *
+   * Pede-se aqui, com calma, e não a meio de uma agressão: no modo de
+   * assalto o aviso tem de sair sem abrir a app de SMS, e um pedido de
+   * permissão na cara de quem está a ser assaltado é pior do que o aviso
+   * demorar um segundo.
+   */
+  const [smsOk, setSmsOk] = useState(false);
+
+  useEffect(() => {
+    if (!sosSenderSupported) return;
+    let alive = true;
+    canSendSmsSilently().then(ok => {
+      if (alive) setSmsOk(ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const askSmsPermission = async () => {
+    if (smsOk) return;
+    const ok = await requestSmsPermission();
+    setSmsOk(ok);
+    if (!ok) {
+      Alert.alert(t('emerg_sms_permission'), t('emerg_sms_permission_denied'));
+    }
+  };
 
   const pickInterval = () => {
     Alert.alert(
@@ -69,6 +104,16 @@ const SosSection = ({
         sub={`${intervalMinutes} min`}
         onPress={pickInterval}
       />
+      {sosSenderSupported && (
+        <ChevronRow
+          divider
+          icon="📨"
+          label={t('emerg_sms_permission')}
+          sub={smsOk ? t('emerg_sms_permission_ok') : t('emerg_sms_permission_hint')}
+          chevronText={smsOk ? t('emerg_sms_permission_ok_short') : undefined}
+          onPress={askSmsPermission}
+        />
+      )}
       <SwitchRow
         divider
         icon="🧍"
