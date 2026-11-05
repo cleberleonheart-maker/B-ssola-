@@ -59,14 +59,106 @@
         </intent-filter>
         <!-- Atalho do widget para o SOS (ideia #105): o botão "Partilhar" do
              widget abre a app já no ecrã de emergência, que é onde a sessão e
-             o link de partilha são criados. -->
+             o link são criados. -->
         <intent-filter>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.DEFAULT" />
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="bussola" android:host="sos" />
         </intent-filter>
+        <!-- Atalhos dos tiles das Definições Rápidas (ideia #14): cada tile
+             abre a app já no seu modo, com `bussola://mode/<modo>`. -->
+        <intent-filter>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="bussola" android:host="mode" />
+        </intent-filter>
       </activity>
+
+      <!-- Tiles das Definições Rápidas (ideia #14): um por modo, e cada um
+           abre a app nesse modo. O Android só mostra um tile por serviço, por
+           isso há uma classe por modo (todas herdadas de ModeTileService). -->
+      <service
+        android:name=".TileCompass"
+        android:label="@string/tile_compass"
+        android:icon="@drawable/ic_tile_bussola"
+        android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.service.quicksettings.action.QS_TILE" />
+        </intent-filter>
+      </service>
+      <service
+        android:name=".TileAr"
+        android:label="@string/tile_ar"
+        android:icon="@drawable/ic_tile_bussola"
+        android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.service.quicksettings.action.QS_TILE" />
+        </intent-filter>
+      </service>
+      <service
+        android:name=".TileLevel"
+        android:label="@string/tile_level"
+        android:icon="@drawable/ic_tile_bussola"
+        android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.service.quicksettings.action.QS_TILE" />
+        </intent-filter>
+      </service>
+      <service
+        android:name=".TileMetal"
+        android:label="@string/tile_metal"
+        android:icon="@drawable/ic_tile_bussola"
+        android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.service.quicksettings.action.QS_TILE" />
+        </intent-filter>
+      </service>
+      <service
+        android:name=".TileEmf"
+        android:label="@string/tile_emf"
+        android:icon="@drawable/ic_tile_bussola"
+        android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.service.quicksettings.action.QS_TILE" />
+        </intent-filter>
+      </service>
+      <service
+        android:name=".TileSun"
+        android:label="@string/tile_sun"
+        android:icon="@drawable/ic_tile_bussola"
+        android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.service.quicksettings.action.QS_TILE" />
+        </intent-filter>
+      </service>
+      <service
+        android:name=".TileTrack"
+        android:label="@string/tile_track"
+        android:icon="@drawable/ic_tile_bussola"
+        android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.service.quicksettings.action.QS_TILE" />
+        </intent-filter>
+      </service>
+      <service
+        android:name=".TileTri"
+        android:label="@string/tile_tri"
+        android:icon="@drawable/ic_tile_bussola"
+        android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.service.quicksettings.action.QS_TILE" />
+        </intent-filter>
+      </service>
 
       <!-- Mantem o processo em foreground durante o rastreio ao vivo -->
       <service

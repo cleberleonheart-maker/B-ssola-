@@ -25,4 +25,14 @@
     <string name="widget_share_start">📡 Partilhar localização</string>
     <string name="widget_share_stop">🛑 Parar rastreio</string>
     <string name="widget_share_active">📡 A partilhar a localização</string>
+
+    <!-- Tiles das Definições Rápidas (ideia #14): o rótulo de cada tile. -->
+    <string name="tile_compass">🧭 Bússola</string>
+    <string name="tile_ar">✨ AR</string>
+    <string name="tile_level">◉ Nível</string>
+    <string name="tile_metal">🧲 Detector</string>
+    <string name="tile_emf">📡 EMF</string>
+    <string name="tile_sun">☀️ Sol</string>
+    <string name="tile_track">🗺️ Trilha</string>
+    <string name="tile_tri">📐 Triângulo</string>
 </resources>

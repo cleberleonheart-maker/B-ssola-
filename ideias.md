@@ -164,7 +164,15 @@
       recusa medir em vez de gravar um número errado. A medição lê o sensor em
       tempo real (as 12 amostras são do momento, não do clique) e aborta se a
       estrela se perder a meio.
-- [ ] **14. Tiles Android** — quick-settings tile para abrir direto num modo.
+- [x] **14. Tiles Android** — ✅ feito na v7.73 (code 204): o app tem tiles
+      para as Definições Rápidas do Android — bússola, AR, nível, detector de
+      metais, EMF, sol, trilha e triângulo. Cada tile é um `TileService`
+      (`ModeTileService.kt`; uma classe por modo, porque o Android só mostra
+      um tile por serviço) e abre a app pelo atalho `bussola://mode/<modo>`,
+      que o JavaScript lê em `utils/deepLinks.ts` (`parseModeUrl`) e que o
+      `CompassScreen` transforma em `openMode`: a app abre já no modo pedido,
+      sem passar pelo menu. Para os usar, arrasta-se os tiles da Bússola para
+      o painel de Definições Rápidas.
 - [x] **15. Tema automático** — ✅ feito: opção "Automático" no grid de tema, com
       três estratégias (Claro/Escuro por horário 6h–18h; Sol forte/Noturno por
       horário; e "pelo sol real" via `sunEvents`, com recuo ao horário sem GPS).

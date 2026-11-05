@@ -158,6 +158,7 @@ import {
   type CelestialPoint,
 } from '../utils/astro';
 import { setUnitSystem, formatAccuracy, type UnitSystem } from '../utils/units';
+import { parseModeUrl } from '../utils/deepLinks';
 import { useRepetitiveBeep, soundAvailable } from '../services/sound';
 import {
   updateWidget,
@@ -233,24 +234,6 @@ const CompassScreen = () => {
   const [alertsVisible, setAlertsVisible] = useState(false);
   const [emergencyVisible, setEmergencyVisible] = useState(false);
 
-  /*
-   * Atalho do widget para o SOS (ideia #105): o botão "Partilhar" do widget
-   * abre a app com `bussola://sos`, e a app abre já no ecrã de emergência —
-   * que é onde a sessão e o link de partilha são criados. Sem este tratamento
-   * o atalho abria a app na bússola, e a pessoa teria de ir buscar o SOS.
-   */
-  useEffect(() => {
-    const abrir = (url: string | null | undefined) => {
-      if (url && url.startsWith('bussola://sos')) {
-        setEmergencyVisible(true);
-      }
-    };
-    Linking.getInitialURL()
-      .then(abrir)
-      .catch(() => {});
-    const sub = Linking.addEventListener('url', ({ url }) => abrir(url));
-    return () => sub.remove();
-  }, []);
   const alertsCheckedRef = useRef(false);
   const notifiedAlertsRef = useRef(new Set<string>());
   const [calibrated, setCalibrated] = useState(false);
@@ -654,6 +637,29 @@ const CompassScreen = () => {
     },
     [selectDisplayMode],
   );
+
+  /*
+   * Atalhos que abrem a app: o `bussola://sos` do botão do widget (ideia
+   * #105) abre o ecrã de emergência — que é onde a sessão e o link de partilha
+   * são criados — e o `bussola://mode/<modo>` dos tiles das Definições
+   * Rápidas (ideia #14) abre a app já no modo pedido.
+   */
+  useEffect(() => {
+    const abrir = (url: string | null | undefined) => {
+      if (!url) return;
+      if (url.startsWith('bussola://sos')) {
+        setEmergencyVisible(true);
+        return;
+      }
+      const mode = parseModeUrl(url);
+      if (mode) openMode(mode);
+    };
+    Linking.getInitialURL()
+      .then(abrir)
+      .catch(() => {});
+    const sub = Linking.addEventListener('url', ({ url }) => abrir(url));
+    return () => sub.remove();
+  }, [openMode]);
 
   const goHome = useCallback(() => {
     setLauncherVisible(true);

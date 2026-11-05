@@ -27,6 +27,29 @@ export type DisplayMode =
 
 export type WindCal = { zero: number; strong: number };
 
+/** Todos os modos de ecrã, pela ordem em que o menu os mostra. */
+export const DISPLAY_MODES: DisplayMode[] = [
+  'compass',
+  'level',
+  'ar',
+  'camera',
+  'metal',
+  'theodolite',
+  'emf',
+  'sun',
+  'wind',
+  'track',
+  'map',
+  'notes',
+  'height',
+  'car',
+  'tri',
+  'odometer',
+  'selftest',
+  'diag',
+  'cadence',
+];
+
 const DECLINATION_KEY = '@bussola/declination';
 const APP_MODE_KEY = '@bussola/appMode';
 const DISPLAY_MODE_KEY = '@bussola/displayMode';
@@ -88,28 +111,9 @@ export const saveAppMode = async (mode: AppMode) => {
 export const loadDisplayMode = async (): Promise<DisplayMode> => {
   try {
     const raw = await AsyncStorage.getItem(DISPLAY_MODE_KEY);
-    const modes: DisplayMode[] = [
-      'compass',
-      'level',
-      'ar',
-      'camera',
-      'metal',
-      'theodolite',
-      'emf',
-      'sun',
-      'wind',
-      'track',
-      'map',
-      'notes',
-      'height',
-      'car',
-      'tri',
-      'odometer',
-      'selftest',
-      'diag',
-      'cadence',
-    ];
-    return modes.includes(raw as DisplayMode) ? (raw as DisplayMode) : 'compass';
+    return DISPLAY_MODES.includes(raw as DisplayMode)
+      ? (raw as DisplayMode)
+      : 'compass';
   } catch {
     return 'compass';
   }

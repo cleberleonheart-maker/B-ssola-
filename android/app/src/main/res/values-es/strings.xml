@@ -20,4 +20,13 @@
     <string name="widget_share_start">📡 Compartir ubicación</string>
     <string name="widget_share_stop">🛑 Parar rastreo</string>
     <string name="widget_share_active">📡 Compartiendo tu ubicación</string>
+
+    <string name="tile_compass">🧭 Brújula</string>
+    <string name="tile_ar">✨ AR</string>
+    <string name="tile_level">◉ Nivel</string>
+    <string name="tile_metal">🧲 Detector</string>
+    <string name="tile_emf">📡 EMF</string>
+    <string name="tile_sun">☀️ Sol</string>
+    <string name="tile_track">🗺️ Ruta</string>
+    <string name="tile_tri">📐 Triángulo</string>
 </resources>
