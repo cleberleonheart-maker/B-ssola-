@@ -22,8 +22,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PKG="com.bussola.app"
 ACT="$PKG/.MainActivity"
 REPO="cleberleonheart-maker/B-ssola-"
-ASSET="bussola-v205.apk"
-SHA="1837c5a752d0d25b302b984c37a2f48a4b4e935ad22d1a179c1b54687b6e59f1"
+ASSET="bussola-v206.apk"
+SHA="bfd85f3d0e97b1b024657ac27351e19f3f34aa8c84ca68078069a400cf44f233"
 VIGIA_S=45
 
 APK="${1:-}"
