@@ -173,6 +173,11 @@
       `CompassScreen` transforma em `openMode`: a app abre já no modo pedido,
       sem passar pelo menu. Para os usar, arrasta-se os tiles da Bússola para
       o painel de Definições Rápidas.
+      **Na v7.74 (code 205)**: as Definições > Bússola ganharam uma entrada
+      para os tiles (`TilesDialog`): diz em três passos como os pôr no painel
+      e mostra quais já lá estão. Para saber isso, o `TileService` marca a
+      entrada e a saída de cada tile (`onTileAdded`/`onTileRemoved`) em
+      `TilePrefs`, e o módulo `TileStatus` leva a lista ao JavaScript.
 - [x] **15. Tema automático** — ✅ feito: opção "Automático" no grid de tema, com
       três estratégias (Claro/Escuro por horário 6h–18h; Sol forte/Noturno por
       horário; e "pelo sol real" via `sunEvents`, com recuo ao horário sem GPS).

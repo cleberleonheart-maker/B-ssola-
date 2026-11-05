@@ -35,6 +35,7 @@ class MainApplication : Application(), ReactApplication {
           add(NetworkInfoPackage())
           add(BiometricPackage())
           add(PhoneNumberPackage())
+          add(TileStatusPackage())
         },
     )
   }

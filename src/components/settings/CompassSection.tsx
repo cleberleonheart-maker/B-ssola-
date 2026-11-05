@@ -22,6 +22,7 @@ type Props = {
   calibrated: boolean;
   onOpenCalibration: () => void;
   onOpenStarCal: () => void;
+  onOpenTiles: () => void;
   declination: Declination;
   onSetDeclination: (decl: Declination) => void;
   declinationSuggest: Suggest;
@@ -49,6 +50,7 @@ const CompassSection = (props: Props) => {
     calibrated,
     onOpenCalibration,
     onOpenStarCal,
+    onOpenTiles,
     declination,
     onSetDeclination,
     declinationSuggest,
@@ -173,6 +175,13 @@ const CompassSection = (props: Props) => {
               { backgroundColor: arStatus.supported ? colors.success : colors.danger },
             ]}
           />
+        </GroupRow>
+
+        {/* Os tiles das Definições Rápidas (ideia #14) são do Android: o
+            diálogo diz como os pôr no painel e mostra quais já lá estão. */}
+        <GroupRow divider onPress={onOpenTiles}>
+          <IconChip icon="🧩" />
+          <RowBody label={t('set_tiles_title')} sub={t('set_tiles_sub')} lines={2} />
         </GroupRow>
       </GroupCard>
     </>

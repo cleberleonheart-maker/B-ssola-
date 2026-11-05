@@ -22,7 +22,20 @@ abstract class ModeTileService : TileService() {
 
   override fun onStartListening() {
     super.onStartListening()
+    // O tile só é ouvido quando está no painel: o Android avisou-o de que
+    // está lá, e é isso que as definições mostram.
+    TilePrefs.mark(this, mode, true)
     refresh()
+  }
+
+  override fun onTileAdded() {
+    super.onTileAdded()
+    TilePrefs.mark(this, mode, true)
+  }
+
+  override fun onTileRemoved() {
+    super.onTileRemoved()
+    TilePrefs.mark(this, mode, false)
   }
 
   override fun onClick() {

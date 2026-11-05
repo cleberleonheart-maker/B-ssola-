@@ -42,6 +42,7 @@ import ContactDialog from './settings/ContactDialog';
 import ImportDialog from './settings/ImportDialog';
 import PinDialog from './settings/PinDialog';
 import ReportProblemDialog from './settings/ReportProblemDialog';
+import TilesDialog from './settings/TilesDialog';
 import { Caption, SectionLabel } from './settings/primitives';
 import { styles } from './settings/styles';
 
@@ -138,6 +139,7 @@ const SettingsModal = ({
   const [importVisible, setImportVisible] = useState(false);
   const [contactVisible, setContactVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
+  const [tilesVisible, setTilesVisible] = useState(false);
   const [importText, setImportText] = useState('');
   const [exporting, setExporting] = useState(false);
   const [hasPin, setHasPin] = useState(false);
@@ -434,6 +436,7 @@ const SettingsModal = ({
                 calibrated={calibrated}
                 onOpenCalibration={onOpenCalibration}
                 onOpenStarCal={onOpenStarCal}
+                onOpenTiles={() => setTilesVisible(true)}
                 declination={declination}
                 onSetDeclination={onSetDeclination}
                 declinationSuggest={declinationSuggest}
@@ -545,6 +548,8 @@ const SettingsModal = ({
       {reportVisible && (
         <ReportProblemDialog onClose={() => setReportVisible(false)} />
       )}
+
+      {tilesVisible && <TilesDialog onClose={() => setTilesVisible(false)} />}
 
       <UpdateAvailableModal
         visible={update !== null}
