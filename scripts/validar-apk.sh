@@ -101,17 +101,20 @@ fi
 echo
 echo "== o guião que falta (à mão, no aparelho) =="
 cat <<'GUIA'
-1. "O que foi feito": no build 209 devem aparecer 3 linhas — o SOS sem a app
-   aberta, modo de assalto e partilha da trilha por link.
+1. "O que foi feito": no build 210 devem aparecer 3 linhas — o aviso em silêncio com
+   o rastreio, o SOS sem a app aberta e o modo de assalto.
 2. Modo de assalto: em Definições > SOS, toca em "📨 Envio de SMS em silêncio" e
    permite a permissão. Põe a tile "🚨 Assalto" no painel de Definições
    Rápidas e bloqueia o telemóvel. Toca na tile: a app NÃO pode abrir, o ecrã
    não se acende e tem de aparecer uma notificação silenciosa a contar 10
    segundos, com o botão "Cancelar". Ao fim da contagem o aviso tem de sair
-   por SMS para o contacto guardado, com a última posição e a bateria, e o
-   telemóvel continua bloqueado. Testa também o "Cancelar": passados uns
-   segundos, cancela e confirma que o SMS não saiu. (Sem contacto de
-   emergência guardado, a tile tem de abrir a app no ecrã de emergência.)
+   por SMS para o contacto guardado, com a última posição, a bateria e — se
+   houver rede — o link do rastreio ao vivo; o telemóvel continua bloqueado.
+   Abre o link num outro telefone: tem de mostrar a pessoa a mover-se.
+   Testa também o "Cancelar": passados uns segundos, cancela e confirma que o
+   SMS não saiu. Toca duas vezes seguidas: só pode sair um aviso. (Sem
+   contacto de emergência guardado, a tile tem de abrir a app no ecrã de
+   emergência.)
    Dentro da app, o botão "🚨 SOS discreto" continua a contar 5 segundos e
    manda o aviso com o link do rastreio ao vivo.
 3. Partilha por link: grava uma trilha (Trilha > gravar > parar), toca em

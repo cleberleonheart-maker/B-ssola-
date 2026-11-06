@@ -88,10 +88,20 @@ class SosAlertService : Service() {
       parar()
       return
     }
+    // Com a app fechada não há sessão na nuvem para linkar — mas o nativo
+    // consegue criar uma: o refresh token guardado dá um access token novo,
+    // a linha é criada e o serviço de rastreio arranca. Se este passo falhar, o
+    // aviso sai na mesma, só sem o link.
+    val fix = fixAtual()
+    val link = try {
+      SosCloud.startLiveSession(this, fix, SosPrefs.battery(this))
+    } catch (_: Exception) {
+      null
+    }
     try {
       @Suppress("DEPRECATION")
-      SmsManager.getDefault().sendTextMessage(contacto, null, buildMessage(), null, null)
-      mostrarEnviado()
+      SmsManager.getDefault().sendTextMessage(contacto, null, buildMessage(link), null, null)
+      mostrarEnviado(link != null)
     } catch (_: Exception) {
       // Falhou o envio: nada a fazer aqui — a notificação some e a app
       // continua com o aviso do erro quando for aberta.
@@ -99,8 +109,22 @@ class SosAlertService : Service() {
     parar()
   }
 
-  /** O texto do aviso: posição, hora e bateria. */
-  private fun buildMessage(): String {
+  /** A última posição guardada, como o `LiveFix` do rastreio. */
+  private fun fixAtual(): LiveFix? {
+    val f = SosPrefs.fix(this) ?: return null
+    return LiveFix(
+      latitude = f.lat,
+      longitude = f.lon,
+      accuracy = f.accuracy,
+      altitude = f.alt,
+      speed = null,
+      heading = null,
+      batteryLevel = SosPrefs.battery(this),
+    )
+  }
+
+  /** O texto do aviso: posição, hora, bateria e o link do rastreio. */
+  private fun buildMessage(link: String?): String {
     val fix = SosPrefs.fix(this)
     val bateria = SosPrefs.battery(this)
     val hora = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())
@@ -111,7 +135,8 @@ class SosAlertService : Service() {
     val bat = bateria?.toString() ?: "?"
     val maps =
       if (fix != null) "https://maps.google.com/?q=${fix.lat},${fix.lon}" else ""
-    return "SOS BUSSOLA\n$hora\nLat:$lat Lon:$lon acc:${acc}m alt:${alt}m\nBateria:$bat%\n$maps"
+    val rastreio = if (link != null) "\nRastreio ao vivo: $link" else ""
+    return "SOS BUSSOLA\n$hora\nLat:$lat Lon:$lon acc:${acc}m alt:${alt}m\nBateria:$bat%\n$maps$rastreio"
       .trim()
   }
 
@@ -180,7 +205,7 @@ class SosAlertService : Service() {
   }
 
   /** A notificação que confirma que o aviso saiu. */
-  private fun mostrarEnviado() {
+  private fun mostrarEnviado(comLink: Boolean) {
     ensureChannel()
     val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     manager.notify(
@@ -188,7 +213,11 @@ class SosAlertService : Service() {
       NotificationCompat.Builder(this, CHANNEL_ID)
         .setSmallIcon(R.drawable.ic_stat_live)
         .setContentTitle(getString(R.string.sos_sent_title))
-        .setContentText(getString(R.string.sos_sent_text))
+        .setContentText(
+          getString(
+            if (comLink) R.string.sos_sent_text_live else R.string.sos_sent_text,
+          ),
+        )
         .setAutoCancel(true)
         .setSilent(true)
         .setPriority(NotificationCompat.PRIORITY_LOW)

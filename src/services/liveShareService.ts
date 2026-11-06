@@ -12,6 +12,7 @@ import {
   takeCloudError,
 } from './cloud';
 import type { LocationFix } from './locationService';
+import { LIVE_PAGE_URL } from './livePage';
 
 /**
  * Motivo da falha, para o Alert deixar de dizer só "não foi possível".
@@ -32,8 +33,7 @@ export interface LiveSession {
 }
 
 export const liveLink = (s: LiveSession): string =>
-  'https://cleberleonheart-maker.github.io/B-ssola-/live.html#tkn=' +
-  encodeURIComponent(s.token);
+  `${LIVE_PAGE_URL}#tkn=` + encodeURIComponent(s.token);
 
 export const liveCountdown = (s: LiveSession): string => {
   const left = s.expiresAt - Date.now();

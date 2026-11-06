@@ -14,6 +14,7 @@ type SosNative = {
   cacheFix: jest.Mock;
   cacheBattery: jest.Mock;
   cachedState: jest.Mock;
+  cacheCloud: jest.Mock;
 };
 
 const loadSos = (native: SosNative) => {
@@ -30,6 +31,7 @@ const nativeMock = (): SosNative => ({
   cacheFix: jest.fn().mockResolvedValue(true),
   cacheBattery: jest.fn().mockResolvedValue(true),
   cachedState: jest.fn().mockResolvedValue({}),
+  cacheCloud: jest.fn().mockResolvedValue(true),
 });
 
 describe('o cache do modo de assalto', () => {
@@ -120,6 +122,45 @@ describe('o cache do modo de assalto', () => {
     const sos = loadSos(native);
 
     await expect(sos.cacheEmergencyContact('+351919999999')).resolves.toBeUndefined();
+  });
+
+  it('guarda as credenciais da nuvem, para o aviso criar o rastreio', async () => {
+    const native = nativeMock();
+    const sos = loadSos(native);
+
+    await sos.cacheCloudCredentials({
+      refreshToken: 'refresh-123',
+      url: 'https://exemplo.supabase.co',
+      anonKey: 'anon-123',
+      userId: 'user-1',
+      livePageUrl: 'https://exemplo/live.html',
+      liveMinutes: 30,
+    });
+
+    expect(native.cacheCloud).toHaveBeenCalledWith(
+      'refresh-123',
+      'https://exemplo.supabase.co',
+      'anon-123',
+      'user-1',
+      'https://exemplo/live.html',
+      30,
+    );
+  });
+
+  it('sem refresh token não há cache de nuvem', async () => {
+    const native = nativeMock();
+    const sos = loadSos(native);
+
+    await sos.cacheCloudCredentials({
+      refreshToken: '',
+      url: 'https://exemplo.supabase.co',
+      anonKey: 'anon-123',
+      userId: 'user-1',
+      livePageUrl: 'https://exemplo/live.html',
+      liveMinutes: 30,
+    });
+
+    expect(native.cacheCloud).not.toHaveBeenCalled();
   });
 
   it('lê o estado que o nativo tem', async () => {

@@ -1430,3 +1430,12 @@ a nota de cada uma diz o que a distingue da ideia vizinha.
       contagem com o ecrã apagado — por isso o cancelamento está sempre à
       vista, na notificação. Sem contacto guardado, a tile abre a app no
       ecrã de emergência (é lá que o contacto se guarda).
+      **Feito na v7.79 (code 210)**: o aviso nativo deixou de ser um ponto.
+      O JavaScript guarda agora no telemóvel o **refresh token** da nuvem (o
+      access token expira em uma hora; o aviso pode ser disparado dias
+      depois), o URL, a anon key e a página do rastreio — tudo o que o nativo
+      precisa para criar a sessão sozinho: o `SosCloud` renova o token, cria
+      a linha em `live_shares`, arranca o `LiveTrackingService` e devolve o
+      link, que vai no SMS. Se a rede falhar, o aviso sai na mesma, só sem o
+      link. E dois toques seguidos na tile já não mandam dois avisos (o
+      segundo toque é ignorado enquanto há uma contagem em curso).

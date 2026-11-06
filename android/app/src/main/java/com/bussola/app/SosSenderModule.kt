@@ -103,6 +103,35 @@ class SosSenderModule(private val reactContext: ReactApplicationContext) :
     promise.resolve(true)
   }
 
+  /**
+   * As credenciais da nuvem, para o aviso conseguir criar a sessao de
+   * rastreio sem a app aberta.
+   *
+   * O refresh token e o que interessa: o access token expira em uma hora e o
+   * aviso pode ser disparado dias depois de a app ter estado fechada.
+   */
+  @ReactMethod
+  fun cacheCloud(
+    refreshToken: String,
+    url: String,
+    anonKey: String,
+    userId: String,
+    livePageUrl: String,
+    liveMinutes: Double,
+    promise: Promise,
+  ) {
+    SosPrefs.setCloud(
+      reactContext,
+      refreshToken,
+      url,
+      anonKey,
+      userId,
+      livePageUrl,
+      liveMinutes.toInt(),
+    )
+    promise.resolve(true)
+  }
+
   /** O que o nativo sabe: para os testes e para o diagnóstico. */
   @ReactMethod
   fun cachedState(promise: Promise) {
@@ -111,6 +140,7 @@ class SosSenderModule(private val reactContext: ReactApplicationContext) :
     map.putString("contact", SosPrefs.contact(reactContext))
     map.putInt("battery", SosPrefs.battery(reactContext) ?: -1)
     map.putBoolean("pending", SosPrefs.pending(reactContext))
+    map.putBoolean("hasCloud", SosPrefs.refreshToken(reactContext).isNotBlank())
     if (fix != null) {
       map.putDouble("lat", fix.lat)
       map.putDouble("lon", fix.lon)

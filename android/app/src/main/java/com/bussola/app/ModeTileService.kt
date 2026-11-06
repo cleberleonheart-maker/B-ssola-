@@ -181,6 +181,13 @@ class TileSos : TileService() {
   }
 
   override fun onClick() {
+    // Um aviso já em contagem: o segundo toque não dispara um segundo SMS.
+    // Quem tocou duas vezes por engano ia avisar duas vezes — e a segunda
+    // vez sem querer, quando já o tinha cancelado.
+    if (SosPrefs.pending(this)) {
+      refresh()
+      return
+    }
     val contacto = SosPrefs.contact(this)
     if (contacto.isBlank()) {
       abrirEcraEmergencia()

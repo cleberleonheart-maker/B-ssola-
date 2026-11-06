@@ -29,10 +29,19 @@ type SosSenderNative = {
     contact?: string;
     battery?: number;
     pending?: boolean;
+    hasCloud?: boolean;
     lat?: number;
     lon?: number;
     fixAt?: number;
   }>;
+  cacheCloud?: (
+    refreshToken: string,
+    url: string,
+    anonKey: string,
+    userId: string,
+    livePageUrl: string,
+    liveMinutes: number,
+  ) => Promise<boolean>;
 };
 
 const SosSender = (NativeModules as { SosSender?: SosSenderNative }).SosSender ?? null;
@@ -159,6 +168,38 @@ export const cacheBattery = async (percent: number | null): Promise<void> => {
     await SosSender.cacheBattery(percent);
   } catch {
     // idem
+  }
+};
+
+/**
+ * As credenciais da nuvem, para o aviso conseguir criar a sessão de
+ * rastreio sem a app aberta.
+ *
+ * O refresh token e o que interessa (o access token expira em uma hora); o
+ * URL e a anon key são públicos e a página do rastreio é a mesma que o app
+ * partilha — vêm todos do JavaScript para que haja uma só cópia de cada.
+ */
+export const cacheCloudCredentials = async (creds: {
+  refreshToken: string;
+  url: string;
+  anonKey: string;
+  userId: string;
+  livePageUrl: string;
+  liveMinutes: number;
+}): Promise<void> => {
+  if (!SosSender?.cacheCloud) return;
+  if (!creds.refreshToken || !creds.url || !creds.anonKey || !creds.userId) return;
+  try {
+    await SosSender.cacheCloud(
+      creds.refreshToken,
+      creds.url,
+      creds.anonKey,
+      creds.userId,
+      creds.livePageUrl || '',
+      creds.liveMinutes || 30,
+    );
+  } catch {
+    // sem cache, o aviso sai na mesma — só sem o link do rastreio
   }
 };
 

@@ -28,6 +28,12 @@ object SosPrefs {
   private const val KEY_FIX_AT = "fix_at"
   private const val KEY_BATTERY = "battery"
   private const val KEY_PENDING = "pending"
+  private const val KEY_REFRESH_TOKEN = "refresh_token"
+  private const val KEY_CLOUD_URL = "cloud_url"
+  private const val KEY_ANON_KEY = "anon_key"
+  private const val KEY_USER_ID = "user_id"
+  private const val KEY_LIVE_PAGE_URL = "live_page_url"
+  private const val KEY_LIVE_MINUTES = "live_minutes"
 
   /** A última posição que a app soube. */
   data class Fix(
@@ -89,6 +95,48 @@ object SosPrefs {
     val p = prefs(context)
     return if (p.contains(KEY_BATTERY)) p.getInt(KEY_BATTERY, -1) else null
   }
+
+  /**
+   * As credenciais da nuvem, para o aviso conseguir criar uma sessão de
+   * rastreio sem a app aberta.
+   *
+   * O que se guarda e o *refresh* token (o access token expira em uma hora) e
+   * o URL e a anon key do Supabase — que são públicos e vêm do JavaScript, de
+   * modo que há uma só cópia de cada (duas cópias divergem em silêncio).
+   */
+  fun setCloud(
+    context: Context,
+    refreshToken: String,
+    url: String,
+    anonKey: String,
+    userId: String,
+    livePageUrl: String,
+    liveMinutes: Int,
+  ) {
+    prefs(context)
+      .edit()
+      .putString(KEY_REFRESH_TOKEN, refreshToken)
+      .putString(KEY_CLOUD_URL, url)
+      .putString(KEY_ANON_KEY, anonKey)
+      .putString(KEY_USER_ID, userId)
+      .putString(KEY_LIVE_PAGE_URL, livePageUrl)
+      .putInt(KEY_LIVE_MINUTES, liveMinutes)
+      .apply()
+  }
+
+  fun refreshToken(context: Context): String =
+    prefs(context).getString(KEY_REFRESH_TOKEN, "") ?: ""
+
+  fun cloudUrl(context: Context): String = prefs(context).getString(KEY_CLOUD_URL, "") ?: ""
+
+  fun anonKey(context: Context): String = prefs(context).getString(KEY_ANON_KEY, "") ?: ""
+
+  fun userId(context: Context): String = prefs(context).getString(KEY_USER_ID, "") ?: ""
+
+  fun livePageUrl(context: Context): String =
+    prefs(context).getString(KEY_LIVE_PAGE_URL, "") ?: ""
+
+  fun liveMinutes(context: Context): Int = prefs(context).getInt(KEY_LIVE_MINUTES, 30)
 
   /** Há um aviso em contagem? (o tile mostra-o no subtítulo) */
   fun setPending(context: Context, pending: Boolean) {

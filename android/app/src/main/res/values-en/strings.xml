@@ -49,4 +49,5 @@
     <string name="sos_sent_title">🚨 SOS sent</string>
     <string name="sos_sent_text">The alert went out quietly to the saved contact.</string>
     <string name="tile_sos_pending">Sending…</string>
+    <string name="sos_sent_text_live">The alert went out quietly and the live tracking is running.</string>
 </resources>

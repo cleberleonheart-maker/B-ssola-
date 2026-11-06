@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { LIVE_PAGE_URL } from './livePage';
 
 const SUPABASE_URL: string = 'https://wotzcykrvidbjkonaawx.supabase.co';
 const SUPABASE_ANON_KEY: string = 'sb_publishable_g8EcCQe4YPGaeMz1V-8gIw_OxF3iLNv';
@@ -197,6 +198,9 @@ export const ensureCloudUser = async (): Promise<string | null> => {
       }
       if (data?.session?.user) {
         currentUserId = data.session.user.id;
+        // O modo de assalto (ideia #107) precisa do refresh token para criar
+        // a sessão de rastreio sem a app aberta.
+        void cacheCloudForSos(currentUserId);
         return currentUserId;
       }
       const { data: signInData, error: signInError } = await withTimeout(
@@ -237,10 +241,47 @@ export const ensureCloudUser = async (): Promise<string | null> => {
  * parâmetro. Sem ele o push nativo voltaria 401 e o rastreio morreria em
  * silêncio — daí `null` ser tratado como "não dá para subir o serviço".
  */
+/**
+ * Copia para o nativo o que ele precisa para criar uma sessão de rastreio
+ * sem a app aberta (ideia #107).
+ *
+ * O que se guarda é o *refresh* token: o access token expira em uma hora e o
+ * aviso pode ser disparado dias depois de a app ter estado fechada. O
+ * refresh token gira a cada renovação, por isso isto é feito sempre que a
+ * sessão é lida — um refresh token velho é um refresh token inútil.
+ */
+const cacheCloudForSos = async (userId: string): Promise<void> => {
+  if (!client) return;
+  try {
+    const { data } = await withTimeout(client.auth.getSession(), 15000);
+    const refreshToken = data?.session?.refresh_token;
+    if (!refreshToken) return;
+    const [{ loadLiveDuration }, { cacheCloudCredentials }] = await Promise.all([
+      import('./preferencesService'),
+      import('./sosSender'),
+    ]);
+    const minutes = await loadLiveDuration();
+    await cacheCloudCredentials({
+      refreshToken,
+      url: SUPABASE_URL,
+      anonKey: SUPABASE_ANON_KEY,
+      userId,
+      livePageUrl: LIVE_PAGE_URL,
+      liveMinutes: minutes,
+    });
+  } catch {
+    // Sem cache, o aviso sai na mesma — só sem o link do rastreio.
+  }
+};
+
 export const getCloudAccessToken = async (): Promise<string | null> => {
   if (!client) return null;
   try {
     const { data } = await withTimeout(client.auth.getSession());
+    if (data?.session?.user?.id) {
+      // O refresh token gira a cada renovação: volta a guardá-lo.
+      void cacheCloudForSos(data.session.user.id);
+    }
     const token = data?.session?.access_token;
     return typeof token === 'string' && token.length > 0 ? token : null;
   } catch {

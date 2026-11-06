@@ -74,17 +74,19 @@ echo "   logcat -s ReactNativeJS:V AndroidRuntime:E | tail -100"
 echo
 echo "== o guião (à mão, no aparelho) =="
 cat <<'GUIA'
-1. "What was done": in build 209 there should be 3 lines — the SOS without the
-   app open, attack mode and track shared by link.
+1. "What was done": in build 210 there should be 3 lines — the quiet alert with the
+   tracking, the SOS without the app open and attack mode.
 2. Attack mode: in Settings > SOS, tap "📨 Quiet SMS sending" and allow the
    permission. Put the "🚨 SOS" tile in the Quick Settings panel and lock the
    phone. Tap the tile: the app must NOT open, the screen must not light up,
    and a quiet notification must count 10 seconds with a "Cancel" button.
    When the countdown ends the alert must go out by SMS to the saved contact,
-   with the last position and the battery, and the phone stays locked. Test
-   "Cancel" as well: cancel after a few seconds and check no SMS went out.
-   (With no emergency contact saved, the tile must open the app on the
-   emergency screen.)
+   with the last position, the battery and — if there is network — the live
+   tracking link; the phone stays locked. Open the link on another phone: it
+   must show the person moving. Test "Cancel" as well: cancel after a few
+   seconds and check no SMS went out. Tap twice in a row: only one alert may
+   go out. (With no emergency contact saved, the tile must open the app on
+   the emergency screen.)
    Inside the app, the "🚨 Quiet SOS" button still counts 5 seconds and sends
    the alert with the live tracking link.
 3. Sharing by link: record a track (Track > record > stop), tap "Link" next to

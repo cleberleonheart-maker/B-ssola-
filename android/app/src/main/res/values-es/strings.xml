@@ -49,4 +49,5 @@
     <string name="sos_sent_title">🚨 SOS enviado</string>
     <string name="sos_sent_text">El aviso salió en silencio al contacto guardado.</string>
     <string name="tile_sos_pending">Enviando…</string>
+    <string name="sos_sent_text_live">El aviso salió en silencio y el rastreo en vivo está corriendo.</string>
 </resources>
