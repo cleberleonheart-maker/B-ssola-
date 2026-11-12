@@ -111,6 +111,27 @@ done
 # -- so faz o update ficar mais fraco do que parece.
 probe "app_version.apk_sha256" GET "app_version?select=version_code,apk_sha256&limit=1" || true
 
+# A versao que a nuvem anuncia e a que o app consulta para saber que ha
+# atualizacao. Quando ela fica atrasada do repositorio, o app instalado nao
+# recebe o prompt -- e quem vier de uma versao mais antiga ainda pior: a linha
+# aponta para um APK e traz o hash de outro, e a comparacao falha num APK que
+# estava certo. Foi o que aconteceu com a v197 a sobreviver a seis releases.
+# Nao e' uma "FALTA" (a tabela esta la): e' um desvio, e por isso avisa sem
+# partir o --strict -- o workflow da release grava a versao em paralelo.
+CODIGO_REPO=$(grep -E '^versionCode=' "$ROOT/android/app/version.properties" | cut -d'=' -f2 || true)
+if [ -n "$CODIGO_REPO" ]; then
+  resposta=$(curl -s --max-time 60 "$SUPABASE_URL/rest/v1/app_version?select=version_code,version_name,apk_sha256&limit=1" \
+    -H "apikey: $SUPABASE_ANON_KEY")
+  CODIGO_NUVEM=$(printf '%s' "$resposta" | sed -nE 's/.*"version_code":([0-9]+).*/\1/p' | head -1)
+  if [ -n "$CODIGO_NUVEM" ] && [ "$CODIGO_NUVEM" -lt "$CODIGO_REPO" ]; then
+    echo "  AVISO app_version na nuvem esta na v$CODIGO_NUVEM e o repositorio ja vai na v$CODIGO_REPO"
+    echo "          quem tiver na v$CODIGO_NUVEM nao recebe o aviso de atualizacao."
+    echo "          Corrija com: ./scripts/publicar-sql.sh scripts/app_version.sql"
+  elif [ -n "$CODIGO_NUVEM" ]; then
+    echo "  ok    app_version na nuvem (v$CODIGO_NUVEM, repositorio v$CODIGO_REPO)"
+  fi
+fi
+
 # A bateria do rastreio (ideia #103): o Kotlin grava-a no push e o viewer le-a
 # da get_live_position. Um select com `battery_level` em falta responde PGRST204,
 # e e isso que o probe apanha antes de uma release.

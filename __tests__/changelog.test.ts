@@ -129,10 +129,10 @@ describe('changelogBetween — o que não acumula', () => {
 
   it('a entrada do build mais recente não aparece duplicada sob o código antigo', () => {
     // O mesmo título nos dois grupos seria duas linhas iguais na tela.
-    const titles = changelogBetween(CURRENT - 2, CURRENT, t).flatMap(b =>
+    const titulos = changelogBetween(CURRENT - 2, CURRENT, t).flatMap(b =>
       b.entries.map(e => e.title),
     );
-    expect(new Set(titles).size).toBe(titles.length);
+    expect(new Set(titulos).size).toBe(titulos.length);
   });
 
   it('build muito à frente mostra a entrada conhecida mais recente', () => {

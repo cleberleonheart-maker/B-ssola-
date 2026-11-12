@@ -59,7 +59,7 @@ const parseVoiceErrorCode = (raw: string): number | null => {
 // o motor Google e a palavra de ativação deixou de ser reconhecida (erro 7).
 const VOICE_ENGINE_FALLBACK_CODES = new Set([11, 12]);
 
-type AssistantApi = {
+export type AssistantApi = {
   ready: boolean;
   voiceSupported: boolean;
   listening: boolean;

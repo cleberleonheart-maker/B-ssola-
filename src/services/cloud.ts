@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { LIVE_PAGE_URL } from './livePage';
+import { LIVE_PAGE_URL } from './pageUrls';
 
 const SUPABASE_URL: string = 'https://wotzcykrvidbjkonaawx.supabase.co';
 const SUPABASE_ANON_KEY: string = 'sb_publishable_g8EcCQe4YPGaeMz1V-8gIw_OxF3iLNv';

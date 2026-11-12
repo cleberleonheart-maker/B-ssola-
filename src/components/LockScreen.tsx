@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -27,27 +27,43 @@ const LockScreen = ({ onUnlock, biometricEnabled = true }: Props) => {
   const [entered, setEntered] = useState('');
   const [error, setError] = useState(false);
   const [bioAvailable, setBioAvailable] = useState(false);
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    void isBiometricAvailable().then(setBioAvailable);
+    return () => {
+      if (resetTimerRef.current) {
+        clearTimeout(resetTimerRef.current);
+        resetTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    isBiometricAvailable()
+      .then(setBioAvailable)
+      .catch(() => setBioAvailable(false));
   }, []);
 
   const canUseBio = bioAvailable && biometricEnabled;
 
   const doBiometric = useCallback(async () => {
-    const ok = await authenticateBiometric(
-      t('lock_screen_title'),
-      t('lock_screen_sub'),
-      t('lock_clear'),
-    );
-    if (ok) {
-      onUnlock('');
+    try {
+      const ok = await authenticateBiometric(
+        t('lock_screen_title'),
+        t('lock_screen_sub'),
+        t('lock_clear'),
+      );
+      if (ok) {
+        onUnlock('');
+      }
+    } catch {
+      // a biometria falhou: o PIN continua a ser a porta
     }
   }, [onUnlock, t]);
 
   useEffect(() => {
     if (canUseBio) {
-      void doBiometric();
+      doBiometric().catch(() => {});
     }
   }, [canUseBio, doBiometric]);
 
@@ -67,7 +83,11 @@ const LockScreen = ({ onUnlock, biometricEnabled = true }: Props) => {
         const ok = onUnlock(next);
         if (!ok) {
           setError(true);
-          setTimeout(() => setEntered(''), 400);
+          if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+          resetTimerRef.current = setTimeout(() => {
+            resetTimerRef.current = null;
+            setEntered('');
+          }, 400);
         }
       }
     },
@@ -133,7 +153,7 @@ const LockScreen = ({ onUnlock, biometricEnabled = true }: Props) => {
             {canUseBio && (
               <Pressable
                 onPress={() => {
-                  void doBiometric();
+                  doBiometric().catch(() => {});
                 }}
                 style={({ pressed }) => [
                   styles.key,

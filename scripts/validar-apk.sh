@@ -101,8 +101,9 @@ fi
 echo
 echo "== o guião que falta (à mão, no aparelho) =="
 cat <<'GUIA'
-1. "O que foi feito": no build 210 devem aparecer 3 linhas — o aviso em silêncio com
-   o rastreio, o SOS sem a app aberta e o modo de assalto.
+1. "O que foi feito": no build 211 devem aparecer 3 linhas — as coordenadas no
+   hemisfério sul, os minutos e segundos que não mentem, e a atualização que
+   volta a instalar.
 2. Modo de assalto: em Definições > SOS, toca em "📨 Envio de SMS em silêncio" e
    permite a permissão. Põe a tile "🚨 Assalto" no painel de Definições
    Rápidas e bloqueia o telemóvel. Toca na tile: a app NÃO pode abrir, o ecrã

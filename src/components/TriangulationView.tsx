@@ -143,10 +143,7 @@ export const TriangulationView = ({
         onPress={() => setTab(key)}
         style={[
           styles.tab,
-          {
-            borderColor: picked ? colors.primary : colors.border,
-            backgroundColor: picked ? colors.surfaceAlt : 'transparent',
-          },
+          picked ? styles.tabActive : styles.tabIdle,
         ]}>
         <Text
           style={[
@@ -289,12 +286,20 @@ export const TriangulationView = ({
   );
 };
 
-const createStyles = (_colors: ReturnType<typeof useThemeColors>) =>
+const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
     container: {
       flex: 1,
       padding: spacing.lg,
       alignSelf: 'stretch',
+    },
+    tabActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.surfaceAlt,
+    },
+    tabIdle: {
+      borderColor: colors.border,
+      backgroundColor: 'transparent',
     },
     title: {
       fontSize: 18,

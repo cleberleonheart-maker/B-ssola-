@@ -74,8 +74,9 @@ echo "   logcat -s ReactNativeJS:V AndroidRuntime:E | tail -100"
 echo
 echo "== o guião (à mão, no aparelho) =="
 cat <<'GUIA'
-1. "What was done": in build 210 there should be 3 lines — the quiet alert with the
-   tracking, the SOS without the app open and attack mode.
+1. "What was done": in build 211 there should be 3 lines — the coordinates in the
+   southern hemisphere, the minutes and seconds that do not lie, and the update
+   that installs again.
 2. Attack mode: in Settings > SOS, tap "📨 Quiet SMS sending" and allow the
    permission. Put the "🚨 SOS" tile in the Quick Settings panel and lock the
    phone. Tap the tile: the app must NOT open, the screen must not light up,

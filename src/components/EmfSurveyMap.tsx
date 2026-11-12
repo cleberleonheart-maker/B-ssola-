@@ -93,17 +93,16 @@ const EmfSurveyMap = ({ points, location, size }: Props) => {
       {trail.map((seg, i) => (
         <View
           key={i}
-          style={{
-            position: 'absolute',
-            left: seg.x,
-            top: seg.y,
-            width: seg.w,
-            height: 2,
-            borderRadius: 1,
-            backgroundColor: colors.textMuted,
-            opacity: 0.6,
-            transform: [{ rotate: `${seg.a}deg` }],
-          }}
+          style={[
+            styles.segment,
+            {
+              left: seg.x,
+              top: seg.y,
+              width: seg.w,
+              backgroundColor: colors.textMuted,
+              transform: [{ rotate: `${seg.a}deg` }],
+            },
+          ]}
         />
       ))}
 
@@ -119,17 +118,15 @@ const EmfSurveyMap = ({ points, location, size }: Props) => {
         return (
           <React.Fragment key={point.id}>
             <View
-              style={{
-                position: 'absolute',
-                left: pixel.x - 5,
-                top: pixel.y - 5,
-                width: 10,
-                height: 10,
-                borderRadius: 5,
-                backgroundColor: color,
-                borderWidth: 2,
-                borderColor: colors.surfaceAlt,
-              }}
+              style={[
+                styles.point,
+                {
+                  left: pixel.x - 5,
+                  top: pixel.y - 5,
+                  backgroundColor: color,
+                  borderColor: colors.surfaceAlt,
+                },
+              ]}
             />
             <Text
               style={[
@@ -144,23 +141,17 @@ const EmfSurveyMap = ({ points, location, size }: Props) => {
 
       {here && (
         <View
-          style={{
-            position: 'absolute',
-            left: here.x - 7,
-            top: here.y - 7,
-            width: 14,
-            height: 14,
-            borderRadius: 7,
-            borderWidth: 2,
-            borderColor: colors.accent,
-          }}
+          style={[
+            styles.hereMarker,
+            { left: here.x - 7, top: here.y - 7, borderColor: colors.accent },
+          ]}
         />
       )}
 
       <Text style={[styles.north, { color: colors.textMuted }]}>N</Text>
 
       {bar && (
-        <View style={[styles.scaleBar, { bottom: 8, left: 10 }]}>
+        <View style={[styles.scaleBar, styles.scaleBarOffset]}>
           <View
             style={[styles.scaleLine, { width: bar.pixels, borderColor: colors.text }]}
           />
@@ -209,6 +200,30 @@ const createStyles = () =>
     },
     scaleBar: {
       position: 'absolute',
+    },
+    scaleBarOffset: {
+      bottom: 8,
+      left: 10,
+    },
+    segment: {
+      position: 'absolute',
+      height: 2,
+      borderRadius: 1,
+      opacity: 0.6,
+    },
+    point: {
+      position: 'absolute',
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      borderWidth: 2,
+    },
+    hereMarker: {
+      position: 'absolute',
+      width: 14,
+      height: 14,
+      borderRadius: 7,
+      borderWidth: 2,
     },
     scaleLine: {
       height: 5,

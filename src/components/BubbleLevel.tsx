@@ -43,13 +43,7 @@ const BubbleLevel = ({ x, y, z, size = 260 }: Props) => {
       style={[
         styles.panel,
         { width: size, height: size, borderRadius: radius },
-        leveled && {
-          borderColor: colors.accent,
-          shadowColor: colors.success,
-          shadowOpacity: 0.7,
-          shadowRadius: 20,
-          elevation: 14,
-        },
+        leveled && styles.leveled,
       ]}>
       <View style={styles.reticleLines}>
         <View style={[styles.hLine, { backgroundColor: colors.border }]} />
@@ -97,6 +91,13 @@ const createStyles = (colors: {
       shadowOpacity: 0.3,
       shadowRadius: 16,
       elevation: 8,
+    },
+    leveled: {
+      borderColor: colors.accent,
+      shadowColor: colors.success,
+      shadowOpacity: 0.7,
+      shadowRadius: 20,
+      elevation: 14,
     },
     reticleLines: {
       position: 'absolute',

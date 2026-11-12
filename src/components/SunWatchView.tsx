@@ -152,7 +152,6 @@ const SunWatchView = ({ lat, lon }: Props) => {
               style={[
                 styles.sunDot,
                 {
-                  position: 'absolute',
                   left: sunDotLeft,
                   bottom: sunDotBottom,
                   borderColor: status.color,
@@ -295,6 +294,7 @@ const createStyles = (colors: ColorScheme) =>
       borderBottomWidth: 0,
     },
     sunDot: {
+      position: 'absolute',
       width: 20,
       height: 20,
       borderRadius: 10,

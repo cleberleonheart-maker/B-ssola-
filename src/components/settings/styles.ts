@@ -1,10 +1,35 @@
-import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  StyleSheet,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
+} from 'react-native';
 import { spacing, radius } from '../../theme/colors';
 import type { ColorScheme } from '../../theme/themes';
 
 export const rowDivider = (colors: ColorScheme): StyleProp<ViewStyle> => ({
   borderTopWidth: StyleSheet.hairlineWidth,
   borderTopColor: colors.border,
+});
+
+/** Botão principal dos diálogos: a cor vem do tema e o botão apaga-se sozinho
+ *  quando ainda não há nada para enviar. */
+export const primaryAction = (
+  colors: ColorScheme,
+  enabled: boolean,
+): StyleProp<ViewStyle> => ({
+  backgroundColor: colors.primary,
+  opacity: enabled ? 1 : 0.5,
+});
+
+/** Campo de texto dos diálogos de conta e importação. */
+export const themedInput = (
+  colors: ColorScheme,
+  withoutTopMargin = false,
+): StyleProp<TextStyle> => ({
+  marginTop: withoutTopMargin ? 0 : undefined,
+  borderColor: colors.border,
+  color: colors.text,
 });
 
 export const styles = StyleSheet.create({

@@ -58,7 +58,7 @@ export const WaypointTriangulation = ({
 }: Props) => {
   const colors = useThemeColors();
   const { t } = useLanguage();
-  const styles = createStyles();
+  const styles = createStyles(colors);
 
   const [sightings, setSightings] = useState<Sighting[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -176,10 +176,7 @@ export const WaypointTriangulation = ({
               onPress={() => setSelectedId(marker.id)}
               style={[
                 styles.marker,
-                {
-                  borderColor: picked ? colors.primary : colors.border,
-                  backgroundColor: picked ? colors.surfaceAlt : 'transparent',
-                },
+                picked ? styles.markerActive : styles.markerIdle,
               ]}>
               <Text style={[styles.markerName, { color: colors.text }]}>
                 {marker.name}
@@ -284,9 +281,17 @@ export const WaypointTriangulation = ({
   );
 };
 
-const createStyles = () =>
+const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
     container: { padding: spacing.lg },
+    markerActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.surfaceAlt,
+    },
+    markerIdle: {
+      borderColor: colors.border,
+      backgroundColor: 'transparent',
+    },
     title: { fontSize: 18, fontWeight: '800', textAlign: 'center' },
     hint: { textAlign: 'center', marginTop: spacing.sm, marginBottom: spacing.md },
     section: { fontSize: 12, fontWeight: '700', marginBottom: spacing.xs },

@@ -48,7 +48,7 @@ const PADDING = 18;
 const WhereaboutsHeatmap = ({ location }: Props) => {
   const colors = useThemeColors();
   const { t } = useLanguage();
-  const styles = useMemo(() => createStyles(), []);
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [points, setPoints] = useState<WhereaboutsPoint[]>([]);
   const [window, setWindow] = useState<Window>('day');
@@ -115,10 +115,7 @@ const WhereaboutsHeatmap = ({ location }: Props) => {
           onPress={() => setWindow('day')}
           style={[
             styles.tab,
-            {
-              borderColor: colors.border,
-              backgroundColor: window === 'day' ? colors.surfaceAlt : 'transparent',
-            },
+            window === 'day' ? styles.tabActive : styles.tabIdle,
           ]}>
           <Text
             style={[
@@ -132,10 +129,7 @@ const WhereaboutsHeatmap = ({ location }: Props) => {
           onPress={() => setWindow('week')}
           style={[
             styles.tab,
-            {
-              borderColor: colors.border,
-              backgroundColor: window === 'week' ? colors.surfaceAlt : 'transparent',
-            },
+            window === 'week' ? styles.tabActive : styles.tabIdle,
           ]}>
           <Text
             style={[
@@ -165,43 +159,39 @@ const WhereaboutsHeatmap = ({ location }: Props) => {
           <>
             {cells.map((cell, i) => {
               const pixel = projection.points[i];
-              const radius = Math.max(3, (DEFAULT_CELL_METERS / 2) * projection.scale);
+              const raio = Math.max(3, (DEFAULT_CELL_METERS / 2) * projection.scale);
               return (
                 <View
                   key={`${cell.lat}:${cell.lon}:${i}`}
-                  style={{
-                    position: 'absolute',
-                    left: pixel.x - radius,
-                    top: pixel.y - radius,
-                    width: radius * 2,
-                    height: radius * 2,
-                    borderRadius: radius,
-                    backgroundColor: heatColor(cell.weight),
-                    opacity: 0.3 + 0.5 * cell.weight,
-                  }}
+                  style={[
+                    styles.cell,
+                    {
+                      left: pixel.x - raio,
+                      top: pixel.y - raio,
+                      width: raio * 2,
+                      height: raio * 2,
+                      borderRadius: raio,
+                      backgroundColor: heatColor(cell.weight),
+                      opacity: 0.3 + 0.5 * cell.weight,
+                    },
+                  ]}
                 />
               );
             })}
 
             {here && (
               <View
-                style={{
-                  position: 'absolute',
-                  left: here.x - 7,
-                  top: here.y - 7,
-                  width: 14,
-                  height: 14,
-                  borderRadius: 7,
-                  borderWidth: 2,
-                  borderColor: colors.accent,
-                }}
+                style={[
+                  styles.hereMarker,
+                  { left: here.x - 7, top: here.y - 7, borderColor: colors.accent },
+                ]}
               />
             )}
 
             <Text style={[styles.north, { color: colors.textMuted }]}>N</Text>
 
             {bar && (
-              <View style={[styles.scaleBar, { bottom: 8, left: 10 }]}>
+              <View style={[styles.scaleBar, styles.scaleBarOffset]}>
                 <View
                   style={[styles.scaleLine, { width: bar.pixels, borderColor: colors.text }]}
                 />
@@ -253,7 +243,7 @@ const WhereaboutsHeatmap = ({ location }: Props) => {
   );
 };
 
-const createStyles = () =>
+const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
     wrap: {
       paddingBottom: spacing.md,
@@ -290,6 +280,14 @@ const createStyles = () =>
       paddingVertical: 6,
       borderRadius: radius.full,
       borderWidth: 1,
+    },
+    tabActive: {
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceAlt,
+    },
+    tabIdle: {
+      borderColor: colors.border,
+      backgroundColor: 'transparent',
     },
     tabText: {
       fontSize: 12,
@@ -358,6 +356,20 @@ const createStyles = () =>
     },
     scaleBar: {
       position: 'absolute',
+    },
+    scaleBarOffset: {
+      bottom: 8,
+      left: 10,
+    },
+    cell: {
+      position: 'absolute',
+    },
+    hereMarker: {
+      position: 'absolute',
+      width: 14,
+      height: 14,
+      borderRadius: 7,
+      borderWidth: 2,
     },
     scaleLine: {
       height: 5,

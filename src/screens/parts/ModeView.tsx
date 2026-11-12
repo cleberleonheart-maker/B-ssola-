@@ -279,10 +279,7 @@ const ModeView = (props: Props) => {
               onPress={() => setMapView('map')}
               style={[
                 styles.mapTab,
-                {
-                  borderColor: colors.border,
-                  backgroundColor: mapView === 'map' ? colors.surfaceAlt : 'transparent',
-                },
+                mapView === 'map' ? styles.mapTabActive : styles.mapTabIdle,
               ]}>
               <Text
                 style={[
@@ -296,11 +293,7 @@ const ModeView = (props: Props) => {
               onPress={() => setMapView('whereabouts')}
               style={[
                 styles.mapTab,
-                {
-                  borderColor: colors.border,
-                  backgroundColor:
-                    mapView === 'whereabouts' ? colors.surfaceAlt : 'transparent',
-                },
+                mapView === 'whereabouts' ? styles.mapTabActive : styles.mapTabIdle,
               ]}>
               <Text
                 style={[

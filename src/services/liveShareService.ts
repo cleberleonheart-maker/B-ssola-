@@ -12,7 +12,7 @@ import {
   takeCloudError,
 } from './cloud';
 import type { LocationFix } from './locationService';
-import { LIVE_PAGE_URL } from './livePage';
+import { LIVE_PAGE_URL } from './pageUrls';
 
 /**
  * Motivo da falha, para o Alert deixar de dizer só "não foi possível".

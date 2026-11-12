@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeColors } from '../theme/ThemeContext';
@@ -12,23 +12,30 @@ const BatteryOptBanner = () => {
   const colors = useThemeColors();
   const { t } = useLanguage();
   const [show, setShow] = useState(false);
+  const aliveRef = useRef(true);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    let mounted = true;
-    void (async () => {
+    aliveRef.current = true;
+    const check = async () => {
       try {
         const hide = await AsyncStorage.getItem(HIDE_KEY);
         if (hide === '1') return;
         const ignoring = await isIgnoringBatteryOptimizations();
-        if (mounted && ignoring === false) {
+        if (aliveRef.current && ignoring === false) {
           setShow(true);
         }
       } catch {
         // ignore
       }
-    })();
+    };
+    check();
     return () => {
-      mounted = false;
+      aliveRef.current = false;
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
     };
   }, []);
 
@@ -36,9 +43,12 @@ const BatteryOptBanner = () => {
 
   const handleAllow = async () => {
     await requestIgnoreBatteryOptimizations();
-    // check again shortly
-    setTimeout(async () => {
+    if (!aliveRef.current) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(async () => {
+      timerRef.current = null;
       const ignoring = await isIgnoringBatteryOptimizations();
+      if (!aliveRef.current) return;
       if (ignoring === true) {
         setShow(false);
         await AsyncStorage.setItem(HIDE_KEY, '1');

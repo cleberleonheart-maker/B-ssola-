@@ -101,8 +101,8 @@ jobs:
             scripts/rls.sql \
             scripts/live_rls.sql \
             scripts/live_points.sql \
-            scripts/app_version.sql \
             scripts/app_version_sha.sql \
+            scripts/app_version.sql \
             scripts/crashes.sql \
             scripts/track_shares.sql \
             scripts/account_delete.sql

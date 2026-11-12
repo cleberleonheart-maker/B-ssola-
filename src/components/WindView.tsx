@@ -293,7 +293,7 @@ const WindView = ({ active }: Props) => {
               disabled={!hasReadingRef.current}
               style={[
                 styles.calButton,
-                { borderColor: colors.border, opacity: hasReadingRef.current ? 1 : 0.4 },
+                hasReadingRef.current ? styles.calButtonReady : styles.calButtonDim,
               ]}>
               <Text style={[styles.calButtonText, { color: colors.text }]}>
                 {t('wind_cal_zero')}
@@ -307,7 +307,7 @@ const WindView = ({ active }: Props) => {
               disabled={!hasReadingRef.current}
               style={[
                 styles.calButton,
-                { borderColor: colors.border, opacity: hasReadingRef.current ? 1 : 0.4 },
+                hasReadingRef.current ? styles.calButtonReady : styles.calButtonDim,
               ]}>
               <Text style={[styles.calButtonText, { color: colors.text }]}>
                 {t('wind_cal_strong')}
@@ -350,8 +350,16 @@ const WindView = ({ active }: Props) => {
   );
 };
 
-const createStyles = (_colors: ColorScheme) =>
+const createStyles = (colors: ColorScheme) =>
   StyleSheet.create({
+    calButtonReady: {
+      borderColor: colors.border,
+      opacity: 1,
+    },
+    calButtonDim: {
+      borderColor: colors.border,
+      opacity: 0.4,
+    },
     container: {
       flex: 1,
       alignItems: 'center',

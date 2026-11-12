@@ -33,22 +33,63 @@ if ! gh release view "$TAG" --repo "$REPO" --json assets --jq \
   exit 1
 fi
 
-SQL="update app_version
+# O SHA-256 do asset, como a GitHub o calcula. E a mesma fonte que o app usa
+# quando a nuvem nao tem hash: se a linha da nuvem apontar para um APK e o
+# hash for de outro, o app recusa-se a instalar ("hash nao bate certo") em vez
+# de instalar um binario trocado no caminho.
+APK_SHA256=$(gh release view "$TAG" --repo "$REPO" --json assets --jq \
+  ".assets[] | select(.name == \"bussola-v$VERSION_CODE.apk\") | .digest" \
+  2>/dev/null | sed -E 's/^sha256://' | tr 'A-Z' 'a-z' || true)
+
+if ! printf '%s' "$APK_SHA256" | grep -qE '^[0-9a-f]{64}$'; then
+  echo "Aviso: nao consegui ler o digest do asset bussola-v$VERSION_CODE.apk." >&2
+  APK_SHA256=""
+fi
+
+# O `version_code <= $VERSION_CODE` e o que impede que este ficheiro, que fica
+# desatualizado entre releases, rebaixe o ponteiro que a release acabou de
+# gravar na nuvem. Sem ele, o workflow "Schema do Supabase" (que aplica os
+# scripts/*.sql em qualquer commit que os toque) voltava a por a versao
+# antiga — e a linha ficava a dizer 197 com o hash do APK 210.
+SHA_COLUMN=""
+if [ -n "$APK_SHA256" ]; then
+  SHA_COLUMN=",
+    apk_sha256 = '$APK_SHA256'"
+fi
+
+SQL="-- =====================================================================
+-- app_version: a linha que o app consulta para saber que ha versao nova.
+--
+-- Gerado por scripts/publicar-supabase.sh. Copie e cole no SQL Editor quando
+-- nao ha chave de escrita; com chave, o script grava isto direto.
+--
+-- O 'where version_code <= $VERSION_CODE' e o que impede que este ficheiro,
+-- que fica desatualizado entre releases, rebaixe o ponteiro que a release
+-- acabou de gravar. Sem ele, o workflow \"Schema do Supabase\" - que aplica os
+-- scripts/*.sql em qualquer commit que os toque - voltava a por a versao
+-- antiga na nuvem, e a linha ficava a dizer 197 com o hash do APK 210.
+-- =====================================================================
+update app_version
 set version_code = $VERSION_CODE,
     version_name = '$VERSION_NAME',
     update_url = '$UPDATE_URL',
     message = '$MESSAGE',
-    required = $REQUIRED
-where id = 1;"
+    required = $REQUIRED$SHA_COLUMN
+where id = 1 and version_code <= $VERSION_CODE;"
 
 if [ -n "$SERVICE_KEY" ]; then
   echo "==> Gravando direto no Supabase (service_role key)"
+  BODY="{\"version_code\":$VERSION_CODE,\"version_name\":\"$VERSION_NAME\",\"update_url\":\"$UPDATE_URL\",\"message\":\"$MESSAGE\",\"required\":$REQUIRED"
+  if [ -n "$APK_SHA256" ]; then
+    BODY="$BODY,\"apk_sha256\":\"$APK_SHA256\""
+  fi
+  BODY="$BODY}"
   curl -fsS -X PATCH "$SUPABASE_URL/rest/v1/app_version?id=eq.1" \
     -H "apikey: $SERVICE_KEY" \
     -H "Authorization: Bearer $SERVICE_KEY" \
     -H "Content-Type: application/json" \
     -H "Prefer: return=representation" \
-    -d "{\"version_code\":$VERSION_CODE,\"version_name\":\"$VERSION_NAME\",\"update_url\":\"$UPDATE_URL\",\"message\":\"$MESSAGE\",\"required\":$REQUIRED}" \
+    -d "$BODY" \
     >/tmp/app_version_reply.json
   if grep -q "\"version_code\":$VERSION_CODE" /tmp/app_version_reply.json; then
     echo "OK: app_version atualizado para $VERSION_CODE ($VERSION_NAME)"

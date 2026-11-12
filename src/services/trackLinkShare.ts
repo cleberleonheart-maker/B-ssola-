@@ -1,6 +1,7 @@
 import { Share } from 'react-native';
 
 import { createTrackShare, ensureCloudUser, pushTracks } from './cloud';
+import { GPX_PAGE_URL } from './pageUrls';
 import { trackCloudPayload, type RecordedTrack } from './trackService';
 
 /**
@@ -19,8 +20,6 @@ import { trackCloudPayload, type RecordedTrack } from './trackService';
  * partilhas pela RLS da tabela `track_shares`.
  */
 
-const PAGE_URL = 'https://cleberleonheart-maker.github.io/B-ssola-/gpx.html';
-
 /** Dias que o link aguenta. Passado isso, a pagina diz que expirou. */
 export const TRACK_LINK_DAYS = 30;
 
@@ -28,7 +27,7 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /** O link que a pessoa manda. */
 export const trackLinkUrl = (token: string): string =>
-  `${PAGE_URL}#tkn=${encodeURIComponent(token)}`;
+  `${GPX_PAGE_URL}#tkn=${encodeURIComponent(token)}`;
 
 /**
  * Token da partilha. O prefixo `trk` distingue-o do token do rastreio ao

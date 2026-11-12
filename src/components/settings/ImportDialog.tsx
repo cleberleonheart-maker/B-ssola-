@@ -8,7 +8,7 @@ import {
   type BackupMode,
   type BackupSummary,
 } from '../../services/backupService';
-import { styles } from './styles';
+import { primaryAction, styles, themedInput } from './styles';
 
 type Props = {
   value: string;
@@ -69,7 +69,7 @@ const ImportDialog = ({ value, onChange, onClose, onRestore }: Props) => {
               autoFocus
               value={value}
               onChangeText={onChange}
-              style={[styles.importInput, { borderColor: colors.border, color: colors.text }]}
+              style={[styles.importInput, themedInput(colors)]}
               placeholder={t('backup_import_placeholder')}
               placeholderTextColor={colors.textMuted}
               textAlignVertical="top"
@@ -83,10 +83,7 @@ const ImportDialog = ({ value, onChange, onClose, onRestore }: Props) => {
               <Pressable
                 onPress={handleInspect}
                 disabled={!canRestore}
-                style={[
-                  styles.restoreButton,
-                  { backgroundColor: colors.primary, opacity: canRestore ? 1 : 0.5 },
-                ]}>
+                style={[styles.restoreButton, primaryAction(colors, canRestore)]}>
                 <Text style={styles.restoreButtonText}>{t('backup_restore')}</Text>
               </Pressable>
             </View>

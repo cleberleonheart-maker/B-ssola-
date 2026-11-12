@@ -49,7 +49,7 @@ const SensorDiagnosticsView = ({
 }: Props) => {
   const colors = useThemeColors();
   const { t } = useLanguage();
-  const styles = createStyles();
+  const styles = createStyles(colors);
 
   const [accel, setAccel] = useState<Vec3 | null>(null);
   const [mag, setMag] = useState<Vec3 | null>(null);
@@ -163,10 +163,7 @@ const SensorDiagnosticsView = ({
                   onPress={() => confirmAxis(axis)}
                   style={[
                     styles.axisButton,
-                    {
-                      borderColor: picked ? colors.primary : colors.border,
-                      backgroundColor: picked ? colors.primary : 'transparent',
-                    },
+                    picked ? styles.axisChipActive : styles.axisChipIdle,
                   ]}>
                   <Text
                     style={[
@@ -199,7 +196,7 @@ type CardProps = {
 };
 
 const SensorCard = ({ title, vector, axis, axisLabel, colors }: CardProps) => {
-  const styles = createStyles();
+  const styles = createStyles(colors);
   return (
     <View style={[styles.row, { borderColor: colors.border }]}>
       <Text style={[styles.rowLabel, { color: colors.text }]}>{title}</Text>
@@ -222,12 +219,20 @@ const SensorCard = ({ title, vector, axis, axisLabel, colors }: CardProps) => {
   );
 };
 
-const createStyles = () =>
+const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
     container: {
       flex: 1,
       alignItems: 'center',
       padding: spacing.lg,
+    },
+    axisChipActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary,
+    },
+    axisChipIdle: {
+      borderColor: colors.border,
+      backgroundColor: 'transparent',
     },
     title: {
       fontSize: 20,

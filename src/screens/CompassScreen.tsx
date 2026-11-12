@@ -4,187 +4,78 @@ import {
   Text,
   BackHandler,
   Pressable,
-  ScrollView,
   useWindowDimensions,
   Alert,
   AppState,
   Linking,
   Share,
-  Vibration,
   type LayoutChangeEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import {
-  magnetometer,
-  accelerometer,
-  setUpdateIntervalForType,
-  SensorTypes,
-} from 'react-native-sensors';
-import CalibrationModal from '../components/CalibrationModal';
-import StarCalibrationModal from '../components/StarCalibrationModal';
-import SettingsModal from '../components/SettingsModal';
-import WaypointModal from '../components/WaypointModal';
-import AlertsModal from '../components/AlertsModal';
-import EmergencyModal from '../components/EmergencyModal';
-import BatteryOptBanner from '../components/BatteryOptBanner';
-import CoordModal from '../components/CoordModal';
-import {
-  fetchCivilAlerts,
-  fetchCurrentTemperature,
-  isSevere,
-} from '../services/alertsService';
-import {
-  showAlertNotification,
-  showPressureDropNotification,
-  showBeaconNotification,
-} from '../services/notifications';
 import { useThemeColors, useTheme } from '../theme/ThemeContext';
 import { useAssistant } from '../assistant/AssistantContext';
-import { speak } from '../assistant/voice';
-import KeferaAvatar from '../components/KeferaAvatar';
 import { useLanguage } from '../i18n/LanguageContext';
-import type { KnownWaypoint, TrackSummary } from '../assistant/types';
+import type { TrackSummary } from '../assistant/types';
 import { spacing } from '../theme/colors';
-import {
-  watchLocation,
-  getLocationOnce,
-  type LocationFix,
-  type LocationMode,
-} from '../services/locationService';
-import { reverseGeocode } from '../services/geocodingService';
 import { useWhereabouts } from '../services/whereaboutsService';
 import {
-  loadCalibration,
   loadVerification,
   verifyStatus,
-  applyCalibration,
-  type MagCalibration,
   type VerifyStatus,
 } from '../services/calibrationService';
 import {
-  watchBarometer,
-  barometricAltitude,
-} from '../services/barometerService';
-import {
-  loadPressureHistory,
-  recordPressure,
-  fastPressureDrop,
-} from '../services/pressureHistoryService';
-import {
-  recordMotionSample,
-  updateFixQuality,
-} from '../services/sensorLogService';
-import { setLastLocation } from '../services/lastLocation';
-import {
-  loadWaypoints,
-  saveWaypoint,
-  removeWaypoint,
-  createWaypointId,
-  type Waypoint,
-} from '../services/waypointsService';
-import {
-  loadDeclination,
-  saveDeclination,
-  loadAppMode,
-  saveAppMode,
-  loadDisplayMode,
-  saveDisplayMode,
-  loadVoiceGuide,
-  saveVoiceGuide,
-  loadVirtualWp,
-  saveVirtualWp,
-  loadUseMils,
-  saveUseMils,
-  loadUnitSystem,
-  saveUnitSystem,
   loadLockPin,
   saveLockPin,
   clearLockPin,
-  loadKeepAwake,
-  saveKeepAwake,
-  loadEmergencyContact,
-  saveEmergencyContact,
-  loadBeaconEnabled,
-  saveBeaconEnabled,
-  loadBeaconInterval,
-  saveBeaconInterval,
-  loadBeaconLastSent,
   saveBeaconLastSent,
-  clearBeaconLastSent,
-  loadFallDetectionEnabled,
-  saveFallDetectionEnabled,
-  type AppMode,
   type DisplayMode,
 } from '../services/preferencesService';
-import { startFallDetection, stopFallDetection } from '../services/fallDetection';
-import { startBeaconLoop } from '../services/beaconLoop';
-import { setKeepScreenOn } from '../services/keepAwake';
 import { buildBackup, applyBackup, type BackupMode } from '../services/backupService';
-import { syncAllCollections, syncWaypoints } from '../services/cloudSync';
 import {
-  addDistance,
-  flushOdometer,
   getTotals,
   resetToday,
+  flushOdometer,
   type DayTotal,
 } from '../services/odometerService';
+import { loadTracks } from '../services/trackService';
+import { suggestDeclination } from '../utils/declination';
+import { solarPosition } from '../utils/astro';
 import {
-  loadTracks,
-  type RecordedTrack,
-} from '../services/trackService';
-import {
-  applyDeclination,
-  suggestDeclination,
-  type Declination,
-} from '../utils/declination';
-import {
-  getHeading,
-  normalizeHeading,
   cardinalOf,
   formatCoord,
-  formatAzimuth,
+  normalizeHeading,
 } from '../utils/compass';
-import {
-  haversine,
-  initialBearing,
-  formatDistance,
-  elevationAngle,
-  hasLocationFix,
-} from '../utils/geo';
-import {
-  solarPosition,
-  lunarPosition,
-  moonPhase,
-  type CelestialPoint,
-} from '../utils/astro';
-import { setUnitSystem, formatAccuracy, type UnitSystem } from '../utils/units';
+import { hasLocationFix } from '../utils/geo';
+import { formatAccuracy } from '../utils/units';
 import { parseModeUrl } from '../utils/deepLinks';
 import { useRepetitiveBeep, soundAvailable } from '../services/sound';
 import {
   updateWidget,
   widgetSupported,
 } from '../services/widgetService';
-import {
-  addGeofence,
-  removeGeofence,
-  requestNotificationPermission,
-  geofenceSupported,
-} from '../services/geofenceService';
+import { requestNotificationPermission } from '../services/geofenceService';
 import { createStyles } from './parts/styles';
-import { buildModeCards } from './parts/modeCards';
 import StatusPanels from './parts/StatusPanels';
 import ModeView from './parts/ModeView';
+import CompassModals from './parts/CompassModals';
+import CompassHeader from './parts/CompassHeader';
+import CompassLauncher from './parts/CompassLauncher';
+import { useSensors } from './hooks/useSensors';
+import { useLocation } from './hooks/useLocation';
+import { usePreferences } from './hooks/usePreferences';
+import { useWaypoints } from './hooks/useWaypoints';
+import { useSafety } from './hooks/useSafety';
+import { useAssistantBridge } from './hooks/useAssistantBridge';
+import { useBarometer } from './hooks/useBarometer';
+import { useWeatherAlerts } from './hooks/useWeatherAlerts';
 
-const SENSOR_INTERVAL = 200;
-const SMOOTHING_FAST = 0.45;
-const SMOOTHING_SLOW = 0.08;
-const ROTATION_DEAD_ZONE = 0.5;
-const ACCEL_VERIFY_SAMPLES = 20;
-const ACCEL_MIN_MAGNITUDE = 0.6;
-const IDLE_STEPS = 4;
-const ARRIVE_METERS = 15;
-const GUIDE_INTERVAL_MS = 9000;
-
+/**
+ * O ecrã principal.
+ *
+ * Este ficheiro é o que junta tudo; a lógica vive nos hooks em `./hooks` e
+ * nos componentes em `./parts`. O que fica aqui é a composição: o que o ecrã
+ * mostra e o que o utilizador pode fazer com ele.
+ */
 const CompassScreen = () => {
   const colors = useThemeColors();
   const { theme } = useTheme();
@@ -200,6 +91,7 @@ const CompassScreen = () => {
     welcomedRef.current = true;
     assistant.welcome();
   }, [assistant]);
+
   const { width, height } = useWindowDimensions();
   const [dialAreaH, setDialAreaH] = useState(0);
 
@@ -217,79 +109,209 @@ const CompassScreen = () => {
     );
   }, [width, height]);
 
-  const [heading, setHeading] = useState(0);
-  const [rotation, setRotation] = useState(0);
-  // zero = "sem amostra ainda": viewElevationDeg(0,0,0) devolve 0 (horizonte)
-  // em vez de −90°, e BubbleLevel/HeightView continuam a dar 0 de inclinação
-  const [accel, setAccel] = useState({ x: 0, y: 0, z: 0 });
-  const [sensorError, setSensorError] = useState<string | null>(null);
-  const [accelError, setAccelError] = useState<string | null>(null);
-  const [locError, setLocError] = useState<string | null>(null);
-  const [locLoading, setLocLoading] = useState(true);
-  const [locationMode, setLocationMode] = useState<LocationMode>('satellite');
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [coordVisible, setCoordVisible] = useState(false);
   const [calibrationVisible, setCalibrationVisible] = useState(false);
   const [starCalVisible, setStarCalVisible] = useState(false);
   const [alertsVisible, setAlertsVisible] = useState(false);
   const [emergencyVisible, setEmergencyVisible] = useState(false);
-
-  const alertsCheckedRef = useRef(false);
-  const notifiedAlertsRef = useRef(new Set<string>());
-  const [calibrated, setCalibrated] = useState(false);
-  // Mesmo objeto do `calibrationRef`, mas em state: o sensor de EMF lê pela
-  // ref (não reabre o magnetômetro) e a tela precisa do valor para re-renderizar
-  // quando a calibração muda.
-  const [calibration, setCalibration] = useState<MagCalibration | null>(null);
-  const calibrationRef = useRef<MagCalibration | null>(null);
-  const calPromptedRef = useRef(false);
-  const [location, setLocation] = useState<LocationFix>({
-    latitude: 0,
-    longitude: 0,
-    accuracy: null,
-    altitude: null,
-    speed: null,
-    provider: null,
-    updatedAt: null,
-    heading: null,
-  });
-  const [place, setPlace] = useState<{ name: string; cep: string | null } | null>(null);
-  const geoLastRef = useRef<{ lat: number; lon: number; at: number } | null>(null);
-  // Última posição conhecida, sempre atual: usada por efeitos de polling que
-  // não podem se recriar a cada fix do GPS (alertas de clima, etc.).
-  const latestFixRef = useRef<{ latitude: number; longitude: number }>({
-    latitude: 0,
-    longitude: 0,
-  });
-  // Inline-fix contínuo: ref carregada a cada render, que é onde a localização
-  // realmente muda, sem forçar re-execução de efeitos dependentes dela.
-  useEffect(() => {
-    latestFixRef.current = {
-      latitude: location.latitude,
-      longitude: location.longitude,
-    };
-  });
-
-  const prevHeadingRef = useRef<number | null>(null);
-  const continuousRef = useRef(0);
-  const smoothedRef = useRef(0);
-  const smoothingRef = useRef(SMOOTHING_FAST);
-  const stopWatchRef = useRef<(() => void) | null>(null);
-  const prevFixRef = useRef<{ latitude: number; longitude: number } | null>(null);
-  const distTotalRef = useRef(0);
-  const currentModeRef = useRef<LocationMode>('satellite');
-  const idleCountRef = useRef(0);
-  const relaxedRef = useRef(false);
-  const [locExpanded, setLocExpanded] = useState(false);
-
-  const [declination, setDeclinationState] = useState<Declination>({
-    enabled: false,
-    degrees: 0,
-  });
-  const declinationRef = useRef(declination);
-  const [appMode, setAppModeState] = useState<AppMode>('full');
-  const [displayMode, setDisplayModeState] = useState<DisplayMode>('compass');
+  const [wpVisible, setWpVisible] = useState(false);
   const [launcherVisible, setLauncherVisible] = useState(true);
+
+  const openAlerts = useCallback(() => setAlertsVisible(true), []);
+  const openSos = useCallback(() => setEmergencyVisible(true), []);
+
+  const {
+    calibration,
+    calibrationRef,
+    calibrated,
+    declination,
+    declinationRef,
+    appMode,
+    displayMode,
+    voiceGuide,
+    useMils,
+    unitSystem,
+    keepAwake,
+    emergencyContact,
+    beaconEnabled,
+    beaconIntervalMinutes,
+    fallDetection,
+    virtualWpId,
+    selectDisplayMode,
+    selectAppMode,
+    setDeclination,
+    toggleVoiceGuide,
+    toggleMils,
+    toggleUnitSystem,
+    toggleKeepAwake,
+    toggleBeacon,
+    changeEmergencyContact,
+    changeBeaconInterval,
+    toggleFallDetection,
+    selectVirtualWp,
+    saveCalibration,
+    reload: reloadPreferences,
+  } = usePreferences();
+
+  const {
+    heading,
+    rotation,
+    accel,
+    sensorError,
+    accelError,
+    setMoving,
+  } = useSensors({ calibrationRef, declinationRef, t });
+
+  const {
+    location,
+    locError,
+    locLoading,
+    locationMode,
+    odometer,
+    place,
+    locExpanded,
+    setLocExpanded,
+    celestial,
+    latestFixRef,
+    selectMode,
+    refreshLocation,
+    resetOdometer: resetLiveOdometer,
+  } = useLocation({ setMoving, t, lang });
+
+  const {
+    baroPressure,
+    baroAvailable,
+    baroBaseline,
+    setBaroBaseline,
+    baroAlt,
+  } = useBarometer(t);
+
+  const hasFix = hasLocationFix(location);
+
+  const clearVirtualWp = useCallback(
+    (id: string) => {
+      if (virtualWpId === id) {
+        selectVirtualWp(null);
+      }
+    },
+    [virtualWpId, selectVirtualWp],
+  );
+
+  const {
+    waypoints,
+    activeWpId,
+    setActiveWpId,
+    activeTarget,
+    targetMarker,
+    virtualMarker,
+    assistantWaypoints,
+    arrived,
+    addWaypoint,
+    addRemoteWaypoint,
+    deleteWaypoint,
+    reload: reloadWaypoints,
+  } = useWaypoints({
+    location,
+    hasFix,
+    declination,
+    virtualWpId,
+    voiceGuide,
+    clearVirtualWp,
+    t,
+  });
+
+  useSafety({
+    fallDetection,
+    beaconEnabled,
+    emergencyContact,
+    beaconIntervalMinutes,
+    onOpenSos: openSos,
+    t,
+  });
+
+  const [odoHistory, setOdoHistory] = useState<{
+    today: number;
+    week: number;
+    lastDays: DayTotal[];
+  } | null>(null);
+  const [trackSummary, setTrackSummary] = useState<TrackSummary | null>(null);
+
+  useEffect(() => {
+    const refresh = () => {
+      getTotals()
+        .then(setOdoHistory)
+        .catch(() => {});
+      loadTracks()
+        .then(tracks => {
+          let longest: (typeof tracks)[number] | null = null;
+          for (const tr of tracks) {
+            if (longest === null || tr.distance > longest.distance) {
+              longest = tr;
+            }
+          }
+          setTrackSummary({
+            count: tracks.length,
+            totalDistance: tracks.reduce((acc, tr) => acc + tr.distance, 0),
+            longestDistance: longest ? longest.distance : null,
+            longestName: longest ? longest.name : null,
+          });
+        })
+        .catch(() => {});
+    };
+    refresh();
+    const id = setInterval(refresh, 20000);
+    return () => clearInterval(id);
+  }, []);
+
+  const { widgetTemp } = useWeatherAlerts(
+    location.latitude,
+    location.longitude,
+    latestFixRef,
+    openAlerts,
+    t,
+  );
+
+  const cardinal = cardinalOf(heading);
+  const cardinalFull = cardinal.full;
+
+  const assistantTarget = useMemo(
+    () =>
+      activeTarget
+        ? { name: activeTarget.name, distance: activeTarget.distance }
+        : null,
+    [activeTarget],
+  );
+
+  const addWaypointForAssistant = useCallback(
+    (name: string) => {
+      addWaypoint(name).catch(() => {});
+    },
+    [addWaypoint],
+  );
+
+  useAssistantBridge({
+    assistant,
+    heading,
+    cardinal: cardinalFull,
+    location,
+    hasFix,
+    baroPressure,
+    baroAvailable,
+    declination,
+    odometer,
+    odoHistory,
+    trackSummary,
+    appMode,
+    displayMode,
+    theme,
+    waypoints: assistantWaypoints,
+    target: assistantTarget,
+    voiceGuide,
+    selectDisplayMode,
+    addWaypoint: addWaypointForAssistant,
+    t,
+  });
 
   const dialSize = useMemo(() => {
     const maxByWidth = width - spacing.lg * 2 - spacing.md;
@@ -300,575 +322,6 @@ const CompassScreen = () => {
     const fit = Math.floor(Math.min(maxByWidth, maxByHeight));
     return Math.max(168, Math.min(232, fit));
   }, [width, height, dialAreaH, appMode]);
-
-  const [baroPressure, setBaroPressure] = useState<number | null>(null);
-  // Temperatura atual para o widget (ideia #20): só a rede a dá, então é
-  // opcional e atualiza no mesmo ritmo dos alertas.
-  const [widgetTemp, setWidgetTemp] = useState<string | null>(null);
-  const [baroAvailable, setBaroAvailable] = useState(true);
-  const [baroBaseline, setBaroBaseline] = useState<number | null>(null);
-  // O alarme da queda de pressão (ideia #104) dispara uma vez por episódio: só
-  // volta a avisar depois de a série deixar de ultrapassar o limite, senão cada
-  // leitura dos 10 s seguintes repetia a mesma notificação.
-  const pressureAlertRef = useRef(false);
-
-  const [odometer, setOdometer] = useState(0);
-  const [useMils, setUseMils] = useState(false);
-  const [unitSystem, setUnitSystemState] = useState<UnitSystem>('metric');
-  const [odoHistory, setOdoHistory] = useState<{
-    today: number;
-    week: number;
-    lastDays: DayTotal[];
-  } | null>(null);
-  const [trackSummary, setTrackSummary] = useState<TrackSummary | null>(null);
-
-  const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
-  const [wpVisible, setWpVisible] = useState(false);
-  const [activeWpId, setActiveWpId] = useState<string | null>(null);
-  const [virtualWpId, setVirtualWpId] = useState<string | null>(null);
-  const [voiceGuide, setVoiceGuide] = useState(false);
-  const [keepAwake, setKeepAwake] = useState(false);
-  // Beacon de emergência (ideia #6) e detecção de queda (ideia #7).
-  const [beaconEnabled, setBeaconEnabled] = useState(false);
-  const [emergencyContact, setEmergencyContact] = useState('');
-  const [beaconIntervalMinutes, setBeaconIntervalMinutes] = useState(30);
-  const [fallDetection, setFallDetection] = useState(false);
-  const fallPromptRef = useRef(false);
-  const beaconPromptRef = useRef(false);
-  const [arrived, setArrived] = useState(false);
-  const arrivedWpRef = useRef<string | null>(null);
-  const lastSpokeRef = useRef(0);
-  const guideRef = useRef<{
-    hasFix: boolean;
-    heading: number;
-    cardinal: string;
-    target: { name: string; distance: number } | null;
-  }>({ hasFix: false, heading: 0, cardinal: '', target: null });
-
-  const [celestial, setCelestial] = useState<{
-    sun: CelestialPoint;
-    moon: CelestialPoint;
-    moonIcon: string;
-  } | null>(null);
-
-  useEffect(() => {
-    loadCalibration().then(cal => {
-      calibrationRef.current = cal;
-      setCalibration(cal);
-      setCalibrated(cal !== null);
-    });
-    loadDeclination().then(decl => {
-      declinationRef.current = decl;
-      setDeclinationState(decl);
-    });
-    loadAppMode().then(setAppModeState);
-    loadDisplayMode().then(setDisplayModeState);
-    loadWaypoints().then(setWaypoints);
-    // Sincronização com a nuvem (ideia #18): puxa o que existe noutro aparelho,
-    // junta com o local e sobe o que mudou. Corre em segundo plano e não
-    // bloqueia o arranque; sem rede, o `setWaypoints` leva a lista local.
-    syncAllCollections()
-      .then(result => setWaypoints(result.waypoints))
-      .catch(() => {});
-    loadVoiceGuide().then(setVoiceGuide);
-    loadVirtualWp().then(id => {
-      setVirtualWpId(id);
-    });
-    loadUseMils().then(setUseMils);
-    loadUnitSystem().then(units => {
-      setUnitSystem(units);
-      setUnitSystemState(units);
-    });
-    loadKeepAwake().then(setKeepAwake);
-    loadEmergencyContact().then(setEmergencyContact);
-    loadBeaconEnabled().then(setBeaconEnabled);
-    loadBeaconInterval().then(setBeaconIntervalMinutes);
-    loadFallDetectionEnabled().then(setFallDetection);
-  }, []);
-
-  // tela sempre acesa: aplica na janela da Activity sempre que o toggle (ou a
-  // preferência carregada no arranque) mudar
-  useEffect(() => {
-    setKeepScreenOn(keepAwake);
-  }, [keepAwake]);
-
-  useEffect(() => {
-    const refresh = () => {
-      getTotals()
-        .then(setOdoHistory)
-        .catch(() => {});
-      loadTracks().then(tracks => {
-        let longest: RecordedTrack | null = null;
-        for (const tr of tracks) {
-          if (longest === null || tr.distance > longest.distance) {
-            longest = tr;
-          }
-        }
-        setTrackSummary({
-          count: tracks.length,
-          totalDistance: tracks.reduce((acc, tr) => acc + tr.distance, 0),
-          longestDistance: longest ? longest.distance : null,
-          longestName: longest ? longest.name : null,
-        });
-      });
-    };
-    refresh();
-    const id = setInterval(refresh, 20000);
-    return () => clearInterval(id);
-  }, []);
-
-  useEffect(() => {
-    if (calibrated || calPromptedRef.current || calibrationVisible) {
-      return;
-    }
-    if (displayMode !== 'compass' || launcherVisible) {
-      return;
-    }
-    calPromptedRef.current = true;
-    const id = setTimeout(() => setCalibrationVisible(true), 1500);
-    return () => clearTimeout(id);
-  }, [calibrated, calibrationVisible, displayMode, launcherVisible]);
-
-
-  const toggleVoiceGuide = useCallback(() => {
-    setVoiceGuide(prev => {
-      const next = !prev;
-      saveVoiceGuide(next).catch(() => {});
-      return next;
-    });
-  }, []);
-
-  const toggleMils = useCallback(() => {
-    setUseMils(prev => {
-      const next = !prev;
-      saveUseMils(next).catch(() => {});
-      return next;
-    });
-  }, []);
-
-  const toggleUnitSystem = useCallback(() => {
-    setUnitSystemState(prev => {
-      const next: UnitSystem = prev === 'imperial' ? 'metric' : 'imperial';
-      saveUnitSystem(next).catch(() => {});
-      // aplica já na fonte: as formatações leem a escolha viva em `units.ts`
-      setUnitSystem(next);
-      return next;
-    });
-  }, []);
-
-  const toggleKeepAwake = useCallback(() => {
-    setKeepAwake(prev => {
-      const next = !prev;
-      saveKeepAwake(next).catch(() => {});
-      return next;
-    });
-  }, []);
-
-  const toggleBeacon = useCallback((enabled: boolean) => {
-    setBeaconEnabled(enabled);
-    saveBeaconEnabled(enabled).catch(() => {});
-    // Ligar o beacon conta como pedir um aviso: o primeiro não espera o
-    // intervalo inteiro.
-    if (enabled) {
-      clearBeaconLastSent().catch(() => {});
-    }
-  }, []);
-
-  const changeEmergencyContact = useCallback((contact: string) => {
-    setEmergencyContact(contact);
-    saveEmergencyContact(contact).catch(() => {});
-  }, []);
-
-  const changeBeaconInterval = useCallback((minutes: number) => {
-    setBeaconIntervalMinutes(minutes);
-    saveBeaconInterval(minutes).catch(() => {});
-  }, []);
-
-  const toggleFallDetection = useCallback((enabled: boolean) => {
-    setFallDetection(enabled);
-    saveFallDetectionEnabled(enabled).catch(() => {});
-    fallPromptRef.current = false;
-  }, []);
-
-  /**
-   * Detecção de queda (ideia #7).
-   *
-   * O acelerómetro leva um embate e o aparelho fica parado: a app pergunta se
-   * foi queda e oferece o SOS. A pergunta — e não o envio — é a decisão de
-   * quem tem o telemóvel na mão; quem caiu não tem.
-   */
-  useEffect(() => {
-    if (!fallDetection) {
-      stopFallDetection();
-      return;
-    }
-    startFallDetection(() => {
-      if (fallPromptRef.current) return;
-      fallPromptRef.current = true;
-      Alert.alert(t('fall_detect_alert_title'), t('fall_detect_alert_body'), [
-        {
-          text: t('fall_detect_later'),
-          style: 'cancel',
-          onPress: () => {
-            fallPromptRef.current = false;
-          },
-        },
-        {
-          text: t('fall_detect_send_sos'),
-          onPress: () => {
-            fallPromptRef.current = false;
-            setEmergencyVisible(true);
-          },
-        },
-      ]);
-    });
-    return () => {
-      stopFallDetection();
-    };
-  }, [fallDetection, t]);
-
-  /**
-   * Ciclo do beacon (ideia #6).
-   *
-   * Quando chega a hora, o aviso sai por notificação (o telemóvel está
-   * muitas vezes no bolso) e, se a app estiver à frente, também por diálogo,
-   * com o botão que abre o SOS.
-   */
-  useEffect(() => {
-    if (!beaconEnabled || !emergencyContact) return;
-    const stop = startBeaconLoop({
-      intervalMinutes: beaconIntervalMinutes,
-      getLastSentAt: loadBeaconLastSent,
-      markNotified: saveBeaconLastSent,
-      onDue: () => {
-        void showBeaconNotification(t);
-        if (beaconPromptRef.current) return;
-        beaconPromptRef.current = true;
-        Alert.alert(t('beacon_due_title'), t('beacon_due_body'), [
-          {
-            text: t('fall_detect_later'),
-            style: 'cancel',
-            onPress: () => {
-              beaconPromptRef.current = false;
-            },
-          },
-          {
-            text: t('sos_beacon_send'),
-            onPress: () => {
-              beaconPromptRef.current = false;
-              setEmergencyVisible(true);
-            },
-          },
-        ]);
-      },
-    });
-    return stop;
-  }, [beaconEnabled, emergencyContact, beaconIntervalMinutes, t]);
-
-  const setDeclination = useCallback((decl: Declination) => {
-    declinationRef.current = decl;
-    setDeclinationState(decl);
-    saveDeclination(decl).catch(() => {});
-  }, []);
-
-  const selectAppMode = useCallback((mode: AppMode) => {
-    setAppModeState(mode);
-    saveAppMode(mode).catch(() => {});
-  }, []);
-
-  const handleVerifyPin = useCallback(async (pin: string): Promise<boolean> => {
-    const stored = await loadLockPin();
-    return stored != null && stored === pin;
-  }, []);
-
-  const handleSetPin = useCallback(async (pin: string | null) => {
-    if (pin == null) {
-      await clearLockPin();
-    } else {
-      await saveLockPin(pin);
-    }
-  }, []);
-
-  const handleExportBackup = useCallback(async () => {
-    const json = await buildBackup();
-    await Share.share({ message: json });
-  }, []);
-
-  const handleApplyBackup = useCallback(
-    async (json: string, mode: BackupMode): Promise<string | null> => {
-      const result = await applyBackup(json, { mode });
-      if (!result.ok) {
-        return result.error === 'write_failed'
-          ? `write_failed:${result.detail ?? ''}`
-          : result.error;
-      }
-      await Promise.all([
-        loadAppMode().then(setAppModeState),
-        loadDeclination().then(decl => {
-          declinationRef.current = decl;
-          setDeclinationState(decl);
-        }),
-        loadWaypoints().then(setWaypoints),
-        loadVoiceGuide().then(setVoiceGuide),
-        loadVirtualWp().then(setVirtualWpId),
-        loadUseMils().then(setUseMils),
-        loadUnitSystem().then(units => {
-          setUnitSystem(units);
-          setUnitSystemState(units);
-        }),
-      ]);
-      getTotals()
-        .then(setOdoHistory)
-        .catch(() => {});
-      return null;
-    },
-    [],
-  );
-
-  const selectDisplayMode = useCallback((mode: DisplayMode) => {
-    setDisplayModeState(mode);
-    saveDisplayMode(mode).catch(() => {});
-  }, []);
-
-  const openMode = useCallback(
-    (mode: DisplayMode) => {
-      selectDisplayMode(mode);
-      setLauncherVisible(false);
-    },
-    [selectDisplayMode],
-  );
-
-  /*
-   * Atalhos que abrem a app: o `bussola://sos` do botão do widget (ideia
-   * #105) abre o ecrã de emergência — que é onde a sessão e o link de partilha
-   * são criados — e o `bussola://mode/<modo>` dos tiles das Definições
-   * Rápidas (ideia #14) abre a app já no modo pedido.
-   */
-  useEffect(() => {
-    const abrir = (url: string | null | undefined) => {
-      if (!url) return;
-      if (url.startsWith('bussola://sos')) {
-        setEmergencyVisible(true);
-        return;
-      }
-      const mode = parseModeUrl(url);
-      if (mode) openMode(mode);
-    };
-    Linking.getInitialURL()
-      .then(abrir)
-      .catch(() => {});
-    const sub = Linking.addEventListener('url', ({ url }) => abrir(url));
-    return () => sub.remove();
-  }, [openMode]);
-
-  const goHome = useCallback(() => {
-    setLauncherVisible(true);
-  }, []);
-
-  const handleHeading = useCallback((degrees: number) => {
-    const raw = normalizeHeading(degrees);
-    const normalized = applyDeclination(raw, declinationRef.current);
-
-    if (prevHeadingRef.current === null) {
-      prevHeadingRef.current = normalized;
-      continuousRef.current = normalized;
-      smoothedRef.current = normalized;
-      setHeading(normalized);
-      setRotation(normalized);
-      return;
-    }
-
-    let delta = normalized - prevHeadingRef.current;
-    if (delta > 180) delta -= 360;
-    if (delta < -180) delta += 360;
-    continuousRef.current += delta;
-    prevHeadingRef.current = normalized;
-
-    const previous = smoothedRef.current;
-    const next =
-      previous +
-      (continuousRef.current - previous) * smoothingRef.current;
-    smoothedRef.current = next;
-
-    if (Math.abs(next - previous) < ROTATION_DEAD_ZONE) {
-      return;
-    }
-
-    setHeading(normalized);
-    setRotation(next);
-  }, []);
-
-  const handleFix = useCallback((fix: LocationFix) => {
-    const prev = prevFixRef.current;
-    const d = prev
-      ? haversine(
-          prev.latitude,
-          prev.longitude,
-          fix.latitude,
-          fix.longitude,
-        )
-      : 0;
-    if (d > 0 && d < 500) {
-      distTotalRef.current += d;
-      setOdometer(distTotalRef.current);
-      addDistance(d).catch(() => {});
-    }
-    prevFixRef.current = { latitude: fix.latitude, longitude: fix.longitude };
-
-    const moving = d > 2 || (fix.speed ?? 0) > 2;
-    smoothingRef.current = moving ? SMOOTHING_FAST : SMOOTHING_SLOW;
-    idleCountRef.current = moving ? 0 : idleCountRef.current + 1;
-
-    if (!relaxedRef.current && idleCountRef.current >= IDLE_STEPS) {
-      relaxedRef.current = true;
-      applyWatchingRef.current(currentModeRef.current, true, false);
-    } else if (
-      relaxedRef.current &&
-      moving &&
-      idleCountRef.current === 0
-    ) {
-      applyWatchingRef.current(currentModeRef.current, false, false);
-    }
-
-    setLocation(fix);
-    setLocLoading(false);
-    setLocError(null);
-    // Só a qualidade do GPS entra no log (ideia #63), nunca a posição.
-    updateFixQuality(fix.accuracy, fix.speed);
-    // A posição partilhada serve o tema "pelo sol real" (ideia #15).
-    setLastLocation(fix.latitude, fix.longitude);
-  }, []);
-
-  const handleLocError = useCallback((error: Error) => {
-    setLocLoading(false);
-    setLocError(error.message || t('ui_loc_error_default'));
-  }, [t]);
-
-  const applyWatching = useCallback(
-    (mode: LocationMode, relaxed = false, announce = true) => {
-      stopWatchRef.current?.();
-      currentModeRef.current = mode;
-      relaxedRef.current = relaxed;
-      idleCountRef.current = 0;
-      if (announce) setLocLoading(true);
-      stopWatchRef.current = watchLocation(
-        { mode, relaxed },
-        handleFix,
-        handleLocError,
-      );
-    },
-    [handleFix, handleLocError],
-  );
-
-  const applyWatchingRef = useRef(applyWatching);
-  applyWatchingRef.current = applyWatching;
-
-  useEffect(() => {
-    setUpdateIntervalForType(SensorTypes.accelerometer, SENSOR_INTERVAL);
-    setUpdateIntervalForType(SensorTypes.magnetometer, SENSOR_INTERVAL);
-
-    let lastAccel = { x: 0, y: 0, z: 1 };
-    let lastMag = { x: 0, y: 0, z: 0 };
-    let lastHeading: number | null = null;
-    let accelSamples = 0;
-    let accelMagMax = 0;
-
-    const magSub = magnetometer.subscribe({
-      next: ({ x, y, z }: { x: number; y: number; z: number }) => {
-        lastMag = applyCalibration({ x, y, z }, calibrationRef.current);
-        const headingDeg = getHeading(lastAccel, lastMag);
-        if (headingDeg !== null && headingDeg !== undefined) {
-          lastHeading = headingDeg;
-          handleHeading(headingDeg);
-        }
-      },
-      error: (error: Error) => {
-        setSensorError(t('ui_mag_unavailable'));
-        console.warn('magnetometer error', error);
-      },
-    });
-
-    const accelSub = accelerometer.subscribe({
-      next: ({ x, y, z }: { x: number; y: number; z: number }) => {
-        lastAccel = { x, y, z };
-        setAccel({ x, y, z });
-
-        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
-          setAccelError(t('ui_accel_invalid'));
-          return;
-        }
-
-        accelMagMax = Math.max(
-          accelMagMax,
-          Math.sqrt(x ** 2 + y ** 2 + z ** 2),
-        );
-        accelSamples += 1;
-
-        if (accelSamples >= ACCEL_VERIFY_SAMPLES) {
-          if (accelMagMax < ACCEL_MIN_MAGNITUDE) {
-            setAccelError(t('ui_accel_verify'));
-          } else {
-            setAccelError(null);
-          }
-          accelSamples = 0;
-          accelMagMax = 0;
-        }
-
-        // Alimenta o log de sensores (ideia #63) para o relato de problema.
-        // Sem coordenadas: só o movimento, o heading e a qualidade do GPS.
-        recordMotionSample({
-          ax: x,
-          ay: y,
-          az: z,
-          mx: lastMag.x,
-          my: lastMag.y,
-          mz: lastMag.z,
-          heading: lastHeading,
-        });
-      },
-      error: (error: Error) => {
-        setAccelError(t('ui_accel_unavailable'));
-        console.warn('accelerometer error', error);
-      },
-    });
-
-    return () => {
-      magSub.unsubscribe();
-      accelSub.unsubscribe();
-    };
-  }, [handleHeading, t]);
-
-  useEffect(() => {
-    void loadPressureHistory().catch(() => {});
-    const stop = watchBarometer(
-      reading => {
-        setBaroPressure(reading.pressure);
-        // Alimenta o histórico partilhado (o painel do barómetro lê-o) e avalia
-        // a regra de campo no mesmo passo: a queda tem de soar mesmo quando o
-        // painel não está montado, que é o caso de uso da ideia #104.
-        const series = recordPressure(reading.pressure);
-        const drop = fastPressureDrop(series);
-        if (drop) {
-          if (!pressureAlertRef.current) {
-            pressureAlertRef.current = true;
-            try {
-              Vibration.vibrate(400);
-            } catch {}
-            void showPressureDropNotification(drop.dropHpa, t);
-          }
-        } else {
-          pressureAlertRef.current = false;
-        }
-      },
-      () => setBaroAvailable(false),
-    );
-    return stop;
-  }, [t]);
-
-  useEffect(() => {
-    applyWatching(locationMode);
-    return () => stopWatchRef.current?.();
-  }, [locationMode, applyWatching]);
 
   /**
    * A gravação do odômetro é debounced em 1,5 s dentro do serviço. Se o app for
@@ -895,149 +348,19 @@ const CompassScreen = () => {
   // preguiçosa e vive no hook; aqui só se liga.
   useWhereabouts(true, location);
 
-  useEffect(() => {
-    const lat = location.latitude;
-    const lon = location.longitude;
-    if (lat === 0 && lon === 0) return;
-    const update = () => {
-      const now = new Date();
-      setCelestial({
-        sun: solarPosition(now, lat, lon),
-        moon: lunarPosition(now, lat, lon),
-        moonIcon: moonPhase(now).icon,
-      });
-    };
-    update();
-    const id = setInterval(update, 60000);
-    return () => clearInterval(id);
-  }, [location.latitude, location.longitude]);
-
-  // Verificação imediata: no primeiro fix real (0,0 = sem fix ainda). Antes
-  // este efeito também criava o intervalo de 30 min, mas como dependia de
-  // latitude/longitude ele se recriava a cada fix e o timer nunca atingia os
-  // 30 min enquanto o usuário se movia.
-  useEffect(() => {
-    if (location.latitude === 0 && location.longitude === 0) return;
-    if (alertsCheckedRef.current) return;
-    alertsCheckedRef.current = true;
-    let cancelled = false;
-    fetchCivilAlerts(location.latitude, location.longitude).then(result => {
-      if (cancelled) return;
-      if (isSevere(result)) {
-        setAlertsVisible(true);
-      }
-      result.weather
-        .filter(
-          alert => alert.severity === 'orange' || alert.severity === 'red',
-        )
-        .forEach(alert => {
-          const key = `${alert.severity}|${alert.event}|${alert.expires ?? 'x'}`;
-          if (!notifiedAlertsRef.current.has(key)) {
-            notifiedAlertsRef.current.add(key);
-            showAlertNotification(alert, t);
-          }
-        });
-    });
-    fetchCurrentTemperature(location.latitude, location.longitude).then(temp => {
-      if (!cancelled && temp != null) {
-        setWidgetTemp(`${Math.round(temp)}°C`);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [location.latitude, location.longitude, t]);
-
-  // Polling de 30 min desacoplado do GPS: lê a última posição do ref em vez
-  // de fechar sobre um fix capturado, então o intervalo não se reinicia a cada
-  // atualização de localização.
-  useEffect(() => {
-    let active = true;
-    const check = () => {
-      const fix = latestFixRef.current;
-      if (fix.latitude === 0 && fix.longitude === 0) return;
-      fetchCivilAlerts(fix.latitude, fix.longitude).then(result => {
-        if (!active) return;
-        if (isSevere(result)) {
-          setAlertsVisible(true);
-        }
-        result.weather
-          .filter(
-            alert => alert.severity === 'orange' || alert.severity === 'red',
-          )
-          .forEach(alert => {
-            const key = `${alert.severity}|${alert.event}|${alert.expires ?? 'x'}`;
-            if (!notifiedAlertsRef.current.has(key)) {
-              notifiedAlertsRef.current.add(key);
-              showAlertNotification(alert, t);
-            }
-          });
-      });
-      fetchCurrentTemperature(fix.latitude, fix.longitude).then(temp => {
-        if (active && temp != null) {
-          setWidgetTemp(`${Math.round(temp)}°C`);
-        }
-      });
-    };
-    const id = setInterval(check, 30 * 60 * 1000);
-    return () => {
-      active = false;
-      clearInterval(id);
-    };
-  }, [t]);
-
-  useEffect(() => {
-    const lat = location.latitude;
-    const lon = location.longitude;
-    if (lat === 0 && lon === 0) return;
-    const last = geoLastRef.current;
-    const now = Date.now();
-    let needs = true;
-    if (last) {
-      const d = haversine(last.lat, last.lon, lat, lon);
-      needs = d > 150 || now - last.at > 30000;
-    }
-    if (!needs) return;
-    geoLastRef.current = { lat, lon, at: now };
-    let cancelled = false;
-    reverseGeocode(lat, lon, lang).then(res => {
-      if (!cancelled && res) setPlace(res);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [location.latitude, location.longitude, lang]);
-
-  const refreshLocation = useCallback(() => {
-    if (locLoading) return;
-    setLocLoading(true);
-    getLocationOnce({ mode: locationMode }, handleFix, handleLocError);
-  }, [locLoading, locationMode, handleFix, handleLocError]);
-
-  const selectMode = useCallback((mode: LocationMode) => {
-    setLocationMode(mode);
-  }, []);
-
   const resetOdometer = useCallback(() => {
-    distTotalRef.current = 0;
-    setOdometer(0);
+    resetLiveOdometer();
     // Zera também o total diário persistido — é dele que vêm o modo
     // Odômetro, o painel "quanto andei hoje" e as respostas do assistente.
     resetToday()
       .then(() => getTotals())
       .then(setOdoHistory)
       .catch(() => {});
-  }, []);
+  }, [resetLiveOdometer]);
 
   const openCalibration = useCallback(() => {
     setSettingsVisible(false);
     setCalibrationVisible(true);
-  }, []);
-
-  const handleCalibrationSave = useCallback((cal: MagCalibration | null) => {
-    calibrationRef.current = cal;
-    setCalibration(cal);
-    setCalibrated(cal !== null);
   }, []);
 
   const requestGeoNotifications = useCallback(async () => {
@@ -1050,189 +373,72 @@ const CompassScreen = () => {
     requestGeoNotifications();
   }, [requestGeoNotifications]);
 
-  const addWaypoint = useCallback(
-    async (name: string) => {
-      if (location.latitude === 0 && location.longitude === 0) return;
-      const wp: Waypoint = {
-        id: createWaypointId(),
-        name,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        altitude: location.altitude,
-        createdAt: Date.now(),
-      };
-      const next = await saveWaypoint(wp);
-      setWaypoints(next);
-      // Sobe o ponto novo e junta o que a nuvem tenha entretanto (ideia #18).
-      syncWaypoints().then(setWaypoints).catch(() => {});
+  const openMode = useCallback(
+    (mode: DisplayMode) => {
+      selectDisplayMode(mode);
+      setLauncherVisible(false);
     },
-    [location],
+    [selectDisplayMode],
   );
 
-  const addRemoteWaypoint = useCallback(
-    async (wp: { name: string; latitude: number; longitude: number }) => {
-      const entry: Waypoint = {
-        id: createWaypointId(),
-        name: wp.name,
-        latitude: wp.latitude,
-        longitude: wp.longitude,
-        altitude: null,
-        createdAt: Date.now(),
-      };
-      const next = await saveWaypoint(entry);
-      setWaypoints(next);
-      syncWaypoints().then(setWaypoints).catch(() => {});
-    },
-    [],
-  );
+  const goHome = useCallback(() => {
+    setLauncherVisible(true);
+  }, []);
 
-  const deleteWaypoint = useCallback(async (id: string) => {
-    const next = await removeWaypoint(id);
-    setWaypoints(next);
-    // `removeWaypoint` deixou a lápide; o sync apaga a linha na nuvem (ideia #18).
-    syncWaypoints().then(setWaypoints).catch(() => {});
-    setActiveWpId(current => (current === id ? null : current));
-    setVirtualWpId(current => {
-      if (current === id) {
-        saveVirtualWp(null).catch(() => {});
-        return null;
+  /*
+   * Atalhos que abrem a app: o `bussola://sos` do botão do widget (ideia
+   * #105) abre o ecrã de emergência — que é onde a sessão e o link de partilha
+   * são criados — e o `bussola://mode/<modo>` dos tiles das Definições
+   * Rápidas (ideia #14) abre a app já no modo pedido.
+   */
+  useEffect(() => {
+    const abrir = (url: string | null | undefined) => {
+      if (!url) return;
+      if (url.startsWith('bussola://sos')) {
+        setEmergencyVisible(true);
+        return;
       }
-      return current;
+      const mode = parseModeUrl(url);
+      if (mode) openMode(mode);
+    };
+    Linking.getInitialURL()
+      .then(abrir)
+      .catch(() => {});
+    const sub = Linking.addEventListener('url', ({ url }) => abrir(url));
+    return () => sub.remove();
+  }, [openMode]);
+
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (launcherVisible) {
+        setLauncherVisible(false);
+        return true;
+      }
+      if (displayMode !== 'compass') {
+        selectDisplayMode('compass');
+        return true;
+      }
+      return false;
     });
-  }, []);
+    return () => sub.remove();
+  }, [launcherVisible, displayMode, selectDisplayMode]);
 
-  const selectVirtualWp = useCallback((id: string | null) => {
-    setVirtualWpId(id);
-    saveVirtualWp(id).catch(() => {});
-  }, []);
-
-  const activeTarget = useMemo(() => {
-    if (!activeWpId) return null;
-    const wp = waypoints.find(w => w.id === activeWpId);
-    if (!wp || (location.latitude === 0 && location.longitude === 0)) return null;
-    const distance = haversine(location.latitude, location.longitude, wp.latitude, wp.longitude);
-    const bearing = initialBearing(location.latitude, location.longitude, wp.latitude, wp.longitude);
-    // elevação do alvo acima de quem observa: só existe se os dois tiverem
-    // altitude guardada (waypoints sem altitude ficam sem marcador vertical)
-    const elevation =
-      wp.altitude !== null && location.altitude !== null
-        ? elevationAngle(wp.altitude - location.altitude, distance)
-        : null;
-    return { name: wp.name, bearing, distance, elevation };
-  }, [activeWpId, waypoints, location.latitude, location.longitude, location.altitude]);
-
-  const shareLocation = useCallback(async () => {
-    if (location.latitude === 0 && location.longitude === 0) {
-      Alert.alert(t('ui_no_loc_title'), t('ui_no_loc_body'));
+  // A conferência pelo norte: quem nunca calibrou recebe o modal; quem já
+  // calibrou recebe um lembrete, porque a conferência exige apontar o
+  // aparelho ao Sol e segurá-lo — não dá para a app fazer sozinha.
+  const calPromptedRef = useRef(false);
+  useEffect(() => {
+    if (calibrated || calPromptedRef.current || calibrationVisible) {
       return;
     }
-    try {
-      await Share.share({
-        message: `📍 ${t('ui_share_here')} — ${t('ui_app_title')}\n${formatCoord(location.latitude, true)}\n${formatCoord(location.longitude, false)}\n${t('ui_share_accuracy')}: ±${formatAccuracy(location.accuracy ?? 0)}`,
-      });
-    } catch {
-      Alert.alert(t('ui_error'), t('ui_share_error'));
+    if (displayMode !== 'compass' || launcherVisible) {
+      return;
     }
-  }, [location, t]);
+    calPromptedRef.current = true;
+    const id = setTimeout(() => setCalibrationVisible(true), 1500);
+    return () => clearTimeout(id);
+  }, [calibrated, calibrationVisible, displayMode, launcherVisible]);
 
-  const declinationSuggest = useMemo(
-    () => suggestDeclination(location.latitude, location.longitude),
-    [location.latitude, location.longitude],
-  );
-
-  const arSupported = !sensorError && !accelError;
-  const arBlocked = arSupported ? null : t('ui_ar_blocked');
-  const arLabel = arSupported ? t('ui_ar_ready') : t('ui_ar_blocked');
-
-  const baroAlt =
-    baroPressure != null ? barometricAltitude(baroPressure, baroBaseline) : null;
-
-  const sunMarker = celestial
-    ? {
-        ...celestial.sun,
-        azimuth: normalizeHeading(
-          celestial.sun.azimuth - (declination.enabled ? 0 : declination.degrees),
-        ),
-      }
-    : null;
-  const moonMarker = celestial
-    ? {
-        ...celestial.moon,
-        azimuth: normalizeHeading(
-          celestial.moon.azimuth - (declination.enabled ? 0 : declination.degrees),
-        ),
-      }
-    : null;
-
-  const targetMarker = activeTarget
-    ? {
-        ...activeTarget,
-        bearing: normalizeHeading(
-          activeTarget.bearing - (declination.enabled ? 0 : declination.degrees),
-        ),
-      }
-    : null;
-
-  const virtualMarker = useMemo(() => {
-    if (!virtualWpId) return null;
-    const wp = waypoints.find(w => w.id === virtualWpId);
-    if (!wp) return null;
-    if (!hasLocationFix(location)) {
-      return { name: wp.name, bearing: 0, distance: 0, elevation: null };
-    }
-    const distance = haversine(
-      location.latitude,
-      location.longitude,
-      wp.latitude,
-      wp.longitude,
-    );
-    const bearing = initialBearing(
-      location.latitude,
-      location.longitude,
-      wp.latitude,
-      wp.longitude,
-    );
-    return {
-      name: wp.name,
-      bearing: normalizeHeading(
-        bearing - (declination.enabled ? 0 : declination.degrees),
-      ),
-      distance,
-      elevation:
-        wp.altitude !== null && location.altitude !== null
-          ? elevationAngle(wp.altitude - location.altitude, distance)
-          : null,
-    };
-  }, [
-    virtualWpId,
-    waypoints,
-    location,
-    declination.enabled,
-    declination.degrees,
-  ]);
-
-  const cardinal = cardinalOf(heading);
-  const fullView = displayMode === 'compass' || displayMode === 'level';
-  const showPanels = launcherVisible || fullView;
-
-  const hasFix = hasLocationFix(location);
-
-  // A conferência pelo Sol só é possível com GPS e Sol acima do horizonte.
-  // Sem esta checagem o banner voltaria sempre para quem abre o app de
-  // noite, sem que houvesse nada a fazer a respeito.
-  const sunViable = useMemo(() => {
-    if (!hasFix) return false;
-    return solarPosition(
-      new Date(),
-      location.latitude,
-      location.longitude,
-    ).visible;
-  }, [hasFix, location.latitude, location.longitude]);
-
-  // A conferência pelo Sol exige apontar o aparelho para o Sol e segurar
-  // firme, então não dá para rodá-la sozinha. O app guarda quando foi a
-  // última vez que deu certo e lembra, uma vez por sessão. Quem nunca
-  // calibrou já recebe o modal acima; aqui só quem já tem calibração.
   const [verify, setVerify] = useState<VerifyStatus>({
     state: 'fresh',
     days: 0,
@@ -1251,6 +457,14 @@ const CompassScreen = () => {
       alive = false;
     };
   }, [calibrated]);
+
+  // A conferência pelo Sol só é possível com GPS e Sol acima do horizonte.
+  // Sem esta checagem o banner voltaria sempre para quem abre o app de
+  // noite, sem que houvesse nada a fazer a respeito.
+  const sunViable = useMemo(() => {
+    if (!hasFix) return false;
+    return solarPosition(new Date(), location.latitude, location.longitude).visible;
+  }, [hasFix, location.latitude, location.longitude]);
 
   useEffect(() => {
     if (
@@ -1286,194 +500,6 @@ const CompassScreen = () => {
     }
   }, [calibrationVisible, verifyBanner]);
 
-
-  const gMag = Math.sqrt(accel.x ** 2 + accel.y ** 2 + accel.z ** 2) || 1;
-  const tiltX = accel.x / gMag;
-  const tiltY = -accel.y / gMag;
-  const levelValue = Math.max(0, 1 - Math.sqrt(tiltX * tiltX + tiltY * tiltY));
-  const leveled = levelValue >= 0.995;
-  const levelBeepEnabled = fullView && displayMode === 'level' && soundAvailable;
-  useRepetitiveBeep({
-    intervalMs: leveled ? 800 : Math.max(40, 1100 - levelValue * 1050),
-    frequency: leveled ? 1250 : 540,
-    durationMs: leveled ? 70 : 30,
-    enabled: levelBeepEnabled,
-  });
-
-  const issueWarnings = [sensorError, accelError].filter(
-    (err): err is string => !!err,
-  );
-  const showInstrumentPanels =
-    appMode === 'full' || appMode === 'adventure';
-
-  const targetRelative = targetMarker
-    ? normalizeHeading(targetMarker.bearing - heading)
-    : 0;
-  const cardinalFull = cardinal.full;
-
-  useEffect(() => {
-    guideRef.current = {
-      hasFix,
-      heading,
-      cardinal: cardinalFull,
-      target: activeTarget
-        ? { name: activeTarget.name, distance: activeTarget.distance }
-        : null,
-    };
-  }, [hasFix, heading, cardinalFull, activeTarget]);
-
-  useEffect(() => {
-    if (!voiceGuide) {
-      return;
-    }
-    const id = setInterval(() => {
-      if (assistant.open || assistant.listening) {
-        return;
-      }
-      const guide = guideRef.current;
-      if (!guide.hasFix || Date.now() - lastSpokeRef.current < GUIDE_INTERVAL_MS) {
-        return;
-      }
-      lastSpokeRef.current = Date.now();
-      let phrase = t('voice_guide_heading', {
-        cardinal: guide.cardinal,
-        deg: Math.round(guide.heading),
-      });
-      if (guide.target) {
-        phrase += `. ${t('voice_guide_target', {
-          name: guide.target.name,
-          distance: formatDistance(guide.target.distance),
-        })}`;
-      }
-      speak(phrase);
-    }, 1000);
-    return () => clearInterval(id);
-  }, [voiceGuide, assistant.open, assistant.listening, t]);
-
-  useEffect(() => {
-    if (!activeTarget || !activeWpId) {
-      arrivedWpRef.current = null;
-      setArrived(false);
-      return;
-    }
-    if (activeTarget.distance <= ARRIVE_METERS) {
-      if (arrivedWpRef.current !== activeWpId) {
-        arrivedWpRef.current = activeWpId;
-        setArrived(true);
-        try {
-          Vibration.vibrate([0, 300, 200, 300]);
-        } catch {
-          Vibration.vibrate(500);
-        }
-        if (voiceGuide) {
-          speak(t('voice_guide_arrived', { name: activeTarget.name }));
-        }
-      }
-    } else if (
-      activeTarget.distance > ARRIVE_METERS + 10 &&
-      arrivedWpRef.current === activeWpId
-    ) {
-      arrivedWpRef.current = null;
-      setArrived(false);
-    }
-  }, [activeTarget, activeWpId, voiceGuide, t]);
-
-  const assistantWaypoints = useMemo<KnownWaypoint[]>(() => {
-    if (
-      (location.latitude === 0 && location.longitude === 0) ||
-      waypoints.length === 0
-    ) {
-      return waypoints.map(wp => ({
-        ...wp,
-        distance: null,
-        bearing: null,
-      }));
-    }
-    return waypoints.map(wp => ({
-      ...wp,
-      distance: haversine(
-        location.latitude,
-        location.longitude,
-        wp.latitude,
-        wp.longitude,
-      ),
-      bearing: initialBearing(
-        location.latitude,
-        location.longitude,
-        wp.latitude,
-        wp.longitude,
-      ),
-    }));
-  }, [waypoints, location.latitude, location.longitude]);
-
-  useEffect(() => {
-    const hasLocation = hasLocationFix(location);
-    assistant.setContextData({
-      heading,
-      cardinal: cardinal.full,
-      latitude: hasLocation ? location.latitude : null,
-      longitude: hasLocation ? location.longitude : null,
-      accuracy: location.accuracy,
-      altitude: location.altitude,
-      speed: location.speed,
-      pressure: baroPressure,
-      baroAvailable,
-      declinationEnabled: declination.enabled,
-      declination: declination.degrees,
-      odometer,
-      todayDistance: odoHistory ? odoHistory.today : null,
-      weekDistance: odoHistory ? odoHistory.week : null,
-      trackSummary,
-      appMode,
-      displayMode,
-      theme,
-      waypoints: assistantWaypoints,
-    });
-  }, [
-    assistant,
-    heading,
-    cardinal,
-    location,
-    baroPressure,
-    baroAvailable,
-    declination,
-    odometer,
-    odoHistory,
-    trackSummary,
-    appMode,
-    displayMode,
-    theme,
-    assistantWaypoints,
-  ]);
-
-  useEffect(() => {
-    assistant.setActionHandler(action => {
-      if (action.type === 'setMode') {
-        selectDisplayMode(action.mode as DisplayMode);
-      } else if (action.type === 'addWaypoint') {
-        if (location.latitude === 0 && location.longitude === 0) {
-          return;
-        }
-        addWaypoint(action.name);
-      }
-    });
-  }, [assistant, selectDisplayMode, addWaypoint, location.latitude, location.longitude]);
-
-  useEffect(() => {
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (launcherVisible) {
-        setLauncherVisible(false);
-        return true;
-      }
-      if (displayMode !== 'compass') {
-        selectDisplayMode('compass');
-        return true;
-      }
-      return false;
-    });
-    return () => sub.remove();
-  }, [launcherVisible, displayMode, selectDisplayMode]);
-
   useEffect(() => {
     if (!widgetSupported) return;
     updateWidget({
@@ -1486,30 +512,105 @@ const CompassScreen = () => {
     });
   }, [heading, cardinalFull, baroPressure, baroAlt, location.altitude, widgetTemp]);
 
-  useEffect(() => {
-    if (!geofenceSupported || waypoints.length === 0 || !hasFix) return;
-    // Recria só quando os waypoints (ou a disponibilidade de fix) mudam. Antes
-    // o efeito dependia de lat/lon e disparava a cada fix, removendo e
-    // re-registrando todas as geofences — com o remove (fire-and-forget) e o
-    // add concorrendo, dava para uma geofence cair no chão em silêncio.
-    for (const wp of waypoints) {
-      addGeofence({
-        id: wp.id,
-        name: wp.name,
-        title: t('gf_notify_title'),
-        latitude: wp.latitude,
-        longitude: wp.longitude,
-        radius: 150,
-      }).catch(() => {});
-    }
-    return () => {
-      for (const wp of waypoints) {
-        removeGeofence(wp.id).catch(() => {});
-      }
-    };
-  }, [waypoints, hasFix, t]);
+  const handleVerifyPin = useCallback(async (pin: string): Promise<boolean> => {
+    const stored = await loadLockPin();
+    return stored != null && stored === pin;
+  }, []);
 
-  const modeCards = useMemo(() => buildModeCards(t), [t]);
+  const handleSetPin = useCallback(async (pin: string | null) => {
+    if (pin == null) {
+      await clearLockPin();
+    } else {
+      await saveLockPin(pin);
+    }
+  }, []);
+
+  const handleExportBackup = useCallback(async () => {
+    const json = await buildBackup();
+    await Share.share({ message: json });
+  }, []);
+
+  const handleApplyBackup = useCallback(
+    async (json: string, mode: BackupMode): Promise<string | null> => {
+      const result = await applyBackup(json, { mode });
+      if (!result.ok) {
+        return result.error === 'write_failed'
+          ? `write_failed:${result.detail ?? ''}`
+          : result.error;
+      }
+      await Promise.all([reloadPreferences(), reloadWaypoints()]);
+      getTotals()
+        .then(setOdoHistory)
+        .catch(() => {});
+      return null;
+    },
+    [reloadPreferences, reloadWaypoints],
+  );
+
+  const shareLocation = useCallback(async () => {
+    if (location.latitude === 0 && location.longitude === 0) {
+      Alert.alert(t('ui_no_loc_title'), t('ui_no_loc_body'));
+      return;
+    }
+    try {
+      await Share.share({
+        message: `📍 ${t('ui_share_here')} — ${t('ui_app_title')}\n${formatCoord(location.latitude, true)}\n${formatCoord(location.longitude, false)}\n${t('ui_share_accuracy')}: ±${formatAccuracy(location.accuracy ?? 0)}`,
+      });
+    } catch {
+      Alert.alert(t('ui_error'), t('ui_share_error'));
+    }
+  }, [location, t]);
+
+  const declinationSuggest = useMemo(
+    () => suggestDeclination(location.latitude, location.longitude),
+    [location.latitude, location.longitude],
+  );
+
+  const arSupported = !sensorError && !accelError;
+  const arBlocked = arSupported ? null : t('ui_ar_blocked');
+  const arLabel = arSupported ? t('ui_ar_ready') : t('ui_ar_blocked');
+
+  const sunMarker = celestial
+    ? {
+        ...celestial.sun,
+        azimuth: normalizeHeading(
+          celestial.sun.azimuth - (declination.enabled ? 0 : declination.degrees),
+        ),
+      }
+    : null;
+  const moonMarker = celestial
+    ? {
+        ...celestial.moon,
+        azimuth: normalizeHeading(
+          celestial.moon.azimuth - (declination.enabled ? 0 : declination.degrees),
+        ),
+      }
+    : null;
+
+  const targetRelative = targetMarker
+    ? normalizeHeading(targetMarker.bearing - heading)
+    : 0;
+
+  const gMag =
+    Math.sqrt(accel.x ** 2 + accel.y ** 2 + accel.z ** 2) || 1;
+  const tiltX = accel.x / gMag;
+  const tiltY = -accel.y / gMag;
+  const levelValue = Math.max(0, 1 - Math.sqrt(tiltX * tiltX + tiltY * tiltY));
+  const leveled = levelValue >= 0.995;
+  const fullView = displayMode === 'compass' || displayMode === 'level';
+  const showPanels = launcherVisible || fullView;
+  const levelBeepEnabled = fullView && displayMode === 'level' && soundAvailable;
+  useRepetitiveBeep({
+    intervalMs: leveled ? 800 : Math.max(40, 1100 - levelValue * 1050),
+    frequency: leveled ? 1250 : 540,
+    durationMs: leveled ? 70 : 30,
+    enabled: levelBeepEnabled,
+  });
+
+  const issueWarnings = [sensorError, accelError].filter(
+    (err): err is string => !!err,
+  );
+  const showInstrumentPanels = appMode === 'full' || appMode === 'adventure';
 
   const statusPanels = (
     <StatusPanels
@@ -1531,7 +632,7 @@ const CompassScreen = () => {
       locError={locError}
       locLoading={locLoading}
       locExpanded={locExpanded}
-      onToggleLocExpanded={() => setLocExpanded(prev => !prev)}
+      onToggleLocExpanded={() => setLocExpanded(!locExpanded)}
       onOpenCoords={() => setCoordVisible(true)}
       onRefreshLocation={refreshLocation}
       locationMode={locationMode}
@@ -1546,51 +647,19 @@ const CompassScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => assistant.setOpen(true)}
-          style={styles.roundButton}
-          hitSlop={12}>
-          <KeferaAvatar size={30} />
-        </Pressable>
-        <View style={styles.headerText}>
-          <Text style={styles.headerTitle}>{t('ui_app_title')}</Text>
-          {launcherVisible ? (
-            <Text style={styles.headerSubtitle}>
-              {issueWarnings.length > 0
-                ? t('ui_sensor_unavailable')
-                : t('ui_header_heading', {
-                    card: cardinal.short,
-                    type: declination.enabled ? t('ui_geo_north') : t('ui_mag_north'),
-                  })}
-            </Text>
-          ) : (
-            <Pressable onPress={goHome} hitSlop={8}>
-              <Text style={[styles.headerSubtitle, styles.homeLink]}>
-                {'‹ '}{t('ui_back_home')}
-              </Text>
-            </Pressable>
-          )}
-        </View>
-        <Pressable
-          onPress={() => setEmergencyVisible(true)}
-          style={styles.roundButton}
-          hitSlop={12}>
-          <Text style={styles.roundButtonIcon}>🆘</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setAlertsVisible(true)}
-          style={styles.roundButton}
-          hitSlop={12}>
-          <Text style={styles.roundButtonIcon}>🚨</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setSettingsVisible(true)}
-          style={styles.roundButton}
-          hitSlop={12}>
-          <Text style={styles.roundButtonIcon}>⚙</Text>
-        </Pressable>
-      </View>
+      <CompassHeader
+        cardinal={cardinal}
+        geoNorth={declination.enabled}
+        sensorUnavailable={issueWarnings.length > 0}
+        launcherVisible={launcherVisible}
+        onOpenAssistant={() => assistant.setOpen(true)}
+        onGoHome={goHome}
+        onOpenSos={openSos}
+        onOpenAlerts={openAlerts}
+        onOpenSettings={() => setSettingsVisible(true)}
+        t={t}
+        styles={styles}
+      />
 
       {verifyBanner && (
         <View
@@ -1622,46 +691,17 @@ const CompassScreen = () => {
       )}
 
       {launcherVisible && (
-        <ScrollView
-          style={styles.homeScroll}
-          contentContainerStyle={styles.homeContent}
-          showsVerticalScrollIndicator={false}>
-          <BatteryOptBanner />
-          <View style={styles.homeHeader}>
-            <Text style={styles.homeTitle}>{t('ui_home_launcher')}</Text>
-            <View style={styles.statusPill}>
-              <View
-                style={[styles.statusPillDot, { backgroundColor: colors.success }]}
-              />
-              <Text style={styles.statusPillText}>
-                {t('ui_home_status')} · {formatAzimuth(heading, useMils)} {cardinal.short}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.cardGrid}>
-            {modeCards.map(card => (
-              <Pressable
-                key={card.key}
-                onPress={() => openMode(card.key)}
-                style={({ pressed }) => [
-                  styles.modeCard,
-                  pressed && styles.modeCardPressed,
-                ]}>
-                <View style={[styles.cardAccent, { backgroundColor: colors.primary }]} />
-                <View style={[styles.cardIcon, { borderColor: colors.primary + '66' }]}>
-                  <Text style={styles.cardIconText}>{card.icon}</Text>
-                </View>
-                <Text style={styles.cardLabel}>{card.label}</Text>
-                <Text style={styles.cardSub} numberOfLines={2}>
-                  {card.sub}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          {statusPanels}
-        </ScrollView>
+        <CompassLauncher
+          primary={colors.primary}
+          success={colors.success}
+          heading={heading}
+          useMils={useMils}
+          cardinal={cardinal}
+          onOpenMode={openMode}
+          statusPanels={statusPanels}
+          t={t}
+          styles={styles}
+        />
       )}
 
       {!launcherVisible && (
@@ -1672,7 +712,7 @@ const CompassScreen = () => {
           dialSize={dialSize}
           arSize={arSize}
           onDialAreaLayout={handleDialAreaLayout}
-          cardinalFull={cardinal.full}
+          cardinalFull={cardinalFull}
           useMils={useMils}
           sun={sunMarker}
           moon={moonMarker}
@@ -1697,9 +737,9 @@ const CompassScreen = () => {
         />
       )}
 
-      <SettingsModal
-        visible={settingsVisible}
-        onClose={() => setSettingsVisible(false)}
+      <CompassModals
+        settingsVisible={settingsVisible}
+        onCloseSettings={() => setSettingsVisible(false)}
         locationMode={locationMode}
         onSelectMode={selectMode}
         calibrated={calibrated}
@@ -1733,64 +773,31 @@ const CompassScreen = () => {
         onToggleFallDetection={toggleFallDetection}
         onExportBackup={handleExportBackup}
         onApplyBackup={handleApplyBackup}
-      />
-
-      <CalibrationModal
-        visible={calibrationVisible}
-        onClose={() => setCalibrationVisible(false)}
-        onSave={handleCalibrationSave}
+        calibrationVisible={calibrationVisible}
+        onCloseCalibration={() => setCalibrationVisible(false)}
+        onSaveCalibration={saveCalibration}
         heading={heading}
-        latitude={location.latitude}
-        longitude={location.longitude}
-        declinationEnabled={declination.enabled}
-        declinationDegrees={declination.degrees}
-      />
-
-      <StarCalibrationModal
-        visible={starCalVisible}
-        onClose={() => setStarCalVisible(false)}
-        onSave={degrees => setDeclination({ enabled: true, degrees })}
-        latitude={location.latitude}
-        longitude={location.longitude}
+        starCalVisible={starCalVisible}
+        onCloseStarCal={() => setStarCalVisible(false)}
+        onSaveStarCal={degrees => setDeclination({ enabled: true, degrees })}
         calibration={calibration}
-        currentDegrees={declination.degrees}
-      />
-
-      <WaypointModal
-        visible={wpVisible}
-        onClose={() => setWpVisible(false)}
+        wpVisible={wpVisible}
+        onCloseWaypoints={() => setWpVisible(false)}
         waypoints={waypoints}
-        latitude={location.latitude}
-        longitude={location.longitude}
         hasFix={hasFix}
-        activeId={activeWpId}
+        activeWpId={activeWpId}
         pinnedId={virtualWpId}
-        onActivate={setActiveWpId}
-        onPin={selectVirtualWp}
-        onAdd={addWaypoint}
-        onDelete={deleteWaypoint}
-      />
-
-      <AlertsModal
-        visible={alertsVisible}
-        latitude={location.latitude}
-        longitude={location.longitude}
-        onClose={() => setAlertsVisible(false)}
-      />
-
-      <CoordModal
-        visible={coordVisible}
-        onClose={() => setCoordVisible(false)}
-        latitude={location.latitude}
-        longitude={location.longitude}
-        altitude={location.altitude}
-      />
-
-      <EmergencyModal
-        visible={emergencyVisible}
-        onClose={() => setEmergencyVisible(false)}
+        onActivateWaypoint={setActiveWpId}
+        onPinWaypoint={selectVirtualWp}
+        onAddWaypoint={addWaypoint}
+        onDeleteWaypoint={deleteWaypoint}
+        alertsVisible={alertsVisible}
+        onCloseAlerts={() => setAlertsVisible(false)}
+        coordVisible={coordVisible}
+        onCloseCoord={() => setCoordVisible(false)}
+        emergencyVisible={emergencyVisible}
+        onCloseEmergency={() => setEmergencyVisible(false)}
         location={location}
-        heading={heading}
         place={place}
         onBeaconSent={() => {
           saveBeaconLastSent().catch(() => {});

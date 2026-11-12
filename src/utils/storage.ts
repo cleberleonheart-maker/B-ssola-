@@ -4,11 +4,11 @@ export const migrateKey = async (
   oldKey: string,
   newKey: string,
 ): Promise<string | null> => {
-  const existing = await AsyncStorage.getItem(newKey);
-  if (existing !== null) {
-    return existing;
-  }
   try {
+    const existing = await AsyncStorage.getItem(newKey);
+    if (existing !== null) {
+      return existing;
+    }
     const legacy = await AsyncStorage.getItem(oldKey);
     if (legacy !== null) {
       await AsyncStorage.setItem(newKey, legacy);

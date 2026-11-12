@@ -213,6 +213,7 @@ const CameraARView = ({
     const startedAt = Date.now();
     let everLive = false;
     let pulsed = false;
+    let pulseTimer: ReturnType<typeof setTimeout> | null = null;
     const id = setInterval(() => {
       if (!alive) {
         return;
@@ -224,7 +225,8 @@ const CameraARView = ({
       if (!pulsed && !everLive && elapsed >= PREVIEW_PULSE_MS) {
         pulsed = true;
         setArmed(false);
-        setTimeout(() => {
+        pulseTimer = setTimeout(() => {
+          pulseTimer = null;
           if (alive) {
             setArmed(true);
           }
@@ -252,6 +254,10 @@ const CameraARView = ({
     return () => {
       alive = false;
       clearInterval(id);
+      if (pulseTimer) {
+        clearTimeout(pulseTimer);
+        pulseTimer = null;
+      }
     };
   }, [active, showCamera, retryKey, previewMode, autoFallback]);
 
@@ -609,10 +615,7 @@ const CameraARView = ({
               onPress={() => setTorchOn(on => !on)}
               style={[
                 styles.controlPill,
-                {
-                  borderColor: colors.border,
-                  backgroundColor: torchOn ? colors.warning + '33' : 'transparent',
-                },
+                torchOn ? styles.torchPillOn : styles.torchPillOff,
               ]}>
               <Text style={styles.controlPillIcon}>
                 {torchOn ? '🔦' : '🔆'}
@@ -661,6 +664,7 @@ const createStyles = (colors: {
   accent: string;
   primary: string;
   surface: string;
+  warning: string;
 }) =>
   StyleSheet.create({
     container: {
@@ -681,6 +685,14 @@ const createStyles = (colors: {
       ...StyleSheet.absoluteFill,
       overflow: 'hidden',
       zIndex: 2,
+    },
+    torchPillOn: {
+      borderColor: colors.border,
+      backgroundColor: colors.warning + '33',
+    },
+    torchPillOff: {
+      borderColor: colors.border,
+      backgroundColor: 'transparent',
     },
     marker: {
       position: 'absolute',

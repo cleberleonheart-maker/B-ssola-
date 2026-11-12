@@ -52,7 +52,7 @@ type Props = {
 const MiniMapView = ({ active, location, heading }: Props) => {
   const colors = useThemeColors();
   const { t } = useLanguage();
-  const styles = useMemo(() => createStyles(), []);
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const side = useMemo(() => mapSideFor(Dimensions.get('window').width), []);
 
@@ -168,78 +168,67 @@ const MiniMapView = ({ active, location, heading }: Props) => {
             {trail.map((seg, i) => (
               <View
                 key={i}
-                style={{
-                  position: 'absolute',
-                  left: seg.x,
-                  top: seg.y,
-                  width: seg.w,
-                  height: 2,
-                  borderRadius: 1,
-                  backgroundColor: colors.primary,
-                  transform: [{ rotate: `${seg.a}deg` }],
-                }}
+                style={[
+                  styles.segment,
+                  {
+                    left: seg.x,
+                    top: seg.y,
+                    width: seg.w,
+                    backgroundColor: colors.primary,
+                    transform: [{ rotate: `${seg.a}deg` }],
+                  },
+                ]}
               />
             ))}
 
             {accuracyRadius != null && here && (
               <View
-                style={{
-                  position: 'absolute',
-                  left: here.x - accuracyRadius,
-                  top: here.y - accuracyRadius,
-                  width: accuracyRadius * 2,
-                  height: accuracyRadius * 2,
-                  borderRadius: accuracyRadius,
-                  borderWidth: 1,
-                  borderColor: colors.textMuted,
-                  opacity: 0.5,
-                }}
+                style={[
+                  styles.accuracyCircle,
+                  {
+                    left: here.x - accuracyRadius,
+                    top: here.y - accuracyRadius,
+                    width: accuracyRadius * 2,
+                    height: accuracyRadius * 2,
+                    borderRadius: accuracyRadius,
+                    borderColor: colors.textMuted,
+                  },
+                ]}
               />
             )}
 
             {heading != null && here && (
               <View
-                style={{
-                  position: 'absolute',
-                  left: here.x - 26,
-                  top: here.y - 26,
-                  width: 52,
-                  height: 52,
-                  transform: [{ rotate: `${heading}deg` }],
-                }}>
-                <View
-                  style={{
-                    position: 'absolute',
-                    left: 25,
-                    top: 0,
-                    width: 2,
-                    height: 14,
-                    backgroundColor: colors.north,
-                  }}
-                />
+                style={[
+                  styles.headingMarker,
+                  {
+                    left: here.x - 26,
+                    top: here.y - 26,
+                    transform: [{ rotate: `${heading}deg` }],
+                  },
+                ]}>
+                <View style={[styles.northNeedle, { backgroundColor: colors.north }]} />
               </View>
             )}
 
             {here && (
               <View
-                style={{
-                  position: 'absolute',
-                  left: here.x - 5,
-                  top: here.y - 5,
-                  width: 10,
-                  height: 10,
-                  borderRadius: 5,
-                  backgroundColor: colors.success,
-                  borderWidth: 2,
-                  borderColor: colors.surfaceAlt,
-                }}
+                style={[
+                  styles.hereDot,
+                  {
+                    left: here.x - 5,
+                    top: here.y - 5,
+                    backgroundColor: colors.success,
+                    borderColor: colors.surfaceAlt,
+                  },
+                ]}
               />
             )}
 
             <Text style={[styles.north, { color: colors.textMuted }]}>N</Text>
 
             {bar && (
-              <View style={[styles.scaleBar, { bottom: 10, left: 12 }]}>
+              <View style={[styles.scaleBar, styles.scaleBarOffset]}>
                 <View
                   style={[styles.scaleLine, { width: bar.pixels, borderColor: colors.text }]}
                 />
@@ -269,10 +258,9 @@ const MiniMapView = ({ active, location, heading }: Props) => {
           onPress={zoomIn}
           style={[
             styles.zoomBtn,
-            {
-              borderColor: colors.border,
-              opacity: spanIndex === SPAN_LEVELS.length - 1 ? 0.35 : 1,
-            },
+            spanIndex === SPAN_LEVELS.length - 1
+              ? styles.zoomBtnDim
+              : styles.zoomBtnReady,
           ]}>
           <Text style={[styles.zoomGlyph, { color: colors.text }]}>+</Text>
         </Pressable>
@@ -320,7 +308,7 @@ const Row = ({
   second?: string;
 }) => {
   const colors = useThemeColors();
-  const styles = useMemo(() => createStyles(), []);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.row}>
       <Text style={[styles.rowLabel, { color: colors.textMuted }]}>{label}</Text>
@@ -332,7 +320,7 @@ const Row = ({
   );
 };
 
-const createStyles = () =>
+const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
     wrap: {
       paddingBottom: spacing.md,
@@ -376,6 +364,47 @@ const createStyles = () =>
     },
     scaleBar: {
       position: 'absolute',
+    },
+    scaleBarOffset: {
+      bottom: 10,
+      left: 12,
+    },
+    segment: {
+      position: 'absolute',
+      height: 2,
+      borderRadius: 1,
+    },
+    accuracyCircle: {
+      position: 'absolute',
+      borderWidth: 1,
+      opacity: 0.5,
+    },
+    headingMarker: {
+      position: 'absolute',
+      width: 52,
+      height: 52,
+    },
+    northNeedle: {
+      position: 'absolute',
+      left: 25,
+      top: 0,
+      width: 2,
+      height: 14,
+    },
+    hereDot: {
+      position: 'absolute',
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      borderWidth: 2,
+    },
+    zoomBtnReady: {
+      borderColor: colors.border,
+      opacity: 1,
+    },
+    zoomBtnDim: {
+      borderColor: colors.border,
+      opacity: 0.35,
     },
     scaleLine: {
       height: 5,

@@ -11,7 +11,7 @@ import { useLanguage } from '../../i18n/LanguageContext';
 import { useThemeColors } from '../../theme/ThemeContext';
 import { reportProblem } from '../../services/crashReporter';
 import { sensorSampleCount } from '../../services/sensorLogService';
-import { styles } from './styles';
+import { primaryAction, styles } from './styles';
 
 type Props = {
   onClose: () => void;
@@ -81,10 +81,7 @@ const ReportProblemDialog = ({ onClose }: Props) => {
           <Pressable
             onPress={send}
             disabled={!canSend}
-            style={[
-              styles.restoreButton,
-              { backgroundColor: colors.primary, opacity: canSend ? 1 : 0.5 },
-            ]}>
+            style={[styles.restoreButton, primaryAction(colors, canSend)]}>
             <Text style={styles.restoreButtonText}>
               {sending ? '…' : t('report_send')}
             </Text>

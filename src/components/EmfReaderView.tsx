@@ -337,10 +337,7 @@ const EmfReaderView = ({
               onPress={toggleFreeze}
               style={[
                 styles.freezeChip,
-                {
-                  borderColor: frozen ? colors.accent : colors.border,
-                  backgroundColor: frozen ? colors.surfaceAlt : 'transparent',
-                },
+                frozen ? styles.freezeChipActive : styles.freezeChipIdle,
               ]}>
               <Text
                 style={[
@@ -584,10 +581,18 @@ const EmfReaderView = ({
   );
 };
 
-const createStyles = (_colors: ColorScheme) =>
+const createStyles = (colors: ColorScheme) =>
   StyleSheet.create({
     scroll: {
       flex: 1,
+    },
+    freezeChipActive: {
+      borderColor: colors.accent,
+      backgroundColor: colors.surfaceAlt,
+    },
+    freezeChipIdle: {
+      borderColor: colors.border,
+      backgroundColor: 'transparent',
     },
     container: {
       flexGrow: 1,

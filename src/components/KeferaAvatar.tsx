@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { useThemeColors } from '../theme/ThemeContext';
 
@@ -10,17 +10,14 @@ type KeferaAvatarProps = {
 
 const KeferaAvatar = ({ size, listening = false, dim = false }: KeferaAvatarProps) => {
   const colors = useThemeColors();
-  const styles = StyleSheet.create({
-    root: {
-      width: size,
-      height: size,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-  });
 
   const glow = listening ? colors.danger : colors.primary;
   const needle = listening ? colors.danger : colors.accent;
+
+  const styles = useMemo(
+    () => createStyles(size, colors, glow, needle),
+    [size, colors, glow, needle],
+  );
 
   const pulse = useRef(new Animated.Value(0)).current;
   const sway = useRef(new Animated.Value(0)).current;
@@ -83,49 +80,31 @@ const KeferaAvatar = ({ size, listening = false, dim = false }: KeferaAvatarProp
   const sat = Array.from({ length: 2 });
 
   return (
-    <View style={[styles.root, dim && { opacity: 0.55 }]}>
+    <View style={[styles.root, dim && styles.dimmed]}>
       <Animated.View
         pointerEvents="none"
-        style={{
-          position: 'absolute',
-          width: size * 0.86,
-          height: size * 0.86,
-          borderRadius: (size * 0.86) / 2,
-          backgroundColor: glow + '2E',
-          transform: [{ scale: haloScale }],
-          opacity: haloOpacity,
-        }}
+        style={[
+          styles.halo,
+          { transform: [{ scale: haloScale }], opacity: haloOpacity },
+        ]}
       />
-      <View
-        style={{
-          position: 'absolute',
-          width: size * 0.7,
-          height: size * 0.7,
-          borderRadius: (size * 0.7) / 2,
-          borderWidth: 1.5,
-          borderColor: glow,
-          opacity: 0.55,
-        }}
-      />
+      <View style={styles.ring} />
       {ticks.map((_, i) => {
         const major = i % 3 === 0;
         return (
           <View
             key={i}
             pointerEvents="none"
-            style={{
-              position: 'absolute',
-              width: major ? 2.5 : 1.5,
-              height: major ? size * 0.07 : size * 0.045,
-              borderRadius: 1,
-              backgroundColor: major ? glow : colors.textMuted + '66',
-              top: size / 2 - (major ? size * 0.035 : size * 0.0225),
-              left: size / 2 - (major ? 1.25 : 0.75),
-              transform: [
-                { rotate: `${i * 30}deg` },
-                { translateY: -size * 0.26 },
-              ],
-            }}
+            style={[
+              styles.tick,
+              major ? styles.tickMajor : styles.tickMinor,
+              {
+                transform: [
+                  { rotate: `${i * 30}deg` },
+                  { translateY: -size * 0.26 },
+                ],
+              },
+            ]}
           />
         );
       })}
@@ -133,94 +112,153 @@ const KeferaAvatar = ({ size, listening = false, dim = false }: KeferaAvatarProp
         <View
           key={i}
           pointerEvents="none"
-          style={{
-            position: 'absolute',
-            width: size * 0.045,
-            height: size * 0.045,
-            borderRadius: (size * 0.045) / 2,
-            backgroundColor: i === 0 ? colors.primary : colors.accent,
-            opacity: 0.9,
-            top: size / 2 - (size * 0.045) / 2,
-            left: size / 2 - (size * 0.045) / 2,
-            transform: [
-              { rotate: i === 0 ? '35deg' : '215deg' },
-              { translateY: -size * 0.33 },
-            ],
-          }}
+          style={[
+            styles.satellite,
+            i === 0 ? styles.satelliteNorth : styles.satelliteSouth,
+            {
+              transform: [
+                { rotate: i === 0 ? '35deg' : '215deg' },
+                { translateY: -size * 0.33 },
+              ],
+            },
+          ]}
         />
       ))}
-      <View
-        style={{
-          position: 'absolute',
-          width: size * 0.52,
-          height: size * 0.52,
-          borderRadius: (size * 0.52) / 2,
-          backgroundColor: colors.surface + 'F2',
-          borderWidth: 1.5,
-          borderColor: colors.accent,
-          alignItems: 'center',
-          justifyContent: 'center',
-          shadowColor: glow,
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.8,
-          shadowRadius: size * 0.12,
-          elevation: 4,
-        }}>
-        <View
-          style={{
-            position: 'absolute',
-            width: size * 0.4,
-            height: size * 0.4,
-            borderRadius: (size * 0.4) / 2,
-            backgroundColor: colors.primary + '18',
-          }}
-        />
+      <View style={styles.dial}>
+        <View style={styles.dialGlow} />
         <Animated.View
           pointerEvents="none"
-          style={{
-            alignItems: 'center',
-            justifyContent: 'center',
-            transform: [{ rotate: needleRotate }],
-          }}>
-          <View
-            style={{
-              width: 0,
-              height: 0,
-              borderLeftWidth: size * 0.045,
-              borderRightWidth: size * 0.045,
-              borderBottomWidth: size * 0.14,
-              borderLeftColor: 'transparent',
-              borderRightColor: 'transparent',
-              borderBottomColor: colors.primary,
-            }}
-          />
-          <View
-            style={{
-              width: 0,
-              height: 0,
-              borderLeftWidth: size * 0.045,
-              borderRightWidth: size * 0.045,
-              borderTopWidth: size * 0.14,
-              borderLeftColor: 'transparent',
-              borderRightColor: 'transparent',
-              borderTopColor: needle,
-            }}
-          />
+          style={[styles.needle, { transform: [{ rotate: needleRotate }] }]}>
+          <View style={styles.needleNorth} />
+          <View style={styles.needleSouth} />
         </Animated.View>
-        <View
-          style={{
-            position: 'absolute',
-            width: size * 0.07,
-            height: size * 0.07,
-            borderRadius: (size * 0.07) / 2,
-            backgroundColor: colors.background,
-            borderWidth: 1.5,
-            borderColor: glow,
-          }}
-        />
+        <View style={styles.hub} />
       </View>
     </View>
   );
 };
+
+const createStyles = (
+  size: number,
+  colors: ReturnType<typeof useThemeColors>,
+  glow: string,
+  needle: string,
+) =>
+  StyleSheet.create({
+    root: {
+      width: size,
+      height: size,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    dimmed: {
+      opacity: 0.55,
+    },
+    halo: {
+      position: 'absolute',
+      width: size * 0.86,
+      height: size * 0.86,
+      borderRadius: (size * 0.86) / 2,
+      backgroundColor: glow + '2E',
+    },
+    ring: {
+      position: 'absolute',
+      width: size * 0.7,
+      height: size * 0.7,
+      borderRadius: (size * 0.7) / 2,
+      borderWidth: 1.5,
+      borderColor: glow,
+      opacity: 0.55,
+    },
+    tick: {
+      position: 'absolute',
+      borderRadius: 1,
+    },
+    tickMajor: {
+      width: 2.5,
+      height: size * 0.07,
+      backgroundColor: glow,
+      top: size / 2 - size * 0.035,
+      left: size / 2 - 1.25,
+    },
+    tickMinor: {
+      width: 1.5,
+      height: size * 0.045,
+      backgroundColor: colors.textMuted + '66',
+      top: size / 2 - size * 0.0225,
+      left: size / 2 - 0.75,
+    },
+    satellite: {
+      position: 'absolute',
+      width: size * 0.045,
+      height: size * 0.045,
+      borderRadius: (size * 0.045) / 2,
+      opacity: 0.9,
+      top: size / 2 - (size * 0.045) / 2,
+      left: size / 2 - (size * 0.045) / 2,
+    },
+    satelliteNorth: {
+      backgroundColor: colors.primary,
+    },
+    satelliteSouth: {
+      backgroundColor: colors.accent,
+    },
+    dial: {
+      position: 'absolute',
+      width: size * 0.52,
+      height: size * 0.52,
+      borderRadius: (size * 0.52) / 2,
+      backgroundColor: colors.surface + 'F2',
+      borderWidth: 1.5,
+      borderColor: colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: glow,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.8,
+      shadowRadius: size * 0.12,
+      elevation: 4,
+    },
+    dialGlow: {
+      position: 'absolute',
+      width: size * 0.4,
+      height: size * 0.4,
+      borderRadius: (size * 0.4) / 2,
+      backgroundColor: colors.primary + '18',
+    },
+    needle: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    needleNorth: {
+      width: 0,
+      height: 0,
+      borderLeftWidth: size * 0.045,
+      borderRightWidth: size * 0.045,
+      borderBottomWidth: size * 0.14,
+      borderLeftColor: 'transparent',
+      borderRightColor: 'transparent',
+      borderBottomColor: colors.primary,
+    },
+    needleSouth: {
+      width: 0,
+      height: 0,
+      borderLeftWidth: size * 0.045,
+      borderRightWidth: size * 0.045,
+      borderTopWidth: size * 0.14,
+      borderLeftColor: 'transparent',
+      borderRightColor: 'transparent',
+      borderTopColor: needle,
+    },
+    hub: {
+      position: 'absolute',
+      width: size * 0.07,
+      height: size * 0.07,
+      borderRadius: (size * 0.07) / 2,
+      backgroundColor: colors.background,
+      borderWidth: 1.5,
+      borderColor: glow,
+    },
+  });
 
 export default KeferaAvatar;

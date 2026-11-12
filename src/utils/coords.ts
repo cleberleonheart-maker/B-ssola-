@@ -4,19 +4,24 @@ import { toRad } from './geo';
 export const toDMS = (value: number, isLat: boolean): string => {
   const hemi = isLat ? (value >= 0 ? 'N' : 'S') : value >= 0 ? 'E' : 'W';
   const abs = Math.abs(value);
-  let deg = Math.floor(abs);
-  let minFloat = (abs - deg) * 60;
-  let min = Math.floor(minFloat);
-  let sec = Math.round((minFloat - min) * 6000) / 100;
-  if (sec >= 60) {
-    min += 1;
-    sec = 0;
-  }
+  const deg = Math.floor(abs);
+  // A conta é feita em décimos de segundo, de uma vez só. Antes era em
+  // segundos (com uma casa) e o arredondamento do `toFixed` produzia
+  // "59'60.0\"" — uma coordenada que não existe, e que quem copia para o
+  // mapa não percebe. Em décimos, o acerto do minuto e do grau acontece
+  // sempre, porque é a mesma divisão.
+  const decimos = Math.round((abs - deg) * 60 * 600);
+  let min = Math.floor(decimos / 600);
+  let degFinal = deg;
   if (min >= 60) {
-    deg += 1;
-    min = 0;
+    degFinal += 1;
+    min -= 60;
   }
-  return `${deg}°${String(min).padStart(2, '0')}'${sec.toFixed(1).replace(/\.0$/, '')}" ${hemi}`;
+  const resto = decimos % 600;
+  const seg = Math.floor(resto / 10);
+  const decima = resto % 10;
+  const segTexto = decima > 0 ? `${seg}.${decima}` : `${seg}`;
+  return `${degFinal}°${String(min).padStart(2, '0')}'${segTexto}" ${hemi}`;
 };
 
 const UTM_HEMI = 'CDEFGHJKLMNPQRSTUVWX';
@@ -73,11 +78,16 @@ export const toUTM = (lat: number, lon: number): UTM | null => {
         (A ** 2 / 2 +
           ((5 - T + 9 * C + 4 * C ** 2) * A ** 4) / 24 +
           ((61 - 58 * T + T ** 2 + 600 * C - 330 * e2Sq) * A ** 6) / 720));
+  // Hemisfério sul: a northing tem uma falsa origem de 10 000 000 m, para
+  // que nenhum ponto do mapa fique com coordenada negativa. Sem isto, São
+  // Paulo saía em 23K −2 605 412 N em vez de 23K 7 394 588 N — um erro de
+  // 10 000 km que o mapa não complainava.
+  const northingFinal = lat < 0 ? 10000000 + northing : northing;
   return {
     zone,
     letter: UTM_HEMI[Math.floor((lat + 80) / 8)] ?? 'X',
     easting: Math.round(easting * 100) / 100,
-    northing: Math.round(northing * 100) / 100,
+    northing: Math.round(northingFinal * 100) / 100,
   };
 };
 

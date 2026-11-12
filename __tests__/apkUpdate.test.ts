@@ -35,8 +35,9 @@ const loadUpdater = (native: MockNative) => {
 };
 
 const emit = (event: string, payload: Record<string, unknown>) =>
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (DeviceEventEmitter as any).emit(event, payload);
+  (DeviceEventEmitter as unknown as {
+    emit: (event: string, payload: Record<string, unknown>) => void;
+  }).emit(event, payload);
 
 const URL_OK = 'https://exemplo.test/app/bussola-7.27.apk';
 
@@ -63,11 +64,14 @@ describe('apkUpdater — cancelamento e timeout', () => {
   it('o cancelamento rejeita a promise em vez de a deixar pendurada', async () => {
     const updater = loadUpdater(native);
     const pending = updater.downloadApk(URL_OK, 'bussola.apk');
-    const assertion = expect(pending).rejects.toThrow('download_cancelled');
+    // O `catch` fica ligado já: se o teste rebentasse antes do cancelamento,
+    // a rejeição ficava sem dono e o Jest queixava-se de uma promessa
+    // rejeitada que ninguém esperou.
+    const erro = pending.catch((e: unknown) => e);
 
     updater.cancelApkDownload();
 
-    await assertion;
+    await expect(erro).resolves.toThrow('download_cancelled');
     expect(native.cancel).toHaveBeenCalledTimes(1);
   });
 
@@ -85,11 +89,11 @@ describe('apkUpdater — cancelamento e timeout', () => {
   it('o timeout de 5 min cancela o nativo e rejeita', async () => {
     const updater = loadUpdater(native);
     const pending = updater.downloadApk(URL_OK, 'bussola.apk');
-    const assertion = expect(pending).rejects.toThrow('download_timeout');
+    const erro = pending.catch((e: unknown) => e);
 
     jest.advanceTimersByTime(5 * 60 * 1000);
 
-    await assertion;
+    await expect(erro).resolves.toThrow('download_timeout');
     expect(native.cancel).toHaveBeenCalled();
   });
 
@@ -103,12 +107,12 @@ describe('apkUpdater — cancelamento e timeout', () => {
     );
 
     const pending = updater.downloadApk(URL_OK, 'bussola.apk');
-    const assertion = expect(pending).rejects.toThrow('download_timeout');
+    const erro = pending.catch((e: unknown) => e);
     jest.advanceTimersByTime(5 * 60 * 1000);
     // O nativo percebe o cancelamento e confirma com `false` logo a seguir.
     resolveNative(false);
 
-    await assertion;
+    await expect(erro).resolves.toThrow('download_timeout');
     // Sem o guard `settled`, o segundo reject apareceria como unhandled rejection.
     await Promise.resolve();
   });
@@ -132,13 +136,13 @@ describe('apkUpdater — cancelamento e timeout', () => {
   it('o id do evento tem de bater com o do download', async () => {
     const updater = loadUpdater(native);
     const pending = updater.downloadApk(URL_OK, 'bussola.apk');
-    const assertion = expect(pending).rejects.toThrow('download_cancelled');
+    const erro = pending.catch((e: unknown) => e);
 
     // Evento de um download antigo que chegou tarde: não pode resolver o atual.
     emit('ApkDownloaderDone', { id: 'outro-id', uri: 'content://media/2' });
     updater.cancelApkDownload();
 
-    await assertion;
+    await expect(erro).resolves.toThrow('download_cancelled');
   });
 
   it('remove os listeners quando o download termina', async () => {

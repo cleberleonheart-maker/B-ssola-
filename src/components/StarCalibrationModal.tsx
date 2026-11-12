@@ -15,7 +15,7 @@ import {
   setUpdateIntervalForType,
   SensorTypes,
 } from 'react-native-sensors';
-import { useTheme } from '../theme/ThemeContext';
+import { useTheme, useThemeColors } from '../theme/ThemeContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { spacing, radius } from '../theme/colors';
 import { circularMeanHeading, getHeading, viewElevationDeg } from '../utils/compass';
@@ -80,7 +80,7 @@ const StarCalibrationModal = ({
 }: Props) => {
   const { colors } = useTheme();
   const { t } = useLanguage();
-  const styles = useMemo(() => createStyles(), []);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { width, height } = useWindowDimensions();
 
   const magSubRef = useRef<ReturnType<typeof magnetometer.subscribe> | null>(null);
@@ -290,10 +290,7 @@ const StarCalibrationModal = ({
                       onPress={() => pick(tg.id)}
                       style={[
                         styles.chip,
-                        {
-                          borderColor: active ? colors.accent : colors.border,
-                          backgroundColor: active ? colors.accent : 'transparent',
-                        },
+                        active ? styles.chipActive : styles.chipIdle,
                       ]}>
                       <Text
                         style={[
@@ -341,10 +338,8 @@ const StarCalibrationModal = ({
                     {
                       left: `${50 + offsetX}%`,
                       top: `${50 + offsetY}%`,
-                      borderColor: aim?.onTarget ? colors.success : colors.accent,
-                      backgroundColor:
-                        aim?.onTarget ? colors.success : 'transparent',
                     },
+                    aim?.onTarget ? styles.targetOn : styles.targetOff,
                   ]}
                 />
                 <View style={[styles.crossH, { backgroundColor: colors.border }]} />
@@ -450,7 +445,7 @@ const StarCalibrationModal = ({
   );
 };
 
-const createStyles = () =>
+const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
     backdrop: {
       flex: 1,
@@ -505,6 +500,14 @@ const createStyles = () =>
       alignItems: 'center',
       minWidth: 72,
     },
+    chipActive: {
+      borderColor: colors.accent,
+      backgroundColor: colors.accent,
+    },
+    chipIdle: {
+      borderColor: colors.border,
+      backgroundColor: 'transparent',
+    },
     chipText: {
       fontSize: 12,
       fontWeight: '800',
@@ -530,6 +533,14 @@ const createStyles = () =>
       marginTop: -14,
       borderRadius: 14,
       borderWidth: 2,
+    },
+    targetOn: {
+      borderColor: colors.success,
+      backgroundColor: colors.success,
+    },
+    targetOff: {
+      borderColor: colors.accent,
+      backgroundColor: 'transparent',
     },
     crossH: {
       position: 'absolute',

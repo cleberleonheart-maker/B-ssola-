@@ -204,6 +204,14 @@ export const createStyles = (colors: ColorScheme) =>
     borderRadius: radius.full,
     borderWidth: 1,
   },
+  mapTabActive: {
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  mapTabIdle: {
+    borderColor: colors.border,
+    backgroundColor: 'transparent',
+  },
   mapTabText: {
     fontSize: 12,
     fontWeight: '800',
@@ -436,3 +444,14 @@ export const createStyles = (colors: ColorScheme) =>
     color: colors.textMuted,
   },
 });
+
+/**
+ * O tipo dos estilos do ecrã principal.
+ *
+ * As partes do ecrã (cabeçalho, lançador) recebem os estilos por parâmetro em
+ * vez de os criarem outra vez — mas o tipo não pode ser `object`: com `object`
+ * o TypeScript aceita `styles.header` mesmo que o estilo não exista, e o erro
+ * só aparece no ecrã, em branco. Com este tipo, cada parte declara com `Pick`
+ * exatamente os estilos que usa.
+ */
+export type ScreenStyles = ReturnType<typeof createStyles>;

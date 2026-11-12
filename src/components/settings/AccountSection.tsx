@@ -144,7 +144,9 @@ const AccountSection = () => {
           sending={enviando}
           error={linkError}
           onClose={() => setLinkOpen(false)}
-          onSend={() => void enviarLink()}
+          onSend={() => {
+            void enviarLink();
+          }}
         />
       ) : null}
     </>

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { useThemeColors } from '../../theme/ThemeContext';
-import { styles } from './styles';
+import { primaryAction, styles, themedInput } from './styles';
 
 type Props = {
   value: string;
@@ -58,7 +58,7 @@ const LinkEmailDialog = ({
           editable={!sending}
           value={value}
           onChangeText={onChange}
-          style={[styles.linkInput, { borderColor: colors.border, color: colors.text }]}
+          style={[styles.linkInput, themedInput(colors)]}
           placeholder={t('account_link_placeholder')}
           placeholderTextColor={colors.textMuted}
         />
@@ -72,10 +72,7 @@ const LinkEmailDialog = ({
           editable={!sending}
           value={password}
           onChangeText={onChangePassword}
-          style={[
-            styles.linkInput,
-            { marginTop: 0, borderColor: colors.border, color: colors.text },
-          ]}
+          style={[styles.linkInput, themedInput(colors, true)]}
           placeholder={t('account_link_password_placeholder')}
           placeholderTextColor={colors.textMuted}
         />
@@ -94,10 +91,7 @@ const LinkEmailDialog = ({
           <Pressable
             onPress={onSend}
             disabled={!canSend}
-            style={[
-              styles.restoreButton,
-              { backgroundColor: colors.primary, opacity: canSend ? 1 : 0.5 },
-            ]}>
+            style={[styles.restoreButton, primaryAction(colors, canSend)]}>
             <Text style={styles.restoreButtonText}>
               {sending ? t('account_link_sending') : t('account_link_send')}
             </Text>

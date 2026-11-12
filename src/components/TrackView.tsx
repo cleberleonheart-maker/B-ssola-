@@ -472,7 +472,7 @@ const TrackView = ({ location, heading = 0, mils = false }: Props) => {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}>
       <View style={styles.intro}>
-        <Text style={[styles.emoji, { fontSize: 34 }]}>🥾</Text>
+        <Text style={[styles.emoji, styles.emojiBig]}>🥾</Text>
         <Text style={[styles.title, { color: colors.text }]}>
           {t('track_title')}
         </Text>
@@ -553,16 +553,16 @@ const TrackView = ({ location, heading = 0, mils = false }: Props) => {
             {segments.map((seg, i) => (
               <View
                 key={i}
-                style={{
-                  position: 'absolute',
-                  left: seg.x,
-                  top: seg.y,
-                  width: Math.max(seg.w, 2),
-                  height: 2,
-                  borderRadius: 1,
-                  backgroundColor: colors.primary,
-                  transform: [{ rotate: `${seg.a}deg` }],
-                }}
+                style={[
+                  styles.segment,
+                  {
+                    left: seg.x,
+                    top: seg.y,
+                    width: Math.max(seg.w, 2),
+                    backgroundColor: colors.primary,
+                    transform: [{ rotate: `${seg.a}deg` }],
+                  },
+                ]}
               />
             ))}
             {drawPoints.points.length > 0 && (
@@ -643,11 +643,11 @@ const TrackView = ({ location, heading = 0, mils = false }: Props) => {
                   <View style={[styles.shortcutRow, { borderColor: colors.success + '44' }]}>
                     <Text style={[styles.shortcutText, { color: colors.text }]}>
                       ⚡ {t('track_short')}:{' '}
-                      <Text style={{ color: colors.primary, fontWeight: '800' }}>
+                      <Text style={styles.navDistance}>
                         {formatDistance(navTarget.straight.distance)}
                       </Text>
                       {'  '}
-                      <Text style={{ color: colors.accent, fontWeight: '800' }}>
+                      <Text style={styles.navBearing}>
                         {formatAzimuth(navTarget.straight.bearing, mils)}
                         {cardinalOf(navTarget.straight.bearing).short} {'↩️'}
                         {formatAzimuth(navTarget.straight.bearing + 180, mils)}
@@ -862,6 +862,22 @@ const createStyles = (colors: {
     },
     emoji: {
       marginBottom: spacing.xs,
+    },
+    emojiBig: {
+      fontSize: 34,
+    },
+    segment: {
+      position: 'absolute',
+      height: 2,
+      borderRadius: 1,
+    },
+    navDistance: {
+      color: colors.primary,
+      fontWeight: '800',
+    },
+    navBearing: {
+      color: colors.accent,
+      fontWeight: '800',
     },
     title: {
       fontSize: 22,

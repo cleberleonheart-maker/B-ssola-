@@ -74,10 +74,14 @@ object SosCloud {
     val anonKey = SosPrefs.anonKey(context)
     val refreshToken = SosPrefs.refreshToken(context)
     val userId = SosPrefs.userId(context)
+    // A pagina do rastreio vem do JavaScript (que e a unica copia do
+    // endereco): o nativo nao tem nenhuma. Sem ela nao ha link, mas o aviso
+    // sai na mesma — um SMS com a posicao vale mais do que nenhum aviso.
     val pageUrl = SosPrefs.livePageUrl(context)
     if (url.isBlank() || anonKey.isBlank() || refreshToken.isBlank() || userId.isBlank()) {
       return null
     }
+    if (pageUrl.isBlank()) return null
     if (fix == null) return null
 
     val accessToken = refreshAccessToken(url, anonKey, refreshToken) ?: return null
@@ -113,10 +117,7 @@ object SosCloud {
       // mostra o ultimo ponto conhecido, que ainda e melhor do que nada.
     }
 
-    val base = pageUrl.ifBlank { DEFAULT_PAGE_URL }
+    val base = pageUrl
     return String.format(Locale.US, "%s#tkn=%s", base, token)
   }
-
-  /** A página de visualização, quando o JavaScript não a consegue dizer. */
-  const val DEFAULT_PAGE_URL = "https://cleberleonheart-maker.github.io/B-ssola-/live.html"
 }

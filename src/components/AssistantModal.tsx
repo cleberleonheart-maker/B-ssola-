@@ -82,20 +82,19 @@ const PulseRing = ({
     outputRange: [0.55, 0.28, 0],
   });
 
+  const rippleStyle = {
+    position: 'absolute' as const,
+    width: size,
+    height: size,
+    borderRadius: size / 2,
+    borderWidth: 2,
+    borderColor: color,
+    transform: [{ scale }],
+    opacity,
+  };
+
   return (
-    <Animated.View
-      pointerEvents="none"
-      style={{
-        position: 'absolute',
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        borderWidth: 2,
-        borderColor: color,
-        transform: [{ scale }],
-        opacity,
-      }}
-    />
+    <Animated.View pointerEvents="none" style={rippleStyle} />
   );
 };
 

@@ -178,11 +178,7 @@ const CadenceView = ({ active = false }: Props) => {
           onPress={() => changeMode('timer')}
           style={[
             styles.modeChip,
-            {
-              borderColor: mode === 'timer' ? colors.primary : colors.border,
-              backgroundColor:
-                mode === 'timer' ? colors.surfaceAlt : 'transparent',
-            },
+            mode === 'timer' ? styles.modeChipActive : styles.modeChipIdle,
           ]}>
           <Text
             style={[
@@ -198,11 +194,7 @@ const CadenceView = ({ active = false }: Props) => {
           onPress={() => changeMode('step')}
           style={[
             styles.modeChip,
-            {
-              borderColor: mode === 'step' ? colors.primary : colors.border,
-              backgroundColor:
-                mode === 'step' ? colors.surfaceAlt : 'transparent',
-            },
+            mode === 'step' ? styles.modeChipActive : styles.modeChipIdle,
           ]}>
           <Text
             style={[
@@ -269,10 +261,7 @@ const CadenceView = ({ active = false }: Props) => {
         onPress={toggle}
         style={[
           styles.startButton,
-          {
-            borderColor: running ? colors.danger : colors.primary,
-            backgroundColor: running ? colors.danger : 'transparent',
-          },
+          running ? styles.startActive : styles.startIdle,
         ]}>
         <Text
           style={[
@@ -299,7 +288,7 @@ const CadenceView = ({ active = false }: Props) => {
   );
 };
 
-const createStyles = (_colors: ColorScheme) =>
+const createStyles = (colors: ColorScheme) =>
   StyleSheet.create({
     container: {
       flex: 1,
@@ -339,6 +328,14 @@ const createStyles = (_colors: ColorScheme) =>
       paddingVertical: spacing.xs,
       borderRadius: radius.full,
       borderWidth: 2,
+    },
+    modeChipActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.surfaceAlt,
+    },
+    modeChipIdle: {
+      borderColor: colors.border,
+      backgroundColor: 'transparent',
     },
     modeText: {
       fontSize: 14,
@@ -384,6 +381,14 @@ const createStyles = (_colors: ColorScheme) =>
       paddingVertical: spacing.md,
       borderRadius: radius.full,
       borderWidth: 2,
+    },
+    startActive: {
+      borderColor: colors.danger,
+      backgroundColor: colors.danger,
+    },
+    startIdle: {
+      borderColor: colors.primary,
+      backgroundColor: 'transparent',
     },
     startText: {
       fontSize: 16,

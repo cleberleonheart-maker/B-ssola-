@@ -8,9 +8,9 @@ export const reverseGeocode = async (
   lon: number,
   lang = 'pt',
 ): Promise<ReverseGeo> => {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 8000);
     const url =
       'https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1' +
       `&zoom=18&accept-language=${encodeURIComponent(lang)}&lat=${lat}&lon=${lon}`;
@@ -18,7 +18,6 @@ export const reverseGeocode = async (
       headers: { 'User-Agent': 'BussolaApp/6.0 (personal use)' },
       signal: ctrl.signal,
     });
-    clearTimeout(timer);
     if (!res.ok) return null;
     const data = await res.json();
     const address = data?.address ?? {};
@@ -35,5 +34,7 @@ export const reverseGeocode = async (
     return { name, cep: address.postcode ? String(address.postcode) : null };
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 };

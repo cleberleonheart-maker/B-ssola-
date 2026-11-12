@@ -33,13 +33,17 @@ const SQL_DIR = join(dirname(fileURLToPath(import.meta.url)));
 
 /** A ordem importa: `live_points.sql` dá `get_live_track` e a tabela de que a
  *  `live_rls.sql` não sabe que existem. Correr o directório por ordem
- *  alfabética seria correr na sorte. */
+ *  alfabética seria correr na sorte.
+ *
+ *  `app_version_sha.sql` vem ANTES de `app_version.sql` porque o segundo
+ *  escreve na coluna `apk_sha256` que o primeiro cria: ao contrário, o update
+ *  falhava com "column does not exist" numa base nova. */
 const FICHEIROS = [
   'rls.sql',
   'live_rls.sql',
   'live_points.sql',
-  'app_version.sql',
   'app_version_sha.sql',
+  'app_version.sql',
   'crashes.sql',
   'track_shares.sql',
   'account_delete.sql',

@@ -62,7 +62,7 @@ const chavesDoPayload = (nome: string): string[] => {
   const corpo = corpoKotlin(
     kotlinSession,
     new RegExp('fun ' + nome + '\\('),
-    /\n  \}/, // fecha no fim do método (dois espaços de indentação)
+    /\n {2}\}/, // fecha no fim do método (dois espaços de indentação)
   );
   if (corpo === null) {
     throw new Error(
@@ -126,7 +126,7 @@ const colunasDe = (ficheiro: string, tabela: string): Coluna[] => {
  * mal que expôs isto, na confiança de que o teste apanhava mais do que apanha.
  */
 const paresDoObjecto = (fonte: string): { chave: string; valor: string }[] => {
-  const corpo = fonte.match(/const config: NativeTrackingConfig = \{([\s\S]*?)\n  \};/);
+  const corpo = fonte.match(/const config: NativeTrackingConfig = \{([\s\S]*?)\n {2}\};/);
   if (!corpo) {
     throw new Error(
       'liveTracking.ts: não encontrei o objecto `config`. A extracção deste ' +
@@ -313,7 +313,7 @@ describe('a ponte do JavaScript para o serviço', () => {
     // é a degradação silenciosa que o aviso de permissão cobre mas não explica.
     // As cinco credenciais de texto e o prazo: o `isUsable` é o único sítio que
     // decide se o serviço sobe, e ele espreita campos por nome.
-    const usavel = kotlinSession.match(/fun isUsable\(\): Boolean =([\s\S]*?)\n\n  fun writeTo/);
+    const usavel = kotlinSession.match(/fun isUsable\(\): Boolean =([\s\S]*?)\n\n {2}fun writeTo/);
     if (!usavel) throw new Error('LiveTrackingSession.kt: não encontrei isUsable');
     const camposObrigatorios = ['token', 'userId', 'accessToken', 'anonKey', 'url', 'expiresAt'];
     const mandadas = chavesDoObjecto(jsTracking);
