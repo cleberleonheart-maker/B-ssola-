@@ -19,6 +19,12 @@
  *   2. nunca aponta para uma versão que ainda não foi construída;
  *   3. o `where` impede a regressão — mesmo que o ficheiro volte a ficar
  *      atrás, aplicá-lo não pode rebaixar a linha da nuvem.
+ *
+ * E uma quarta, que é a que faltava e que ninguém notou: a coluna do hash é
+ * escrita **sempre**, mesmo quando não há hash para meter nela. Um `update`
+ * que a omita não a limpa — deixa-a como estava — e a linha ficava a dizer
+ * "v212" com o hash do APK 211. O app comparava o ficheiro novo com o hash de
+ * outro e recusava-se a instalar: o mesmo sintoma, por outro caminho.
  */
 import fs from 'fs';
 import path from 'path';
@@ -27,6 +33,15 @@ const raiz = path.join(__dirname, '..');
 const ler = (p: string) => fs.readFileSync(path.join(raiz, p), 'utf8');
 
 const sql = ler('scripts/app_version.sql');
+const publicar = ler('scripts/publicar-supabase.sh');
+const workflow = ler('.github/workflows/build-apk.yml');
+
+/**
+ * O JSON dentro do shell e do YAML vem com as aspas escapadas (`\"`), o que
+ * atrapalha a quem procura o campo pelo nome. Tirar as barras deixa o texto
+ * como ele é lido em runtime.
+ */
+const semBarras = (texto: string): string => texto.replace(/\\"/g, '"');
 
 /** O `versionCode` que o app vai anunciando. */
 const codigoDoRepo = (() => {
@@ -102,5 +117,31 @@ describe('scripts/app_version.sql', () => {
     expect(sql.match(/where\s+id\s*=\s*1\s+and\s+version_code\s*<=\s*(\d+)/)?.[1]).toBe(
       String(numeroDe('version_code')),
     );
+  });
+
+  it('a coluna do hash é escrita sempre, mesmo quando não há hash', () => {
+    // Um `update` que omita `apk_sha256` não limpa a coluna: deixa o hash da
+    // release anterior na linha, e a linha passa a dizer "v212" com o hash do
+    // APK 211. O app compara o ficheiro que desceu com o hash de outro e
+    // recusa-se a instalar — a atualização certa, bloqueada outra vez.
+    // `null` é a resposta honesta: "ninguém sabe", e o app usa o digest que a
+    // GitHub calcula por asset.
+    expect(sql).toMatch(/apk_sha256\s*=\s*('[^']*'|null)/);
+  });
+
+  it('o PATCH do publicador também limpa o hash quando não tem digest', () => {
+    // O mesmo caminho, na outra porta: o PATCH directo ao Supabase. Sem o
+    // `null`, o `apk_sha256` ficava com o valor da release anterior.
+    // As aspas do JSON estão escapadas no shell (`\"`), por isso o texto é
+    // lido sem as barras.
+    expect(semBarras(publicar)).toMatch(/"apk_sha256":null/);
+    expect(publicar).not.toMatch(/SHA_COLUMN=""/);
+  });
+
+  it('o PATCH da release também limpa o hash quando o primeiro falha', () => {
+    // O workflow da release repete o PATCH sem o hash quando a coluna ainda
+    // não existe na nuvem. A repetição tem de levar `null`: omitir o campo
+    // deixaria o hash velho na linha, que é o pior par possível.
+    expect(semBarras(workflow)).toMatch(/"apk_sha256":null/);
   });
 });

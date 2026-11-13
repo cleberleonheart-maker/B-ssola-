@@ -51,10 +51,20 @@ fi
 # gravar na nuvem. Sem ele, o workflow "Schema do Supabase" (que aplica os
 # scripts/*.sql em qualquer commit que os toque) voltava a por a versao
 # antiga — e a linha ficava a dizer 197 com o hash do APK 210.
-SHA_COLUMN=""
+#
+# A coluna do hash escreve-se SEMPRE, mesmo quando nao ha digest para meter
+# nela: nesse caso vai a null. O motivo e' o contrario do que parece — um
+# `update` que omita a coluna nao a limpa, deixa-a como estava. A linha ficava
+# a dizer "v212" com o hash do APK 211, e o app comparava o ficheiro novo com
+# o hash de outro e recusava-se a instalar ("hash nao bate certo"). O `null`
+# quer dizer "ninguem sabe", que e' honesto: o app usa o digest que a GitHub
+# calcula por asset.
 if [ -n "$APK_SHA256" ]; then
   SHA_COLUMN=",
     apk_sha256 = '$APK_SHA256'"
+else
+  SHA_COLUMN=",
+    apk_sha256 = null"
 fi
 
 SQL="-- =====================================================================
@@ -79,9 +89,16 @@ where id = 1 and version_code <= $VERSION_CODE;"
 
 if [ -n "$SERVICE_KEY" ]; then
   echo "==> Gravando direto no Supabase (service_role key)"
+  # O `apk_sha256` entra sempre no PATCH, mesmo sem digest: um PATCH que o
+  # omite nao limpa a coluna, deixa o hash da release anterior na linha, e
+  # o app passa a recusar-se a instalar por causa de um hash que ja nao
+  # pertence ao APK apontado. Com `null` o app diz "ninguem sabe" e usa o
+  # digest que a GitHub calcula por asset.
   BODY="{\"version_code\":$VERSION_CODE,\"version_name\":\"$VERSION_NAME\",\"update_url\":\"$UPDATE_URL\",\"message\":\"$MESSAGE\",\"required\":$REQUIRED"
   if [ -n "$APK_SHA256" ]; then
     BODY="$BODY,\"apk_sha256\":\"$APK_SHA256\""
+  else
+    BODY="$BODY,\"apk_sha256\":null"
   fi
   BODY="$BODY}"
   curl -fsS -X PATCH "$SUPABASE_URL/rest/v1/app_version?id=eq.1" \

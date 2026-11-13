@@ -181,6 +181,13 @@ jobs:
           # calcula por asset: uma de cada lado. Sem a coluna (SQL ainda não
           # corrido), o PATCH falha e a release não saía — daí a segunda
           # tentativa sem o campo, que ainda publica o update.
+          #
+          # A segunda tentativa leva `apk_sha256: null` e não a omissão do
+          # campo: um PATCH que não menciona a coluna não a limpa, deixa o
+          # hash da release anterior na linha, e o app passa a recusar-se a
+          # instalar ("hash não bate certo") por causa de um hash que já não
+          # pertence ao APK apontado. Com `null` o app diz "ninguém sabe" e
+          # usa o digest que a GitHub calcula por asset.
           if ! curl -fsS -X PATCH "$SUPABASE_URL/rest/v1/app_version?id=eq.1" \
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
@@ -188,7 +195,7 @@ jobs:
             -H "Prefer: return=representation" \
             -d "$BODY" -o /tmp/app_version.json; then
             echo "::warning::PATCH com apk_sha256 falhou (coluna em falta?); a publicar sem o hash"
-            BODY="{\"version_code\":$CODE,\"version_name\":\"$NAME\",\"update_url\":\"$URL\",\"message\":\"Nova versão disponível\",\"required\":false}"
+            BODY="{\"version_code\":$CODE,\"version_name\":\"$NAME\",\"update_url\":\"$URL\",\"message\":\"Nova versão disponível\",\"required\":false,\"apk_sha256\":null}"
             curl -fsS -X PATCH "$SUPABASE_URL/rest/v1/app_version?id=eq.1" \
               -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
               -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
