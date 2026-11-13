@@ -229,7 +229,7 @@
       a ser manual: a altura já mostra o ângulo em tempo real. **Atenção:**
       `verticalAngle` do Rezarte tem sinal provavelmente invertido — ver nota
       na 65.
-- [ ] **20. Widget do rumo — publicar/validar** — o `widgetService` existe. Dois
+- [x] **20. Widget do rumo — publicar/validar** — o `widgetService` existe. Dois
       defeitos corrigidos daqui: (A) o push do JS mandava `sendBroadcast` só com
       `setPackage` e a ação `WIDGET_UPDATE`, que não está no `<intent-filter>` do
       receiver (o manifesto só declara `APPWIDGET_UPDATE`) — nunca era entregue, e
@@ -239,8 +239,9 @@
       fonte. Passou a buscar `current.temperature_2m` no open-meteo
       (`fetchCurrentTemperature` em `alertsService`, com parser puro
       `parseCurrentTemperature`), atualizada no mesmo ritmo dos alertas (primeiro
-      fixe + a cada 30 min) e enviada ao widget. **Falta validar no aparelho**:
-      widget no seletor, rumo vivo ao girar, pressão/altitude, tap abre o app.
+      fixe + a cada 30 min) e enviada ao widget. **Validado no aparelho** (v211,
+      guião do `scripts/validar-apk.sh`): widget no seletor, rumo vivo ao girar,
+      pressão/altitude, tap abre o app.
       Limitação conhecida: `updatePeriodMillis="0"` — com o app fechado o widget
       congela no último valor.
 - [x] **21. FOV calibrado por aparelho** — ✅ feito em v7.9: botões −/+ (60°–140°, passo
