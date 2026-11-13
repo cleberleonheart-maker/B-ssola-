@@ -24,6 +24,7 @@
 set -u
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO="cleberleonheart-maker/B-ssola-"
 STRICT=0
 AUTH=0
 for arg in "$@"; do
@@ -123,12 +124,38 @@ if [ -n "$CODIGO_REPO" ]; then
   resposta=$(curl -s --max-time 60 "$SUPABASE_URL/rest/v1/app_version?select=version_code,version_name,apk_sha256&limit=1" \
     -H "apikey: $SUPABASE_ANON_KEY")
   CODIGO_NUVEM=$(printf '%s' "$resposta" | sed -nE 's/.*"version_code":([0-9]+).*/\1/p' | head -1)
+  HASH_NUVEM=$(printf '%s' "$resposta" | sed -nE 's/.*"apk_sha256":"([0-9a-f]{64})".*/\1/p' | head -1)
   if [ -n "$CODIGO_NUVEM" ] && [ "$CODIGO_NUVEM" -lt "$CODIGO_REPO" ]; then
     echo "  AVISO app_version na nuvem esta na v$CODIGO_NUVEM e o repositorio ja vai na v$CODIGO_REPO"
     echo "          quem tiver na v$CODIGO_NUVEM nao recebe o aviso de atualizacao."
     echo "          Corrija com: ./scripts/publicar-sql.sh scripts/app_version.sql"
   elif [ -n "$CODIGO_NUVEM" ]; then
     echo "  ok    app_version na nuvem (v$CODIGO_NUVEM, repositorio v$CODIGO_REPO)"
+  fi
+
+  # O hash da nuvem tem de ser o do asset publicado. Se nao for, o app da'
+  # "hash nao bate certo" e recusa-se a instalar — a atualizacao certa, bloqueada
+  # por uma linha que ninguem pediu para mudar. Foi o que aconteceu com a v211:
+  # o asset foi republicado com outros bytes, o repositorio ficou com o hash
+  # antigo e a nuvem passou a dizer 211 com o hash de um APK 211 diferente.
+  #
+  # O `gh` e' opcional: sem ele (ou sem sessao) o script nao sabe o digest do
+  # asset publicado e salta acomparacao. E' um olhar, nunca uma escrita.
+  if [ -n "$CODIGO_NUVEM" ] && [ -n "$HASH_NUVEM" ] && command -v gh >/dev/null 2>&1; then
+    DIGEST=$(gh release view bussola-apk --repo "$REPO" --json assets --jq \
+      ".assets[] | select(.name == \"bussola-v$CODIGO_NUVEM.apk\") | .digest" 2>/dev/null \
+      | sed -E 's/^sha256://' | tr 'A-Z' 'a-z' | head -1 || true)
+    if [ -n "$DIGEST" ]; then
+      if [ "$DIGEST" != "$HASH_NUVEM" ]; then
+        echo "  AVISO o hash da nuvem nao e' o do asset publicado da v$CODIGO_NUVEM"
+        echo "          nuvem:   $HASH_NUVEM"
+        echo "          publicado: $DIGEST"
+        echo "          o app vai recusar-se a instalar ('hash nao bate certo')."
+        echo "          Corrija com: ./scripts/publicar-supabase.sh"
+      else
+        echo "  ok    o hash da nuvem e' o do asset publicado (v$CODIGO_NUVEM)"
+      fi
+    fi
   fi
 fi
 

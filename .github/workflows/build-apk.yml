@@ -141,28 +141,75 @@ jobs:
           echo "assinatura conferida: $EXPECTED"
 
       - name: Publicar APK no release
+        id: publicar
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           APK=android/app/build/outputs/apk/release/app-release.apk
           CODE=$(grep -E '^versionCode=' android/app/version.properties | cut -d'=' -f2)
           NAME=$(grep -E '^versionName=' android/app/version.properties | cut -d'=' -f2)
-          TMP=/tmp/bussola-v${CODE}.apk
+          ASSET="bussola-v${CODE}.apk"
+          TMP=/tmp/$ASSET
           cp "$APK" "$TMP"
-          if gh release view bussola-apk --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload bussola-apk "$TMP" --repo "$GITHUB_REPOSITORY" --clobber
-            # Sem isto o titulo fica congelado na versao que criou o release
-            # (v7.0, cod 80) mesmo com assets bem mais novos.
-            gh release edit bussola-apk --repo "$GITHUB_REPOSITORY" \
-              --title "Bussola APK ($NAME, cod $CODE)" || true
+          LOCAL_SHA=$(sha256sum "$TMP" | cut -d' ' -f1)
+
+          # O digest que a GitHub calcula por asset: a mesma fonte que o app
+          # usa quando a nuvem nao tem hash.
+          digest_de() {
+            gh release view bussola-apk --repo "$GITHUB_REPOSITORY" --json assets --jq \
+              ".assets[] | select(.name == \"$1\") | .digest" 2>/dev/null \
+              | sed -E 's/^sha256://' | tr 'A-Z' 'a-z' | head -1 || true
+          }
+
+          PUBLICADO=$(digest_de "$ASSET")
+          if [ -n "$PUBLICADO" ]; then
+            # O APK publicado de uma versao e' IMUTAVEL. Nao se substitui.
+            #
+            # Substitui-lo rodava mal por duas razoes ao mesmo tempo: quem ja'
+            # instalou a v211 tem os bytes antigos, e trocar o ficheiro faz o
+            # digest rodiar — o hash que o repositorio guarda deixa de bater
+            # e o app da' "hash nao bate certo" a quem tenta atualizar. Um APK
+            # novo e' uma versao nova: sobe o versionCode.
+            if [ "$PUBLICADO" != "$LOCAL_SHA" ]; then
+              echo "::warning::o asset $ASSET ja' estava publicado (sha256 $PUBLICADO) e este build da' $LOCAL_SHA."
+              echo "::warning::o APK publicado de uma versao nao se substitui: o que ja' foi instalado fica com os bytes antigos."
+              echo "::warning::as alteracoes no codigo so saem na proxima versao (com o versionCode subido)."
+            else
+              echo "O asset publicado e' byte a byte igual a este build."
+            fi
+          elif gh release view bussola-apk --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # Sem `--clobber`: se o asset ja' existir, o upload falha em vez de
+            # substitui-lo. A falha nao parte a release — o digest em baixo
+            # diz se o asset ficou la' (corridas simultaneas) ou nao.
+            gh release upload bussola-apk "$TMP" --repo "$GITHUB_REPOSITORY" \
+              || echo "::warning::o upload falhou; se o asset ja' existia, fica o que la' estava."
           else
             gh release create bussola-apk "$TMP" --repo "$GITHUB_REPOSITORY" \
               --title "Bussola APK ($NAME, cod $CODE)" \
               --notes "APK release do app Bussola. Baixe o ultimo asset."
           fi
+
+          if gh release view bussola-apk --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # Sem isto o titulo fica congelado na versao que criou o release
+            # (v7.0, cod 80) mesmo com assets bem mais novos.
+            gh release edit bussola-apk --repo "$GITHUB_REPOSITORY" \
+              --title "Bussola APK ($NAME, cod $CODE)" || true
+          fi
+
+          # O hash que vai para a nuvem e' o do asset PUBLICADO, nunca o deste
+          # build: sao o mesmo ficheiro, mas o publicado e' o que os
+          # utilizadores descarregam e o que o app compara.
+          PUBLICADO=$(digest_de "$ASSET")
+          if ! printf '%s' "$PUBLICADO" | grep -qE '^[0-9a-f]{64}$'; then
+            echo "::error::nao consegui ler o digest do asset $ASSET na release"
+            exit 1
+          fi
+
           echo "Publicado: https://github.com/$GITHUB_REPOSITORY/releases/tag/bussola-apk"
-          echo "apk_name=bussola-v${CODE}.apk" >> "$GITHUB_OUTPUT"
+          echo "apk_name=$ASSET" >> "$GITHUB_OUTPUT"
           echo "version_code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "apk_sha256=$PUBLICADO" >> "$GITHUB_OUTPUT"
 
       - name: Grava app_version no Supabase
         env:
@@ -175,33 +222,53 @@ jobs:
           CODE=$(grep -E '^versionCode=' android/app/version.properties | cut -d'=' -f2)
           NAME=$(grep -E '^versionName=' android/app/version.properties | cut -d'=' -f2)
           URL="https://github.com/$GITHUB_REPOSITORY/releases/download/bussola-apk/bussola-v${CODE}.apk"
-          SHA=$(sha256sum /tmp/bussola-v${CODE}.apk | cut -d' ' -f1)
+          SHA="${{ steps.publicar.outputs.apk_sha256 }}"
+          if ! printf '%s' "$SHA" | grep -qE '^[0-9a-f]{64}$'; then
+            echo "::error::o passo anterior nao passou o sha256 do asset publicado"
+            exit 1
+          fi
           BODY="{\"version_code\":$CODE,\"version_name\":\"$NAME\",\"update_url\":\"$URL\",\"message\":\"Nova versão disponível\",\"required\":false,\"apk_sha256\":\"$SHA\"}"
           # `apk_sha256` é a segunda fonte do hash, a par do `digest` que a GitHub
           # calcula por asset: uma de cada lado. Sem a coluna (SQL ainda não
           # corrido), o PATCH falha e a release não saía — daí a segunda
           # tentativa sem o campo, que ainda publica o update.
           #
-          # A segunda tentativa leva `apk_sha256: null` e não a omissão do
-          # campo: um PATCH que não menciona a coluna não a limpa, deixa o
-          # hash da release anterior na linha, e o app passa a recusar-se a
-          # instalar ("hash não bate certo") por causa de um hash que já não
-          # pertence ao APK apontado. Com `null` o app diz "ninguém sabe" e
-          # usa o digest que a GitHub calcula por asset.
-          if ! curl -fsS -X PATCH "$SUPABASE_URL/rest/v1/app_version?id=eq.1" \
+          # A segunda tentativa NÃO leva `apk_sha256: null`: se a coluna não
+          # existe, não há hash nenhum para limpar, e omitir o campo é o
+          # único caminho que funciona. Um `null` aqui também falharia
+          # (a coluna não existe) e, se a coluna existisse mas o PATCH
+          # tivesse falhado por outra coisa, limpar um hash bom seria pior
+          # do que deixar o hash velho.
+          #
+          # O filtro `version_code=lte.$CODE` é a outra guarda: um run antigo
+          # (um commit mais velho que só agora termina o build) não pode
+          # rebaixar o ponteiro que uma release mais nova já gravou.
+          PATCH_URL="$SUPABASE_URL/rest/v1/app_version?id=eq.1&version_code=lte.$CODE"
+          HTTP=$(curl -sS -o /tmp/app_version.json -w '%{http_code}' -X PATCH "$PATCH_URL" \
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Content-Type: application/json" \
             -H "Prefer: return=representation" \
-            -d "$BODY" -o /tmp/app_version.json; then
-            echo "::warning::PATCH com apk_sha256 falhou (coluna em falta?); a publicar sem o hash"
-            BODY="{\"version_code\":$CODE,\"version_name\":\"$NAME\",\"update_url\":\"$URL\",\"message\":\"Nova versão disponível\",\"required\":false,\"apk_sha256\":null}"
-            curl -fsS -X PATCH "$SUPABASE_URL/rest/v1/app_version?id=eq.1" \
-              -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-              -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-              -H "Content-Type: application/json" \
-              -H "Prefer: return=representation" \
-              -d "$BODY" -o /tmp/app_version.json
+            -d "$BODY" || true)
+          if [ "$HTTP" != "200" ] && [ "$HTTP" != "201" ]; then
+            if grep -qiE 'apk_sha256|42703|PGRST204' /tmp/app_version.json; then
+              echo "::warning::a coluna apk_sha256 ainda não existe na nuvem; a publicar sem a segunda fonte do hash"
+              BODY="{\"version_code\":$CODE,\"version_name\":\"$NAME\",\"update_url\":\"$URL\",\"message\":\"Nova versão disponível\",\"required\":false}"
+              HTTP=$(curl -sS -o /tmp/app_version.json -w '%{http_code}' -X PATCH "$PATCH_URL" \
+                -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+                -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+                -H "Content-Type: application/json" \
+                -H "Prefer: return=representation" \
+                -d "$BODY" || true)
+            fi
+          fi
+          if [ "$HTTP" != "200" ] && [ "$HTTP" != "201" ]; then
+            echo "::error::PATCH do app_version falhou (http $HTTP)"
+            cat /tmp/app_version.json
+            exit 1
+          fi
+          if [ ! -s /tmp/app_version.json ] || [ "$(cat /tmp/app_version.json)" = "[]" ]; then
+            echo "::warning::a linha da nuvem não foi tocada: já está numa versão mais nova do que a $CODE (nada foi rebaixado)"
           fi
           echo "app_version -> $CODE ($NAME)"
           echo "URL: $URL"

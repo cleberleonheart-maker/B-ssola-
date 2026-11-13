@@ -117,6 +117,77 @@ for (const ficheiro of FICHEIROS) {
   }
 }
 
+// A cena que envenenava a nuvem.
+//
+// O `app_version.sql` é uma fotografia: o workflow "Schema do Supabase"
+// aplica-o em qualquer commit que toque `scripts/**`, e o workflow da build
+// grava a linha verdadeira por PATCH. O que interessa não é "o ficheiro está
+// certo", é "o ficheiro está desatualizado e a nuvem não pode levar com
+// isso". Três estados, e os três têm de ficar como devem:
+//
+//   - a nuvem na MESMA versão, com outro hash: o hash é o da release (que
+//     conhece o asset publicado) e a fotografia não o substitui. Era esta a
+//     via que punha a linha a dizer 211 com o hash de um APK 211 diferente —
+//     o app dava "hash não bate certo" e recusava-se a instalar;
+//   - a nuvem numa versão MAIS ANTIGA: a fotografia avança a versão e grava
+//     o hash — é para isto que o ficheiro existe;
+//   - a nuvem numa versão MAIS NOVA: não se toca em nada.
+const appVersionSql = readFileSync(join(SQL_DIR, 'app_version.sql'), 'utf8');
+const codigo = Number(appVersionSql.match(/set\s+version_code\s*=\s*(\d+)/)?.[1]);
+const hashEsperado = appVersionSql.match(/then\s+'([0-9a-f]{64})'/)?.[1];
+const hashDeOutro = '0'.repeat(64);
+
+const linhaDaNuvem = async () => {
+  const { rows } = await db.query(
+    'select version_code, apk_sha256 from app_version where id = 1',
+  );
+  return rows[0] ?? {};
+};
+
+if (codigo > 0 && hashEsperado) {
+  await db.exec(
+    `update app_version set version_code = ${codigo}, apk_sha256 = '${hashDeOutro}' where id = 1`,
+  );
+  await db.exec(appVersionSql);
+  let linha = await linhaDaNuvem();
+  if (linha.version_code === codigo && linha.apk_sha256 === hashDeOutro) {
+    ok.push('app_version.sql não substitui o hash da release na mesma versão');
+  } else {
+    falhas.push(
+      'app_version.sql substituiu o hash de uma versão que a release já gravou ' +
+        `(${linha.apk_sha256}) — a nuvem passa a dizer ${linha.version_code} com o hash de outro APK`,
+    );
+  }
+
+  await db.exec(
+    `update app_version set version_code = ${codigo - 1}, apk_sha256 = '${hashDeOutro}' where id = 1`,
+  );
+  await db.exec(appVersionSql);
+  linha = await linhaDaNuvem();
+  if (linha.version_code === codigo && linha.apk_sha256 === hashEsperado) {
+    ok.push('app_version.sql avança a versão e grava o hash do APK publicado');
+  } else {
+    falhas.push(
+      `app_version.sql não avançou a versão como deve (ficou em ${linha.version_code} com ${linha.apk_sha256})`,
+    );
+  }
+
+  await db.exec(
+    `update app_version set version_code = ${codigo + 1}, apk_sha256 = '${hashDeOutro}' where id = 1`,
+  );
+  await db.exec(appVersionSql);
+  linha = await linhaDaNuvem();
+  if (linha.version_code === codigo + 1 && linha.apk_sha256 === hashDeOutro) {
+    ok.push('app_version.sql não rebaixa a versão que a release já gravou');
+  } else {
+    falhas.push(
+      `app_version.sql rebaixou a linha da nuvem (ficou em ${linha.version_code})`,
+    );
+  }
+} else {
+  falhas.push('app_version.sql não tem version_code nem hash — a cena do veneno não pôde ser provada');
+}
+
 const { rows: tabelas } = await db.query(
   `select tablename as tabela from pg_tables where schemaname = 'public'`,
 );

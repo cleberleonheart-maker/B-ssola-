@@ -32,9 +32,42 @@ tiver texto novo em nativo, também `android/app/src/main/res/values*/strings.xm
   vem antes de `app_version.sql` (que escreve nela).
 - `scripts/app_version.sql` é gerado por `scripts/publicar-supabase.sh` e
   aponta para a versão **publicada** (o mesmo APK que `scripts/validar-apk.sh`
-  instala), não para a versão em construção. O `where version_code <= N`
-  impede que ele rebaixe a versão que a release acabou de gravar na nuvem.
-  O `__tests__/appVersionSql.test.ts` fixa essa coerência.
+  instala), não para a versão em construção. Tem duas guardas: o
+  `where version_code <= N` impede que ele rebaixe a versão que a release
+  acabou de gravar na nuvem, e o `case` do hash impede que substitua o hash
+  que a release gravou para essa mesma versão (o ficheiro é uma fotografia;
+  quem sabe a verdade é o workflow da build, que lê o digest do asset
+  publicado). O `__tests__/appVersionSql.test.ts` fixa essa coerência.
+
+## O APK publicado de uma versão é imutável
+
+Um `versionCode` é um APK, para sempre. O asset `bussola-vNNN.apk` que está
+publicado **não se substitui** — o workflow da build nunca faz `--clobber`, e
+o `publicar.sh` só o faz com `REPUBLICAR=1`, à mão e a propósito.
+
+A razão é o hash. Um APK não é reprodutível byte a byte: o mesmo código
+compilado duas vezes dá dois ficheiros diferentes. Republicar o asset da
+mesma versão fazia o digest rodiar, e a partir daí o hash que o repositório
+guardava deixava de bater com o ficheiro que os utilizadores descarregam — a
+nuvem acabava a dizer "v211" com o hash de um APK 211 diferente, e o app dava
+"hash não bate certo" e recusava-se a instalar.
+
+Três regras que daí resultam:
+
+- **Mudou o código, sobe a versão.** Uma alteração em `src/` que não sobe o
+  `versionCode` não sai no APK publicado: sai na próxima versão. O CI avisa
+  quando o build não bate byte a byte com o asset já publicado.
+- **O hash da nuvem é o do asset publicado**, lido do `digest` que a GitHub
+  calcula (`gh release view ... --json assets`), nunca do `sha256sum` do
+  build local. São o mesmo ficheiro, mas só o publicado é o que se descarrega.
+- **Um snapshot desatualizado não rebaixa nem envenena a nuvem**: o
+  `app_version.sql` só escreve o hash quando a versão avança, e o PATCH dos
+  workflows filtra por `version_code=lte.N` para nunca rebaixar o ponteiro.
+
+Para corrigir um hash que ficou errado na nuvem, use o caminho que conhece o
+asset publicado: `./scripts/publicar-supabase.sh` (PATCH direto) ou
+`./scripts/verificar-nuvem.sh`, que compara o hash da nuvem com o digest
+publicado e diz quando estão divergentes.
 
 ## Comandos
 
@@ -58,5 +91,8 @@ itera (`npx jest __tests__/ficheiro.test.ts`).
    mesmo código e o mesmo hash — `scripts/publicar-supabase.sh` faz isso, ou
    edita-se o ficheiro à mão. Sem os três em sintonia, o
    `__tests__/appVersionSql.test.ts` reprova.
+
+O passo 3 é uma vez por **versão**, não por build: o asset publicado não se
+substitui, portanto o SHA-256 de uma versão não volta a mudar.
 
 Push para `main` publica o APK. Confirme com o dono antes de o fazer.

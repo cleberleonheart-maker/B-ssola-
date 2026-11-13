@@ -973,6 +973,25 @@ existentes e focam em reduzir riscos ou em usabilidade percebida pela Kefera.
       que publica a release — com uma segunda tentativa sem o campo, para a
       coluna em falta nunca partir uma publicação.
 
+      **E a garantia que faltava, a 2026-11-13: o APK publicado de uma versão
+      é imutável.** As duas fontes de hash só valem se ambas falam do mesmo
+      ficheiro, e o ficheiro published é o que os utilizadores descarregam. O
+      workflow fazia `--clobber` a cada build, e um APK não é reprodutível byte
+      a byte: o digest da v211 rodou, o repositório ficou com o hash antigo e a
+      nuvem passou a dizer 211 com o hash de um APK 211 diferente — o app deu
+      "hash não bate certo" e recusou-se a instalar.
+
+      Agora: o asset publicado não se substitui (um APK novo é uma versão nova,
+      com o `versionCode` subido); o hash que vai para a nuvem é o `digest` do
+      asset publicado, lido da GitHub; e o `scripts/app_version.sql`, que é uma
+      fotografia e fica desatualizado entre releases, só escreve o hash quando
+      a versão avança — o hash que a release gravou não se substitui por uma
+      foto. Os PATCH filtram por `version_code=lte.N`, para que um run antigo
+      não rebaixe o ponteiro. O `verificar-nuvem.sh` compara o hash da nuvem
+      com o digest publicado e avisa quando divergem, e o `verificar-sql.mjs`
+      prova as três cenas contra um Postgres a sério (hash não substituído na
+      mesma versão, versão a avançar, versão a não rebaixar).
+
 - [x] **87. 🧨 As RPCs só chegam à nuvem coladas à mão** — o processo era o que
       ficava, e a ideia sugeria o caminho errado. DDL não passa pelo PostgREST:
       a `service_role` salta a RLS das linhas e continua a ser um cliente REST,

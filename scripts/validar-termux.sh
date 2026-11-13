@@ -18,7 +18,7 @@ PKG="com.bussola.app"
 ACT="$PKG/.MainActivity"
 REPO="cleberleonheart-maker/B-ssola-"
 ASSET="${ASSET:-bussola-v211.apk}"
-SHA="${SHA:-f2b3bbedc19cfb3d3a0609d4512644c3beb0154fd1da9db89b07c05934324ff1}"
+SHA="${SHA:-386cb3472fb31f3a5f2ed2f748f99d0e4e1a9f63d48691f3a05dca8cfeecd2f7}"
 DIR="${DIR:-$HOME/bussola}"
 
 APK="${1:-$DIR/$ASSET}"

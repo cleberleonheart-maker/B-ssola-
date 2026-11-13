@@ -124,17 +124,69 @@ Referência atual (o registro da v125 abaixo é histórico e ficou desatualizado
    `version_name` e `update_url` NOT NULL — o ficheiro passou a declarar as
    duas coisas, e a nuvem é que manda.
 6. `git push` na `main`: o workflow builda, assina, publica na tag `bussola-apk`
-   e grava `app_version` no Supabase.
+   e grava `app_version` no Supabase. O asset de uma versão já publicada não se
+   substitui — ver "O APK publicado de uma versão é imutável", mais abaixo.
 
 ## Fluxo local
 `./publicar.sh` faz build + upload via `gh` + `scripts/publicar-supabase.sh`
 (precisa de `SUPABASE_SERVICE_ROLE_KEY` no ambiente ou em `~/.supabase-service-key`;
-sem a chave, gere `scripts/app_version.sql` para colar no SQL Editor).
+sem a chave, gera `scripts/app_version.sql` para colar no SQL Editor).
+
+## O APK publicado de uma versão é imutável (2026-11-13)
+
+**O que aconteceu.** A v211 foi publicada duas vezes. O workflow da build
+fazia `gh release upload --clobber`, e um APK não é reprodutível byte a byte:
+o mesmo código, compilado outra vez, dá outro ficheiro. O digest do asset
+`bussola-v211.apk` rodou de `f2b3bbed…24ff1` para `386cb347…ecd2f7`, e o
+repositório ficou com o hash antigo em `scripts/validar-apk.sh`,
+`scripts/validar-termux.sh` e `scripts/app_version.sql`.
+
+Daí a poisoned pointer: o workflow "Schema do Supabase" aplica
+`scripts/app_version.sql` em qualquer commit que toque `scripts/**`, e o
+`where version_code <= 211` deixava passar a escrita (211 ≤ 211). A nuvem
+ficou a dizer "v211" com o hash do APK 211 **antigo**, e o app — que compara
+o hash que desceu com o que a GitHub calcula do asset — deu "hash não bate
+certo" e recusou-se a instalar. A atualização certa, bloqueada por um
+`--clobber`.
+
+**O que mudou.**
+
+- **O asset publicado não se substitui.** O workflow da build não usa
+  `--clobber`: se o `bussola-vNNN.apk` já existe, fica o que lá está. Um APK
+  novo é uma versão nova (sobe o `versionCode`). O `publicar.sh` só substitui
+  com `REPUBLICAR=1`, à mão e a propósito.
+- **O hash da nuvem é o do asset publicado**, lido do `digest` que a GitHub
+  calcula (`gh release view … --json assets`), não do `sha256sum` do build
+  local. O passo da nuvem recebe-o por output do passo da publicação.
+- **A fotografia não envenena mais a nuvem.** O `scripts/app_version.sql`
+  escreve o hash só quando a versão **avança**
+  (`apk_sha256 = case when version_code < N then … else apk_sha256 end`): com
+  a versão já em cá, o hash que lá está foi gravado pela release — que
+  conhece o asset publicado — e o ficheiro não o substitui. O `where
+  version_code <= N` continua a impedir a regressão.
+- **O PATCH só avança.** Todos os PATCH filtram por `version_code=lte.N`, para
+  que um run antigo (um commit mais velho que só agora termina o build) não
+  rebaixe o ponteiro que uma release mais nova gravou.
+- **A deriva passa a ser vista.** `./scripts/verificar-nuvem.sh` compara o
+  hash da nuvem com o digest do asset publicado e avisa quando divergem.
+
+**O que isso muda na rotina.** O commit `scripts: guião e sha256 do APK NNN`
+passa a ser **uma vez por versão**, não uma vez por build: o SHA-256 de uma
+versão publicada não volta a mudar. E uma alteração em `src/` que não suba o
+`versionCode` só sai na próxima versão — o CI avisa quando o build não bate
+byte a byte com o asset já publicado.
+
+**Se o APK publicado sair partido** (e não dá para publicar outro com o mesmo
+código): apaga-se o asset (`gh release delete-asset`), deixa-se o workflow
+publicar de novo e re-pina-se o repositório com o SHA-256 novo — o mesmo
+passo `scripts:` de sempre, com outro hash.
 
 ## Tabela `app_version`
-Uma única linha (`id=1`) com `version_code`, `version_name`, `update_url`, `message`
-e `required`. É ela que faz o app exibir o prompt de atualização. Schema e RLS em
-`scripts/rls.sql`.
+Uma única linha (`id=1`) com `version_code`, `version_name`, `update_url`,
+`message`, `required` e `apk_sha256` (o SHA-256 do APK publicado, a segunda
+fonte de hash ao lado do `digest` que a GitHub calcula). É ela que faz o app
+exibir o prompt de atualização. Schema e RLS em `scripts/rls.sql`.
+
 
 ## Tabela `crashes` — onde se lê um crash (ideia #56)
 No painel do Supabase, **Table Editor → `crashes`**. É a única tabela do

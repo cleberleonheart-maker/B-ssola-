@@ -65,8 +65,32 @@ fi
 echo "assinatura conferida: $EXPECTED"
 
 echo "==> PUBLICANDO no GitHub"
-if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
-  gh release upload "$TAG" "$TMP_APK" --repo "$REPO" --clobber
+ASSET="bussola-v$VERSION_CODE.apk"
+if gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name' 2>/dev/null \
+  | grep -qx "$ASSET"; then
+  if [ "${REPUBLICAR:-0}" = "1" ]; then
+    # Saida de emergencia, e e' deliberadamente explicita: o APK publicado de
+    # uma versao nao se substitui. Quem ja' o instalou tem os bytes antigos,
+    # e trocar o ficheiro faz o digest rodiar — o hash que o repositorio
+    # guarda deixa de bater e o app da' "hash nao bate certo" a quem tenta
+    # atualizar. Um APK novo e' uma versao nova: sobe o versionCode.
+    #
+    # Para substituir este mesmo asset (APK publicado que saiu partido), o
+    # caminho e' apagar o asset e deixar o CI publicar de novo — e depois
+    # re-pinar o repositorio com o sha256 novo.
+    echo "AVISO: a substituir o asset $ASSET ja' publicado (REPUBLICAR=1)." >&2
+    echo "       Quem ja' o instalou fica com os bytes antigos; o hash muda." >&2
+    gh release upload "$TAG" "$TMP_APK" --repo "$REPO" --clobber
+  else
+    echo "ERRO: o asset $ASSET ja' esta publicado e um APK publicado nao se substitui." >&2
+    echo "      Quem ja' o instalou tem-no, e trocar os bytes faz o hash divergir" >&2
+    echo "      (a app recusa-se a instalar). Para publicar outra vez, sobe o" >&2
+    echo "      versionCode em android/app/version.properties." >&2
+    echo "      Para substituir este mesmo asset, a proposito: REPUBLICAR=1 ./publicar.sh" >&2
+    exit 1
+  fi
+elif gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+  gh release upload "$TAG" "$TMP_APK" --repo "$REPO"
 else
   gh release create "$TAG" "$TMP_APK" --repo "$REPO" \
     --title "Bussola APK ($VERSION_NAME, cod $VERSION_CODE)" \

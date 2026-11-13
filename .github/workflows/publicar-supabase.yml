@@ -14,6 +14,11 @@ jobs:
     steps:
       - name: Atualiza app_version no Supabase
         env:
+          # O `gh api` precisa de um token: sem ele a chamada ao repositório
+          # falhava com 401 e o workflow morria antes de tocar na nuvem
+          # (foi o que aconteceu na única execução deste workflow, em
+          # 2026-10-26).
+          GH_TOKEN: ${{ github.token }}
           SUPABASE_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
@@ -27,12 +32,14 @@ jobs:
           RELEASE="$(gh api "$RELEASE_URL" --jq '.')"
           RELEASE_NAME="$(jq -r '.name // ""' <<<"$RELEASE")"
 
-          ASSET="$(jq -r '.assets[] | .name' <<<"$RELEASE" \
-            | grep -oE 'bussola-v[0-9]+\.apk' \
-            | sort -t'v' -k2 -n \
-            | tail -1 || true)"
+          # O asset mais novo, com o digest que a GitHub calcula por ficheiro.
+          # O digest é a mesma fonte que o app usa quando a nuvem não tem hash:
+          # sem ele na linha, a comparação entre as duas fontes não acontece.
+          ASSET="$(jq -r '[.assets[] | select(.name | test("^bussola-v[0-9]+\\.apk$"))] | max_by(.name | capture("v(?<n>[0-9]+)").n | tonumber) | .name' <<<"$RELEASE")"
+          SHA="$(jq -r --arg nome "$ASSET" '.assets[] | select(.name == $nome) | .digest' <<<"$RELEASE" \
+            | sed -E 's/^sha256://' | tr 'A-Z' 'a-z' | head -1 || true)"
 
-          if [ -z "$ASSET" ]; then
+          if [ -z "$ASSET" ] || [ "$ASSET" = "null" ]; then
             echo "Nenhum asset bussola-v*.apk na tag $TAG." >&2
             exit 1
           fi
@@ -48,14 +55,50 @@ jobs:
           fi
 
           URL="https://github.com/$REPO/releases/download/$TAG/$ASSET"
-          BODY="{\"version_code\":$CODE,\"version_name\":\"$NAME\",\"update_url\":\"$URL\",\"message\":\"Nova versão disponível\",\"required\":false}"
+          BODY="{\"version_code\":$CODE,\"version_name\":\"$NAME\",\"update_url\":\"$URL\",\"message\":\"Nova versão disponível\",\"required\":false"
+          # A coluna do hash escreve-se sempre. Um PATCH que a omite não a
+          # limpa: deixa o hash da release anterior na linha, e a linha passa a
+          # dizer "v212" com o hash do APK 211 — o app compara o ficheiro novo
+          # com o hash de outro e recusa-se a instalar.
+          if [ -n "$SHA" ]; then
+            BODY="$BODY,\"apk_sha256\":\"$SHA\""
+          else
+            BODY="$BODY,\"apk_sha256\":null"
+          fi
+          BODY="$BODY}"
 
-          curl -fsS -X PATCH "$SUPABASE_URL/rest/v1/app_version?id=eq.1" \
+          # O filtro `version_code=lte.$CODE` impede que este caminho rebaixe o
+          # ponteiro que uma release mais nova já gravou.
+          HTTP=$(curl -sS -o /tmp/app_version.json -w '%{http_code}' -X PATCH \
+            "$SUPABASE_URL/rest/v1/app_version?id=eq.1&version_code=lte.$CODE" \
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Content-Type: application/json" \
             -H "Prefer: return=representation" \
-            -d "$BODY"
+            -d "$BODY" || true)
+
+          if [ "$HTTP" != "200" ] && [ "$HTTP" != "201" ]; then
+            if grep -qiE 'apk_sha256|42703|PGRST204' /tmp/app_version.json; then
+              echo "::warning::a coluna apk_sha256 ainda não existe na nuvem; a publicar sem a segunda fonte do hash"
+              BODY="{\"version_code\":$CODE,\"version_name\":\"$NAME\",\"update_url\":\"$URL\",\"message\":\"Nova versão disponível\",\"required\":false}"
+              HTTP=$(curl -sS -o /tmp/app_version.json -w '%{http_code}' -X PATCH \
+                "$SUPABASE_URL/rest/v1/app_version?id=eq.1&version_code=lte.$CODE" \
+                -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+                -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+                -H "Content-Type: application/json" \
+                -H "Prefer: return=representation" \
+                -d "$BODY" || true)
+            fi
+          fi
+          if [ "$HTTP" != "200" ] && [ "$HTTP" != "201" ]; then
+            echo "PATCH do app_version falhou (http $HTTP)"
+            cat /tmp/app_version.json
+            exit 1
+          fi
+          if [ ! -s /tmp/app_version.json ] || [ "$(cat /tmp/app_version.json)" = "[]" ]; then
+            echo "A linha da nuvem não foi tocada: já está numa versão mais nova do que a $CODE."
+          fi
 
           echo "app_version -> $CODE ($NAME)"
           echo "URL: $URL"
+          echo "sha256: ${SHA:-desconhecido}"

@@ -12,19 +12,27 @@
  * "não bate certo" e recusava-se a instalar — a atualização certa, bloqueada
  * por um ficheiro que ninguém tinha pedido para mudar.
  *
- * Estes testes fixam as três coisas que evitam a volta:
+ * Estes testes fixam as coisas que evitam a volta:
  *
  *   1. o ficheiro descreve um APK inteiro — o mesmo código, o mesmo link e o
  *      mesmo hash que os guiões de validação instalam;
  *   2. nunca aponta para uma versão que ainda não foi construída;
  *   3. o `where` impede a regressão — mesmo que o ficheiro volte a ficar
- *      atrás, aplicá-lo não pode rebaixar a linha da nuvem.
+ *      atrás, aplicá-lo não pode rebaixar a linha da nuvem;
+ *   4. a coluna do hash é escrita **sempre**, mesmo quando não há hash para
+ *      meter nela. Um `update` que a omita não a limpa — deixa-a como
+ *      estava — e a linha ficava a dizer "v212" com o hash do APK 211;
+ *   5. o hash só é escrito quando a versão **avança**. Com a versão já em
+ *      ca, o hash que está na nuvem foi gravado pela release (que conhece o
+ *      asset publicado) e a fotografia não o substitui;
+ *   6. o APK publicado de uma versão é **imutável**: o workflow não substitui
+ *      um asset já publicado, e o hash que vai para a nuvem é o do asset
+ *      publicado, nunca o do build local.
  *
- * E uma quarta, que é a que faltava e que ninguém notou: a coluna do hash é
- * escrita **sempre**, mesmo quando não há hash para meter nela. Um `update`
- * que a omita não a limpa — deixa-a como estava — e a linha ficava a dizer
- * "v212" com o hash do APK 211. O app comparava o ficheiro novo com o hash de
- * outro e recusava-se a instalar: o mesmo sintoma, por outro caminho.
+ * A 5 e a 6 são as duas que fecham a volta que sobrou: o asset da v211 foi
+ * republicado com outros bytes (o `--clobber`), o digest rodiou, o
+ * repositório ficou com o hash antigo e a nuvem passou a dizer 211 com o hash
+ * de um APK 211 diferente — o app recusava-se a instalar.
  */
 import fs from 'fs';
 import path from 'path';
@@ -34,7 +42,9 @@ const ler = (p: string) => fs.readFileSync(path.join(raiz, p), 'utf8');
 
 const sql = ler('scripts/app_version.sql');
 const publicar = ler('scripts/publicar-supabase.sh');
+const publicarLocal = ler('publicar.sh');
 const workflow = ler('.github/workflows/build-apk.yml');
+const workflowSupabase = ler('.github/workflows/publicar-supabase.yml');
 
 /**
  * O JSON dentro do shell e do YAML vem com as aspas escapadas (`\"`), o que
@@ -42,6 +52,17 @@ const workflow = ler('.github/workflows/build-apk.yml');
  * como ele é lido em runtime.
  */
 const semBarras = (texto: string): string => texto.replace(/\\"/g, '"');
+
+/**
+ * O workflow e o script sao lidos sem os comentarios: o `--clobber` que se
+ * proibe e' o do comando, nao o da frase que explica porquê. Um teste que
+ * lesse os dois transformava a documentacao em alarme.
+ */
+const semComentarios = (texto: string): string =>
+  texto
+    .split('\n')
+    .filter(linha => !linha.trim().startsWith('#'))
+    .join('\n');
 
 /** O `versionCode` que o app vai anunciando. */
 const codigoDoRepo = (() => {
@@ -63,6 +84,16 @@ const numeroDe = (campo: string): number => {
   return parseInt(m[1], 10);
 };
 
+/**
+ * O hash do ficheiro. Vive dentro do `case` que só o escreve quando a versão
+ * avança, por isso o valor não está logo a seguir ao `=`.
+ */
+const hashDoFicheiro = (): string => {
+  const m = sql.match(/apk_sha256\s*=\s*(?:case[^']*then\s+)?'([0-9a-f]{64})'/);
+  if (!m) throw new Error('scripts/app_version.sql sem apk_sha256');
+  return m[1];
+};
+
 describe('scripts/app_version.sql', () => {
   it('descreve o mesmo APK que os guiões de validação instalam', () => {
     // O `validar-apk.sh` e o `validar-termux.sh` são actualizados no mesmo
@@ -76,7 +107,7 @@ describe('scripts/app_version.sql', () => {
     expect(sha).not.toBeNull();
 
     expect(numeroDe('version_code')).toBe(Number(codigo?.[1]));
-    expect(valorDe('apk_sha256')).toBe(sha?.[1]);
+    expect(hashDoFicheiro()).toBe(sha?.[1]);
     expect(valorDe('update_url')).toContain(`bussola-v${codigo?.[1]}.apk`);
   });
 
@@ -88,7 +119,7 @@ describe('scripts/app_version.sql', () => {
     expect(sha).not.toBeNull();
 
     expect(numeroDe('version_code')).toBe(Number(codigo?.[1]));
-    expect(valorDe('apk_sha256')).toBe(sha?.[1]);
+    expect(hashDoFicheiro()).toBe(sha?.[1]);
   });
 
   it('nunca aponta para uma versão que ainda não foi construída', () => {
@@ -126,7 +157,21 @@ describe('scripts/app_version.sql', () => {
     // recusa-se a instalar — a atualização certa, bloqueada outra vez.
     // `null` é a resposta honesta: "ninguém sabe", e o app usa o digest que a
     // GitHub calcula por asset.
-    expect(sql).toMatch(/apk_sha256\s*=\s*('[^']*'|null)/);
+    expect(sql).toMatch(/set[\s\S]*apk_sha256\s*=/);
+  });
+
+  it('o hash só é escrito quando a versão avança', () => {
+    // A segunda via do mesmo bug. Com a versão já em ca, o hash que está na
+    // nuvem foi gravado pela release — que conhece o asset publicado — e esta
+    // fotografia não o substitui. Sem esta guarda, um ficheiro desatualizado
+    // punha a linha a dizer 211 com o hash de um APK 211 diferente, e o app
+    // recusava-se a instalar.
+    const guarda = sql.match(
+      /apk_sha256\s*=\s*case\s+when\s+version_code\s*<\s*(\d+)\s+then\s+'([0-9a-f]{64})'\s+else\s+apk_sha256\s+end/,
+    );
+    expect(guarda).not.toBeNull();
+    expect(Number(guarda?.[1])).toBe(numeroDe('version_code'));
+    expect(guarda?.[2]).toBe(hashDoFicheiro());
   });
 
   it('o PATCH do publicador também limpa o hash quando não tem digest', () => {
@@ -137,11 +182,54 @@ describe('scripts/app_version.sql', () => {
     expect(semBarras(publicar)).toMatch(/"apk_sha256":null/);
     expect(publicar).not.toMatch(/SHA_COLUMN=""/);
   });
+});
 
-  it('o PATCH da release também limpa o hash quando o primeiro falha', () => {
-    // O workflow da release repete o PATCH sem o hash quando a coluna ainda
-    // não existe na nuvem. A repetição tem de levar `null`: omitir o campo
-    // deixaria o hash velho na linha, que é o pior par possível.
-    expect(semBarras(workflow)).toMatch(/"apk_sha256":null/);
+describe('o APK publicado de uma versão é imutável', () => {
+  it('o workflow da build não substitui um asset já publicado', () => {
+    // O `--clobber` era a origem do problema: republicava o APK da mesma
+    // versão com outros bytes (um APK não é reprodutível byte a byte), o
+    // digest rodia, o hash que o repositório guardava deixava de bater e a
+    // nuvem acabava a dizer 211 com o hash de um APK 211 diferente.
+    expect(semComentarios(workflow)).not.toMatch(/--clobber/);
+  });
+
+  it('o hash que vai para a nuvem é o do asset publicado', () => {
+    // O build local e o asset publicado são o mesmo ficheiro, mas o publicado
+    // é o que os utilizadores descarregam e o que o app compara. O passo da
+    // nuvem tem de pegar no digest que a GitHub calcula, não no `sha256sum`
+    // do ficheiro que o build acabou de fazer.
+    expect(workflow).toMatch(/gh release view bussola-apk[\s\S]*?\.digest/);
+    expect(workflow).toMatch(/steps\.publicar\.outputs\.apk_sha256/);
+    expect(workflow).not.toMatch(/sha256sum \/tmp\/bussola-v/);
+  });
+
+  it('o PATCH só avança o ponteiro: nunca rebaixa', () => {
+    // Um run antigo (um commit mais velho que só agora termina o build) não
+    // pode rebaixar o ponteiro que uma release mais nova já gravou.
+    expect(workflow).toMatch(/version_code=lte\.\$CODE/);
+    expect(publicar).toMatch(/version_code=lte\.\$VERSION_CODE/);
+    expect(workflowSupabase).toMatch(/version_code=lte\.\$CODE/);
+  });
+
+  it('a release não limpa um hash bom quando o PATCH falha', () => {
+    // A segunda tentativa só acontece quando a coluna `apk_sha256` não
+    // existe na nuvem — e nesse caso não há hash nenhum para limpar. Um
+    // `apk_sha256: null` seria inútil (a coluna não existe, o PATCH volta a
+    // falhar) e perigoso (se a coluna existisse, apagava um hash bom).
+    expect(semBarras(workflow)).not.toMatch(/"apk_sha256":null/);
+  });
+
+  it('o workflow da release escreve o hash e tem token', () => {
+    // Sem `GH_TOKEN` o `gh api` respondia 401 e o workflow morria antes de
+    // tocar na nuvem (foi o que aconteceu na única execução dele).
+    expect(workflowSupabase).toMatch(/GH_TOKEN:/);
+    expect(workflowSupabase).toMatch(/apk_sha256/);
+  });
+
+  it('o publicador local só substitui o asset a pedido', () => {
+    expect(publicarLocal).toMatch(/REPUBLICAR/);
+    expect(publicarLocal.indexOf('--clobber')).toBeGreaterThan(
+      publicarLocal.indexOf('REPUBLICAR'),
+    );
   });
 });
