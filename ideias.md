@@ -1459,3 +1459,156 @@ a nota de cada uma diz o que a distingue da ideia vizinha.
       link, que vai no SMS. Se a rede falhar, o aviso sai na mesma, só sem o
       link. E dois toques seguidos na tile já não mandam dois avisos (o
       segundo toque é ignorado enquanto há uma contagem em curso).
+
+## Ideias novas (13/11/2026, 9ª leva — outras ideias e melhorias)
+
+Saiam de uma leitura do código depois de o APK publicado ter deixado de se
+substituir (o `fix:` do `--clobber`). São ideias **novas** — nenhuma repete o
+que está nas levas anteriores — e estão ordenadas por impacto sobre o
+esforço. As cinco primeiras são bugs que afectam o uso real (o SOS, o
+rastreio, a atualização) e cabem num commit cada um; as de processo protegem
+a publicação, que é onde a app se estragou da última vez; as de produto são
+as que devolvem utilidade ao ar livre.
+
+### Risco / processo
+- [ ] **108. 🧭 O rumo do rastreio morre nos aparelhos sem sensor de rotação** —
+      o `LiveTrackingModule.kt:283` descarta qualquer evento que não seja
+      `TYPE_ROTATION_VECTOR`, mas o `startCompass` (`:274-277`) regista o
+      listener no `TYPE_GEOMAGNETIC_ROTATION_VECTOR` quando é esse o único
+      sensor disponível — ou seja, regista um sensor cujos eventos deita
+      fora. O sintoma é o pior possível: nesses aparelhos o link mostra só o
+      bearing do GPS, ou nada, e perde exactamente o caso de uso que o
+      comentário do próprio código diz querer cobrir (aparelho no bolso, sem
+      movimento, sem `bearing`). A correcção é aceitar os dois tipos; o que
+      pesa é que isto vive em Kotlin, sem teste nenhum (ver #119).
+
+- [ ] **109. ⏱️ A contagem do SOS não é idempotente** — o `onStartCommand` do
+      `SosAlertService.kt:60-70` repõe `remaining = 10` e faz
+      `postDelayed(tick)` sem `removeCallbacks(tick)`; a limpeza só existe no
+      `onDestroy` (`:74`). Se o serviço for arrancado duas vezes (reentrega
+      do intent pelo sistema, ou a tile e a app ao mesmo tempo), ficam duas
+      cadeias de ticks a decrementar o mesmo contador — e o SMS sai antes dos
+      10 s, que é o oposto da promessa feita ao utilizador. Um
+      `removeCallbacks(tick)` antes de repor o contador resolve.
+- [ ] **110. 🌐 O "verificar atualização" pode ficar pendurado** — o `fetch`
+      do release em `src/services/versionService.ts:87` não tem
+      `AbortController`, ao contrário do `alertsService.ts:48-63` e do
+      `geocodingService.ts:11-39`. Em rede morta (floresta, montanha, plano
+      sem dados) o modal não reage: o utilizador fica sem feedback e sem
+      atualização, e não sabe se a app está a trabalhar ou pendurada.
+- [ ] **111. 🔐 A release pode limpar um hash bom na nuvem** — no
+      `.github/workflows/publicar-supabase.yml:66`, quando o digest não vem,
+      o PATCH leva `"apk_sha256":null`; o workflow da build, em vez disso,
+      omite o campo. Numa linha que já está na mesma versão, escrever `null`
+      **limpa** o hash que o build tinha gravado, e a segunda fonte de hash
+      desaparece sem ninguém dar por isso. A regra que já vale para o
+      `app_version.sql` (o hash só se escreve quando a versão avança) vale
+      para aqui.
+- [ ] **112. 📍 "Localização aproximada" conta como permissão negada** — o
+      `src/services/locationService.ts:12-33` só pede
+      `ACCESS_FINE_LOCATION`; em Android 12+ quem escolhe "localização
+      aproximada" fica com permissão negada e a app degrada sem explicar
+      porquê. O mesmo ficheiro tem o diálogo em português fixo, num app que
+      promete EN e ES.
+- [ ] **113. 🖼️ As fotos das notas vivem no cache do Android** — o
+      `PhotoModule.kt:65` grava em `cacheDir/photos`, e é esse caminho que
+      fica guardado e sincronizado (`notesService.ts:13`,
+      `trackService.ts:25`). O sistema pode limpar o cache quando falta
+      espaço (a foto deixa de abrir e a caderneta fica com o ícone partido) e,
+      depois de um restauro noutro aparelho, o caminho não existe — os bytes
+      nunca vão na nuvem. `filesDir` resolve o primeiro; o segundo é um
+      problema de formato, não de caminho.
+- [ ] **114. 💾 AsyncStorage como base de dados, com reescrita integral** —
+      o `trackService.ts:110-115` reserializa e reescreve a lista **completa**
+      de trilhas a cada ponto gravado, e o mesmo padrão está no
+      `waypointsService.ts:15-44` e no `notesService.ts:18-52`. O custo
+      cresce com o histórico (JSON de vários MB a passar pela bridge) e uma
+      escrita interrompida perde todas as trilhas de uma vez — ao passo que a
+      app já impõe tetos noutros sítios (`whereaboutsService.ts:31,34`).
+- [ ] **115. 🔀 Builds paralelos disputam a mesma release e a mesma linha** —
+      o `.github/workflows/build-apk.yml` não tem bloco `concurrency:` (só o
+      `pages.yml:17` tem), e os passos de publicação mexem no asset móvel
+      `bussola-apk` e na linha única `app_version`. Dois pushes seguidos
+      publicam em paralelo: o título da release, o asset e o ponteiro da nuvem
+      podem ficar misturados. O filtro `version_code=lte` protege o
+      rebaixamento do ponteiro, não o asset.
+- [ ] **116. 🔑 Dois nomes de secret para a mesma coisa** — o workflow da
+      build usa `secrets.SUPABASE_URL` (`:217`) e os outros dois usam
+      `secrets.SUPABASE_PROJECT_URL` (`publicar-supabase.yml:22`,
+      `verificar-nuvem.yml:93`). Hoje existem os dois, mas são dois segredos
+      para a mesma coisa: rodar um deixa metade a trabalhar, e a falha só
+      aparece no momento da publicação, quando o APK já está no ar.
+- [ ] **117. 🗃️ O schema de produção só vive em ficheiros `.sql` do repo** —
+      o `scripts/verificar-sql.mjs:9-26` valida os SQL em PGlite (via
+      `pretest`), e o `app_version.sql` é gerado por script — mas não há
+      migrações numeradas nem dump versionado da base. Qualquer `ALTER` feito
+      à mão na consola do Supabase perde-se no próximo deploy, e a segurança
+      da app depende de uma RLS que ninguém versiona. É o mesmo problema que
+      o #87 resolveu para as RPCs, do outro lado.
+- [ ] **118. ♿ Acessibilidade quase inexistente** — há 10
+      `accessibilityRole`/`accessibilityLabel` em todo o `src`
+      (`MiniMapView.tsx:248,257`, `CameraARView.tsx:572,586,642,649`,
+      `CompassDial.tsx:117`), e o `TargetNavBar.tsx:23-43` não dá nome a
+      nenhum botão. Um app de emergência usado de noite, ao sol ou com luvas
+      precisa de ser operável por TalkBack; hoje o leitor de ecrã diz apenas
+      "botão".
+- [ ] **119. 🧪 O código nativo crítico não tem testes** — o CI corre
+      eslint, typecheck e jest (`build-apk.yml:75-79`), mas o build usa
+      `-x lint -x test` (`:100`), e não há suíte para o `LiveTrackingModule`,
+      o `GeofenceModule`, o `PhotoModule` nem o `SosAlertService`. Os bugs
+      #108, #109, #113 e #123 vivem todos em Kotlin sem rede de segurança:
+      um teste de paridade simples (aceitar os dois tipos de sensor) apanhava
+      o #108.
+- [ ] **120. 🧷 29 promessas "penduradas" e o `strict` desligado** — a regra
+      `no-floating-promises` está desligada no `.eslintrc.js:5-9` para calar
+      os avisos que o próprio ficheiro admite, e o `tsconfig.json` não liga
+      `strict` (`locationService.ts:67` e `battery.ts:28` precisam de `any`
+      por causa disso). Falhas de rede e de IO ficam invisíveis — no pior
+      caso, guardar o contacto de emergência ou enviar a posição falha sem o
+      utilizador saber.
+- [ ] **121. 🎒 O backup valida o envelope, não o conteúdo** — o
+      `backupService.ts:191` faz `parsed.data as Partial<BackupData>` sem
+      validar item a item, e o `applyBackup` (`:244-261`) guarda trilhas sem
+      verificar `points`. Um ficheiro adulterado (ou de uma geração futura
+      com o mesmo `fileVersion`) grava estrutura inválida que rebenta mais
+      tarde no `trackService.ts:59`, em `points.length` sobre `undefined`.
+- [ ] **122. 🤝 Conflitos de sincronização resolvidos em silêncio** — no
+      `cloudSync.ts:42-49`, no empate ganha o local, sem registo e sem aviso
+      ao utilizador. Com dois aparelhos (casa e carro), uma edição de
+      waypoint ou de trilha desaparece sem que ninguém perceba porquê.
+- [ ] **123. 📍 Cercas que falham em silêncio, com API depreciada** — o
+      `geofenceService.ts:27-42` devolve `false` sem explicar o erro, e no
+      nativo o `GeofenceModule.kt` usa
+      `LocationManager.addProximityAlert` (`:108`), depreciada no API 29,
+      com `@SuppressLint("MissingPermission")` (`:87,143`). O utilizador
+      acredita que tem aviso ao chegar ao waypoint e não tem.
+
+### Produto
+- [ ] **124. 📥 Importar GPX/KML/GeoJSON** — só existe exportação
+      (`src/utils/gpx.ts:13-42`, `trackLinkShare.ts:29-39`) e o ecrã
+      "Importar" é a colagem do backup JSON (`ImportDialog.tsx:27`). Quem
+      chega com trilhas do AllTrails, do Strava ou do Organic Maps não as
+      pode trazer: a importação é o complemento natural de uma exportação que
+      já está feita.
+- [ ] **125. 🧲 Declinação magnética válida fora do Brasil** — o
+      `src/utils/declination.ts:19-43` tem 17 cidades brasileiras e o
+      `:56` recusa sugestões acima de 600 km. Em Portugal e no resto da Europa
+      a app devolve `null` e o utilizador tem de saber o valor à mão. A
+      WMM/IGRF (ou uma tabela por país) alimenta o offset manual que já
+      existe, e resolve a mesma coisa para quem viaja.
+- [ ] **126. 🌧️ Avisos oficiais em Portugal** — o
+      `src/services/alertsService.ts:294-304` combina Open-Meteo, USGS e
+      INMET (Brasil). Quem caminha em Portugal não recebe vento extremo,
+      chuva intensa nem cheias do IPMA — e a app já sabe notificar
+      (`useWeatherAlerts.ts:93-99`). O IPMA tem feed público, como o INMET.
+- [ ] **127. ⛰️ Perfil de elevação da trilha** — as estatísticas já existem
+      (`trackService.ts:28-35,49-93`) e o `TrendChart` (`TrendChart.tsx:12`)
+      já é usado no vento, no EMF e no barómetro (`WindView.tsx:283`,
+      `EmfReaderView.tsx:447`, `BarometerPanel.tsx:135`) — mas não na
+      trilha. Ganho e perda de altura em números não dizem *onde* foi a
+      subida; o perfil é a informação de quem planeia uma montanha.
+- [ ] **128. 🗺️ Base cartográfica offline (opcional)** — o
+      `MiniMapView.tsx:18-33` assume, por decisão registada, que não há base
+      nem tiles. Sem linhas de nível, estradas ou caminhos o mapa não serve
+      para planear a rota; importar um MBTiles/GeoJSON opcional, ligado ao
+      GPX do #124, dá mapa sem depender da rede.
